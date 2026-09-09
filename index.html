@@ -80,9 +80,10 @@
       margin: 16px 0;
     }
 
-    /* =========================
+
+    /* =========================================
        DIAGNOSTIC
-       ========================= */
+       ========================================= */
 
     .diagnostic {
       padding: 12px 14px;
@@ -103,9 +104,10 @@
       color: #b42318;
     }
 
-    /* =========================
+
+    /* =========================================
        TABLEAU
-       ========================= */
+       ========================================= */
 
     .table-wrap {
       overflow: auto;
@@ -147,9 +149,10 @@
       background: #fafafa;
     }
 
-    /* =========================
+
+    /* =========================================
        PAGINATION
-       ========================= */
+       ========================================= */
 
     .pagination {
       display: flex;
@@ -201,13 +204,15 @@
 
 </head>
 
+
 <body>
 
 <div class="page">
 
-  <!-- =========================
+
+  <!-- =========================================
        EN-TÊTE
-       ========================= -->
+       ========================================= -->
 
   <section class="hero">
 
@@ -227,9 +232,10 @@
   </section>
 
 
-  <!-- =========================
+
+  <!-- =========================================
        PREMIER TABLEAU
-       ========================= -->
+       ========================================= -->
 
   <section class="section">
 
@@ -261,9 +267,10 @@
   </section>
 
 
-  <!-- =========================
-       INFORMATIONS
-       ========================= -->
+
+  <!-- =========================================
+       INFORMATIONS COMPLÉMENTAIRES
+       ========================================= -->
 
   <section class="section">
 
@@ -285,9 +292,10 @@
   </section>
 
 
-  <!-- =========================
+
+  <!-- =========================================
        DEUXIÈME TABLEAU
-       ========================= -->
+       ========================================= -->
 
   <section class="section">
 
@@ -300,9 +308,10 @@
   </section>
 
 
-  <!-- =========================
+
+  <!-- =========================================
        DOCUMENTS
-       ========================= -->
+       ========================================= -->
 
   <section class="section">
 
@@ -315,7 +324,9 @@
 
   </section>
 
+
 </div>
+
 
 
 <script>
@@ -325,8 +336,8 @@
     COLONNES À AFFICHER
     ==================================================
 
-    1er élément = ID technique Grist
-    2e élément = nom affiché dans le tableau
+    1er élément = ID technique de la colonne Grist
+    2e élément = nom affiché dans le tableau HTML
   */
 
   const COLUMNS = [
@@ -363,6 +374,7 @@
     document.getElementById("diagnostic");
 
 
+
   /*
     ==================================================
     CONNEXION À GRIST
@@ -372,6 +384,7 @@
   grist.ready({
     requiredAccess: "read table"
   });
+
 
 
   /*
@@ -412,13 +425,53 @@
     }
 
 
-    allRecords = records;
+
+    /*
+      ==================================================
+      TRI DES FE
+      ==================================================
+
+      Les FE sont triés par numéro décroissant.
+
+      Exemple :
+
+      5574502
+      5574490
+      5574428
+      5574416
+      5574411
+
+      Le FE avec le numéro le plus grand
+      apparaît donc en premier.
+    */
+
+    allRecords = [...records].sort(function(a, b) {
+
+      const numeroA =
+        getNumeroFE(a.Numero_FE);
+
+      const numeroB =
+        getNumeroFE(b.Numero_FE);
+
+
+      return numeroB - numeroA;
+
+    });
+
+
+    /*
+      On revient toujours à la première page
+      lorsqu'on reçoit de nouvelles données.
+    */
 
     currentPage = 1;
 
 
+
     /*
-      Vérification des colonnes reçues
+      ==================================================
+      VÉRIFICATION DES COLONNES
+      ==================================================
     */
 
     const receivedColumns =
@@ -426,7 +479,7 @@
 
 
     console.log(
-      "Colonnes reçues :",
+      "Colonnes reçues depuis Grist :",
       receivedColumns
     );
 
@@ -451,7 +504,9 @@
       diagnostic.className =
         "diagnostic error";
 
-    } else {
+    }
+
+    else {
 
       diagnostic.textContent =
         "Connexion réussie : " +
@@ -467,6 +522,57 @@
     renderTable();
 
   });
+
+
+
+  /*
+    ==================================================
+    RÉCUPÉRATION DU NUMÉRO FE
+    ==================================================
+
+    Exemple :
+
+    Fait Nº 2026-011-5574411
+
+    retourne :
+
+    5574411
+  */
+
+  function getNumeroFE(value) {
+
+    if (
+      value === null ||
+      value === undefined ||
+      value === ""
+    ) {
+
+      return 0;
+
+    }
+
+
+    const texte =
+      String(value);
+
+
+    const match =
+      texte.match(
+        /(\d+)\s*$/
+      );
+
+
+    if (match) {
+
+      return Number(match[1]);
+
+    }
+
+
+    return 0;
+
+  }
+
 
 
   /*
@@ -499,6 +605,7 @@
     let html = "<table>";
 
 
+
     /*
       EN-TÊTES
     */
@@ -519,6 +626,7 @@
     html += "</tr></thead>";
 
 
+
     /*
       LIGNES
     */
@@ -536,16 +644,6 @@
         const columnId =
           column[0];
 
-
-        /*
-          IMPORTANT :
-
-          On transmet ici :
-          - la valeur
-          - l'ID de la colonne
-
-          à la fonction de formatage.
-        */
 
         const value =
           formatValue(
@@ -579,6 +677,7 @@
     renderPagination();
 
   }
+
 
 
   /*
@@ -718,6 +817,13 @@
   }
 
 
+
+  /*
+    ==================================================
+    CHANGEMENT DE PAGE
+    ==================================================
+  */
+
   function goToPage(page) {
 
     const totalPages =
@@ -760,6 +866,7 @@
   }
 
 
+
   /*
     ==================================================
     FORMATAGE DES DONNÉES
@@ -783,12 +890,11 @@
     }
 
 
+
     /*
       ==================================================
-      1. NUMÉRO FE
+      NUMÉRO FE
       ==================================================
-
-      Exemple :
 
       Fait Nº 2026-011-5574411
 
@@ -799,34 +905,27 @@
 
     if (columnId === "Numero_FE") {
 
-      const texte =
-        String(value);
+      const numero =
+        getNumeroFE(value);
 
 
-      const match =
-        texte.match(
-          /(\d+)\s*$/
-        );
+      if (numero !== 0) {
 
-
-      if (match) {
-
-        return match[1];
+        return String(numero);
 
       }
 
 
-      return texte;
+      return String(value);
 
     }
 
 
+
     /*
       ==================================================
-      2. DATE JAVASCRIPT
+      OBJET DATE JAVASCRIPT
       ==================================================
-
-      Si Grist renvoie directement un objet Date.
     */
 
     if (value instanceof Date) {
@@ -860,9 +959,10 @@
     }
 
 
+
     /*
       ==================================================
-      3. LISTES GRIST
+      LISTES GRIST
       ==================================================
     */
 
@@ -882,16 +982,11 @@
     }
 
 
+
     /*
       ==================================================
-      4. CONVERSION DE LA VALEUR EN TEXTE
+      CONVERSION EN TEXTE
       ==================================================
-
-      Certains types renvoyés par Grist peuvent être
-      sérialisés sous une forme particulière.
-
-      On convertit donc la valeur en texte avant de
-      rechercher une date.
     */
 
     let texte;
@@ -923,18 +1018,13 @@
     }
 
 
-    /*
-      Nettoyage des espaces
-    */
-
     texte =
       texte.trim();
 
 
-    /*
-      Suppression des guillemets éventuels.
 
-      Exemple :
+    /*
+      Suppression des guillemets éventuels
 
       "2026-08-31T00:00:00.000Z"
 
@@ -950,25 +1040,23 @@
       );
 
 
+
     /*
       ==================================================
-      5. DATES ISO
+      DATES
       ==================================================
 
-      Détecte par exemple :
+      Exemples reconnus :
 
       2026-08-31T00:00:00.000Z
 
-      2026-08-31
-
       "2026-08-31T00:00:00.000Z"
 
-      et affiche :
+      2026-08-31
+
+      deviennent :
 
       31/08/26
-
-      Cette règle s'applique automatiquement
-      à toutes les colonnes affichées.
     */
 
     const dateMatch =
@@ -1002,15 +1090,17 @@
     }
 
 
+
     /*
       ==================================================
-      6. AUTRES VALEURS
+      AUTRES VALEURS
       ==================================================
     */
 
     return texte;
 
   }
+
 
 
   /*
