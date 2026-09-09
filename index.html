@@ -15,7 +15,6 @@
   <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
 
   <style>
-
     :root {
       --bg: #f6f7f9;
       --card: #ffffff;
@@ -23,6 +22,7 @@
       --muted: #667085;
       --line: #e5e7eb;
       --primary: #2f6fed;
+      --primary-hover: #245bcc;
       --radius: 14px;
     }
 
@@ -71,9 +71,32 @@
       color: var(--muted);
     }
 
-    /*
-      Zone du tableau
-    */
+    .note {
+      padding: 14px 16px;
+      background: #f8fafc;
+      border-left: 4px solid #98a2b3;
+      border-radius: 8px;
+      margin: 16px 0;
+    }
+
+    .diagnostic {
+      padding: 12px 14px;
+      margin-top: 14px;
+      border-radius: 9px;
+      background: #f8fafc;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .diagnostic.ok {
+      background: #ecfdf3;
+      color: #067647;
+    }
+
+    .diagnostic.error {
+      background: #fef3f2;
+      color: #b42318;
+    }
 
     .table-wrap {
       overflow: auto;
@@ -85,9 +108,9 @@
 
     table {
       width: 100%;
-      min-width: 900px;
+      min-width: 950px;
       border-collapse: collapse;
-      background: white;
+      background: #fff;
     }
 
     th,
@@ -115,74 +138,44 @@
       background: #fafafa;
     }
 
-    /*
-      Diagnostic / chargement
-    */
-
-    .diagnostic {
-      padding: 12px 14px;
-      margin-top: 14px;
-      border-radius: 9px;
-      background: #f8fafc;
-      color: var(--muted);
-      font-size: 14px;
-    }
-
-    .diagnostic.ok {
-      background: #ecfdf3;
-      color: #067647;
-    }
-
-    .diagnostic.error {
-      background: #fef3f2;
-      color: #b42318;
-    }
-
-    /*
-      Bloc information
-    */
-
-    .note {
-      padding: 14px 16px;
-      background: #f8fafc;
-      border-left: 4px solid #98a2b3;
-      border-radius: 8px;
-      margin: 16px 0;
-    }
-
-    /*
-      Pagination
-    */
-
     .pagination {
       display: flex;
-      justify-content: space-between;
       align-items: center;
+      justify-content: space-between;
       gap: 12px;
+      flex-wrap: wrap;
       margin-top: 14px;
+    }
+
+    .pagination-controls {
+      display: flex;
+      align-items: center;
+      gap: 8px;
       flex-wrap: wrap;
     }
 
-    .pagination-buttons {
-      display: flex;
-      gap: 8px;
-    }
-
-    button {
+    .page-btn {
       padding: 8px 12px;
       border: 1px solid var(--line);
+      background: #fff;
       border-radius: 8px;
-      background: white;
       cursor: pointer;
       font-weight: 600;
+      color: var(--text);
     }
 
-    button:hover:not(:disabled) {
+    .page-btn:hover:not(:disabled) {
       background: #f3f4f6;
     }
 
-    button:disabled {
-      opacity: 0.45;
+    .page-btn.active {
+      background: var(--primary);
+      color: #fff;
+      border-color: var(--primary);
+    }
+
+    .page-btn:disabled {
+      opacity: .45;
       cursor: not-allowed;
     }
 
@@ -190,20 +183,15 @@
       color: var(--muted);
       font-size: 14px;
     }
-
   </style>
 
 </head>
-
 
 <body>
 
 <div class="page">
 
-
-  <!-- ============================= -->
   <!-- EN-TÊTE -->
-  <!-- ============================= -->
 
   <section class="hero">
 
@@ -223,10 +211,7 @@
   </section>
 
 
-
-  <!-- ============================= -->
   <!-- PREMIER TABLEAU -->
-  <!-- ============================= -->
 
   <section class="section">
 
@@ -243,13 +228,11 @@
       Connexion au widget Grist...
     </div>
 
-
     <div
       id="table1"
       class="table-wrap"
     >
     </div>
-
 
     <div
       id="pagination"
@@ -260,21 +243,16 @@
   </section>
 
 
-
-  <!-- ============================= -->
-  <!-- INFORMATIONS -->
-  <!-- ============================= -->
+  <!-- INFORMATIONS COMPLÉMENTAIRES -->
 
   <section class="section">
 
     <h2>Informations complémentaires</h2>
 
     <div class="note">
-
       Ce bloc peut servir à mettre en évidence une procédure,
       une consigne importante, une explication ou un rappel
       entre deux tableaux.
-
     </div>
 
     <p>
@@ -285,10 +263,7 @@
   </section>
 
 
-
-  <!-- ============================= -->
   <!-- DEUXIÈME TABLEAU -->
-  <!-- ============================= -->
 
   <section class="section">
 
@@ -301,10 +276,7 @@
   </section>
 
 
-
-  <!-- ============================= -->
   <!-- DOCUMENTS -->
-  <!-- ============================= -->
 
   <section class="section">
 
@@ -317,20 +289,18 @@
 
   </section>
 
-
 </div>
-
 
 
 <script>
 
   /*
-    ==================================================
-    CONFIGURATION DU TABLEAU
-    ==================================================
+    ============================================
+    COLONNES À AFFICHER
+    ============================================
 
-    PREMIÈRE valeur = ID technique Grist
-    DEUXIÈME valeur = titre affiché dans le tableau
+    Premier élément = ID technique Grist
+    Deuxième élément = nom affiché
   */
 
   const COLUMNS = [
@@ -350,9 +320,8 @@
   ];
 
 
-
   /*
-    Nombre de lignes affichées par page
+    Nombre de lignes par page
   */
 
   const PAGE_SIZE = 10;
@@ -363,33 +332,28 @@
   let currentPage = 1;
 
 
-
-  /*
-    ==================================================
-    CONNEXION À GRIST
-    ==================================================
-  */
-
   const diagnostic =
     document.getElementById("diagnostic");
 
 
+  /*
+    ============================================
+    CONNEXION GRIST
+    ============================================
+  */
+
   grist.ready({
-
     requiredAccess: "read table"
-
   });
 
 
-
   /*
-    ==================================================
+    ============================================
     RÉCEPTION DES DONNÉES
-    ==================================================
+    ============================================
   */
 
   grist.onRecords(function(records) {
-
 
     console.log(
       "Données reçues depuis Grist :",
@@ -406,9 +370,7 @@
         "diagnostic error";
 
       return;
-
     }
-
 
 
     if (records.length === 0) {
@@ -420,34 +382,16 @@
         "diagnostic error";
 
       return;
-
     }
 
-
-
-    /*
-      On conserve toutes les lignes
-    */
 
     allRecords = records;
 
     currentPage = 1;
 
 
-
-    /*
-      Vérification des IDs reçus
-    */
-
     const receivedColumns =
       Object.keys(records[0]);
-
-
-    console.log(
-      "IDs des colonnes Grist :",
-      receivedColumns
-    );
-
 
 
     const missingColumns =
@@ -458,22 +402,19 @@
         );
 
 
-
     if (missingColumns.length > 0) {
 
       diagnostic.textContent =
         "Connexion réussie : " +
         records.length +
         " lignes reçues. " +
-        "Certaines colonnes sont introuvables : " +
+        "Colonnes introuvables : " +
         missingColumns.join(", ");
 
       diagnostic.className =
         "diagnostic error";
 
-    }
-
-    else {
+    } else {
 
       diagnostic.textContent =
         "Connexion réussie : " +
@@ -486,48 +427,46 @@
     }
 
 
-
     renderTable();
 
   });
 
 
-
   /*
-    ==================================================
+    ============================================
     AFFICHAGE DU TABLEAU
-    ==================================================
+    ============================================
   */
 
   function renderTable() {
-
 
     const tableContainer =
       document.getElementById("table1");
 
 
-    const start =
+    const startIndex =
       (currentPage - 1) * PAGE_SIZE;
 
 
-    const end =
-      start + PAGE_SIZE;
+    const endIndex =
+      startIndex + PAGE_SIZE;
 
 
     const visibleRecords =
-      allRecords.slice(start, end);
+      allRecords.slice(
+        startIndex,
+        endIndex
+      );
 
-
-
-    /*
-      En-têtes
-    */
 
     let html = "<table>";
 
-    html += "<thead>";
 
-    html += "<tr>";
+    /*
+      EN-TÊTES
+    */
+
+    html += "<thead><tr>";
 
 
     COLUMNS.forEach(function(column) {
@@ -540,14 +479,11 @@
     });
 
 
-    html += "</tr>";
-
-    html += "</thead>";
-
+    html += "</tr></thead>";
 
 
     /*
-      Lignes
+      LIGNES
     */
 
     html += "<tbody>";
@@ -564,13 +500,16 @@
           column[0];
 
 
+        const value =
+          formatValue(
+            record[columnId],
+            columnId
+          );
+
+
         html +=
           "<td>" +
-          escapeHtml(
-            formatValue(
-              record[columnId]
-            )
-          ) +
+          escapeHtml(value) +
           "</td>";
 
       });
@@ -586,7 +525,6 @@
     html += "</table>";
 
 
-
     tableContainer.innerHTML =
       html;
 
@@ -596,51 +534,119 @@
   }
 
 
-
   /*
-    ==================================================
+    ============================================
     PAGINATION
-    ==================================================
+    ============================================
   */
 
   function renderPagination() {
-
 
     const pagination =
       document.getElementById("pagination");
 
 
     const totalPages =
-      Math.ceil(
-        allRecords.length / PAGE_SIZE
+      Math.max(
+        1,
+        Math.ceil(
+          allRecords.length / PAGE_SIZE
+        )
       );
 
 
-    const start =
-      (currentPage - 1) * PAGE_SIZE + 1;
+    const firstRow =
+      allRecords.length
+        ? ((currentPage - 1) * PAGE_SIZE) + 1
+        : 0;
 
 
-    const end =
+    const lastRow =
       Math.min(
         currentPage * PAGE_SIZE,
         allRecords.length
       );
 
 
+    let buttons = "";
+
+
+    for (
+      let page = 1;
+      page <= totalPages;
+      page++
+    ) {
+
+      const closeToCurrent =
+        Math.abs(
+          page - currentPage
+        ) <= 2;
+
+
+      const edgePage =
+        page === 1 ||
+        page === totalPages;
+
+
+      if (
+        closeToCurrent ||
+        edgePage
+      ) {
+
+        buttons += `
+
+          <button
+            class="page-btn ${page === currentPage ? "active" : ""}"
+            onclick="goToPage(${page})"
+          >
+            ${page}
+          </button>
+
+        `;
+
+      }
+
+      else if (
+
+        (
+          page === 2 &&
+          currentPage > 4
+        )
+
+        ||
+
+        (
+          page === totalPages - 1 &&
+          currentPage < totalPages - 3
+        )
+
+      ) {
+
+        buttons +=
+          '<span class="pagination-info">…</span>';
+
+      }
+
+    }
+
+
     pagination.innerHTML = `
 
-      <div class="pagination-buttons">
+      <div class="pagination-controls">
 
         <button
-          onclick="previousPage()"
+          class="page-btn"
+          onclick="goToPage(${currentPage - 1})"
           ${currentPage === 1 ? "disabled" : ""}
         >
           ← Précédent
         </button>
 
+        ${buttons}
 
         <button
-          onclick="nextPage()"
+          class="page-btn"
+          onclick="goToPage(${currentPage + 1})"
           ${currentPage === totalPages ? "disabled" : ""}
         >
           Suivant →
@@ -651,15 +657,10 @@
 
       <div class="pagination-info">
 
-        ${start}–${end}
+        ${firstRow}–${lastRow}
         sur
         ${allRecords.length}
         faits
-
-        · Page
-        ${currentPage}
-        /
-        ${totalPages}
 
       </div>
 
@@ -668,22 +669,7 @@
   }
 
 
-
-  function previousPage() {
-
-    if (currentPage > 1) {
-
-      currentPage--;
-
-      renderTable();
-
-    }
-
-  }
-
-
-
-  function nextPage() {
+  function goToPage(page) {
 
     const totalPages =
       Math.ceil(
@@ -691,30 +677,47 @@
       );
 
 
-    if (currentPage < totalPages) {
+    if (
+      page < 1 ||
+      page > totalPages
+    ) {
+      return;
+    }
 
-      currentPage++;
 
-      renderTable();
+    currentPage = page;
+
+
+    renderTable();
+
+
+    const table =
+      document.getElementById("table1");
+
+
+    if (table) {
+
+      table.scrollTop = 0;
+
+      table.scrollLeft = 0;
 
     }
 
   }
 
 
-
   /*
-    ==================================================
-    FORMATAGE DES VALEURS
-    ==================================================
+    ============================================
+    FORMATAGE DES DONNÉES
+    ============================================
   */
 
-  function formatValue(value) {
-
+  function formatValue(value, columnId = "") {
 
     if (
       value === null ||
-      value === undefined
+      value === undefined ||
+      value === ""
     ) {
 
       return "";
@@ -723,8 +726,97 @@
 
 
     /*
-      Valeurs Grist de type liste :
-      ["L", valeur1, valeur2]
+      NUMÉRO FE
+
+      Exemple :
+
+      Fait Nº 2026-011-5574411
+
+      devient :
+
+      5574411
+    */
+
+    if (columnId === "Numero_FE") {
+
+      const texte =
+        String(value);
+
+
+      const match =
+        texte.match(
+          /(\d+)\s*$/
+        );
+
+
+      if (match) {
+
+        return match[1];
+
+      }
+
+
+      return texte;
+
+    }
+
+
+    /*
+      DATES ISO
+
+      Ce traitement s'applique automatiquement
+      à TOUTES les colonnes contenant une date
+      au format ISO.
+
+      Exemple :
+
+      2026-08-31T00:00:00.000Z
+
+      devient :
+
+      31/08/26
+    */
+
+    if (
+      typeof value === "string" &&
+      /^\d{4}-\d{2}-\d{2}T/.test(value)
+    ) {
+
+      const match =
+        value.match(
+          /^(\d{4})-(\d{2})-(\d{2})/
+        );
+
+
+      if (match) {
+
+        const annee =
+          match[1].slice(-2);
+
+
+        const mois =
+          match[2];
+
+
+        const jour =
+          match[3];
+
+
+        return (
+          jour +
+          "/" +
+          mois +
+          "/" +
+          annee
+        );
+
+      }
+
+    }
+
+
+    /*
+      LISTES GRIST
     */
 
     if (Array.isArray(value)) {
@@ -743,44 +835,66 @@
     }
 
 
-    if (typeof value === "object") {
+    /*
+      OBJETS
+    */
+
+    if (
+      typeof value === "object"
+    ) {
 
       return JSON.stringify(value);
 
     }
 
 
+    /*
+      VALEUR NORMALE
+    */
+
     return String(value);
 
   }
 
 
-
   /*
-    ==================================================
+    ============================================
     PROTECTION HTML
-    ==================================================
+    ============================================
   */
 
   function escapeHtml(value) {
 
     return String(value)
 
-      .replaceAll("&", "&amp;")
+      .replaceAll(
+        "&",
+        "&amp;"
+      )
 
-      .replaceAll("<", "&lt;")
+      .replaceAll(
+        "<",
+        "&lt;"
+      )
 
-      .replaceAll(">", "&gt;")
+      .replaceAll(
+        ">",
+        "&gt;"
+      )
 
-      .replaceAll('"', "&quot;")
+      .replaceAll(
+        '"',
+        "&quot;"
+      )
 
-      .replaceAll("'", "&#039;");
+      .replaceAll(
+        "'",
+        "&#039;"
+      );
 
   }
 
 </script>
 
-
 </body>
-
 </html>
