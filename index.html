@@ -42,6 +42,9 @@
     .empty,.error{padding:18px;color:var(--muted)}
     .error{color:#b42318;background:#fef3f2;border-radius:9px}
     .note{padding:14px 16px;background:#f8fafc;border-left:4px solid #98a2b3;border-radius:8px;margin:16px 0}
+    .diagnostic{padding:12px 14px;margin-top:14px;border-radius:9px;background:#f8fafc;color:var(--muted);font-size:14px;white-space:pre-wrap}
+    .diagnostic.ok{background:#ecfdf3;color:#067647}
+    .diagnostic.error{background:#fef3f2;color:#b42318}
   </style>
 </head>
 <body>
@@ -61,6 +64,7 @@
     <p>
       Tableau des faits avec les informations principales.
     </p>
+    <div id="diagnostic1" class="diagnostic">Connexion au widget Grist…</div>
     <div id="table1-scroll-top" class="table-scroll-top">
       <div id="table1-scroll-top-inner" class="table-scroll-top-inner"></div>
     </div>
@@ -108,12 +112,12 @@ const CONFIG = {
   table1: {
     id: "FElignes",
     columns: [
-      ["Numero_FE", "Numéro FE"],
-      ["Date_de_saisie", "Date de saisie"],
-      ["ID_et_Nom", "ID et Nom"],
-      ["Ville", "Ville"],
-      ["Departement", "Département"],
-      ["Redacteur", "Rédacteur"]
+      ["$Numero_FE", "Numéro FE"],
+      ["$Date_de_saisie", "Date de saisie"],
+      ["$ID_et_Nom", "ID et Nom"],
+      ["$Ville", "Ville"],
+      ["$Departement", "Département"],
+      ["$Redacteur", "Rédacteur"]
     ]
   },
   table2: {
@@ -131,7 +135,7 @@ const CONFIG = {
   }
 };
 
-grist.ready({requiredAccess: "full"});
+grist.ready({requiredAccess: "read table"});
 
 function rowsFromFetchTable(data) {
   if (!data || !data.id) return [];
@@ -160,6 +164,13 @@ function displayValue(value) {
   }
   if (typeof value === "object") return JSON.stringify(value);
   return value;
+}
+
+function setDiagnostic(message, type = "") {
+  const el = document.getElementById("diagnostic1");
+  if (!el) return;
+  el.textContent = message;
+  el.className = "diagnostic" + (type ? " " + type : "");
 }
 
 const TABLE_STATE = {
@@ -364,40 +375,94 @@ async function renderDownloads(rows) {
     : '<span class="empty">Les lignes existent, mais aucune pièce jointe n'a été trouvée.</span>';
 }
 
-async function load() {
+async function loadSecondarySections() {
+  // Les sections 2 et Documents restent présentes.
+  // Elles sont chargées indépendamment afin qu'une table absente
+  // n'empêche jamais le premier tableau FElignes de fonctionner.
   try {
-    const [raw1, raw2, rawDocs] = await Promise.all([
-      grist.docApi.fetchTable(CONFIG.table1.id),
-      grist.docApi.fetchTable(CONFIG.table2.id),
-      grist.docApi.fetchTable(CONFIG.documents.id)
-    ]);
-
-    TABLE_STATE.table1.rows = rowsFromFetchTable(raw1);
-    TABLE_STATE.table1.columns = CONFIG.table1.columns;
-    TABLE_STATE.table1.page = 1;
-    renderTable(
-      "table1",
-      TABLE_STATE.table1.rows,
-      TABLE_STATE.table1.columns,
-      TABLE_STATE.table1.page,
-      TABLE_STATE.table1.pageSize
-    );
+    const raw2 = await grist.docApi.fetchTable(CONFIG.table2.id);
     renderTable("table2", rowsFromFetchTable(raw2), CONFIG.table2.columns);
+  } catch (err) {
+    console.warn("Deuxième tableau non chargé :", err);
+    document.getElementById("table2").innerHTML =
+      '<div class="empty">Deuxième tableau non configuré ou inaccessible.</div>';
+  }
+
+  try {
+    const rawDocs = await grist.docApi.fetchTable(CONFIG.documents.id);
     await renderDownloads(rowsFromFetchTable(rawDocs));
   } catch (err) {
-    console.error(err);
-    const msg = `<div class="error">
-      Impossible de charger les données. Vérifiez les noms techniques des tables/colonnes
-      dans CONFIG et accordez au widget l'accès complet au document.<br><br>
-      Détail : ${escapeHtml(err.message || err)}
-    </div>`;
-    document.getElementById("table1").innerHTML = msg;
-    document.getElementById("table2").innerHTML = msg;
-    document.getElementById("downloads").innerHTML = msg;
+    console.warn("Documents non chargés :", err);
+    document.getElementById("downloads").innerHTML =
+      '<span class="empty">Section Documents non configurée ou inaccessible.</span>';
   }
 }
 
-load();
+function startMainTable() {
+  try {
+    setDiagnostic("Connexion à Grist…");
+
+    grist.onRecords(function(records) {
+      try {
+        const rows = Array.isArray(records) ? records : [];
+
+        TABLE_STATE.table1.rows = rows;
+        TABLE_STATE.table1.columns = CONFIG.table1.columns;
+        TABLE_STATE.table1.page = 1;
+
+        if (!rows.length) {
+          setDiagnostic(
+            "Connexion réussie, mais aucune ligne n'a été reçue depuis la source FElignes.",
+            "error"
+          );
+          renderTable("table1", [], CONFIG.table1.columns);
+          return;
+        }
+
+        const receivedColumns = Object.keys(rows[0]);
+        const requestedColumns = CONFIG.table1.columns.map(([id]) => id);
+        const missing = requestedColumns.filter(id => !receivedColumns.includes(id));
+
+        if (missing.length) {
+          setDiagnostic(
+            "Connexion Grist réussie : " + rows.length + " lignes reçues.\n\n" +
+            "IDs demandés introuvables : " + missing.join(", ") + "\n\n" +
+            "Colonnes réellement reçues : " + receivedColumns.join(", "),
+            "error"
+          );
+        } else {
+          setDiagnostic(
+            "Connexion Grist réussie : " + rows.length + " faits reçus.\n\n" +
+            "Colonnes réellement reçues : " + receivedColumns.join(", "),
+            "ok"
+          );
+        }
+
+        renderTable(
+          "table1",
+          TABLE_STATE.table1.rows,
+          TABLE_STATE.table1.columns,
+          TABLE_STATE.table1.page,
+          TABLE_STATE.table1.pageSize
+        );
+      } catch (err) {
+        console.error(err);
+        setDiagnostic("Erreur pendant l'affichage : " + (err.message || err), "error");
+      }
+    });
+
+  } catch (err) {
+    console.error(err);
+    setDiagnostic("Erreur de connexion Grist : " + (err.message || err), "error");
+  }
+}
+
+startMainTable();
+
+// On garde les autres sections de la page.
+// Si l'accès "read table" ne permet pas de lire d'autres tables,
+// elles afficheront simplement un message sans bloquer FElignes.
+loadSecondarySections();
 </script>
 </body>
 </html>
