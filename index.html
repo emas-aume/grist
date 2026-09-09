@@ -2,7 +2,6 @@
 <html lang="fr">
 
 <head>
-
   <meta charset="utf-8">
 
   <meta
@@ -12,9 +11,7 @@
 
   <title>Portail Grist</title>
 
-  <!-- API Grist -->
   <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
-
 
   <style>
 
@@ -29,11 +26,9 @@
       --radius: 14px;
     }
 
-
     * {
       box-sizing: border-box;
     }
-
 
     body {
       margin: 0;
@@ -42,13 +37,11 @@
       font-family: Inter, Segoe UI, Arial, sans-serif;
     }
 
-
     .page {
       max-width: 1180px;
       margin: 0 auto;
       padding: 34px 24px 60px;
     }
-
 
     .hero,
     .section {
@@ -59,29 +52,24 @@
       margin-bottom: 22px;
     }
 
-
     .hero h1 {
       margin: 0 0 10px;
       font-size: 30px;
     }
-
 
     h2 {
       margin: 0 0 12px;
       font-size: 22px;
     }
 
-
     p {
       line-height: 1.6;
       margin: 8px 0 14px;
     }
 
-
     .muted {
       color: var(--muted);
     }
-
 
     .note {
       padding: 14px 16px;
@@ -92,10 +80,9 @@
     }
 
 
-
-    /* =========================================
+    /* =========================
        DIAGNOSTIC
-       ========================================= */
+       ========================= */
 
     .diagnostic {
       padding: 12px 14px;
@@ -106,12 +93,10 @@
       font-size: 14px;
     }
 
-
     .diagnostic.ok {
       background: #ecfdf3;
       color: #067647;
     }
-
 
     .diagnostic.error {
       background: #fef3f2;
@@ -119,25 +104,53 @@
     }
 
 
+    /* =========================
+       FILTRES
+       ========================= */
 
-    /* =========================================
-       FILTRES DÉPARTEMENT
-       ========================================= */
-
-    .filters-container {
+    .filters-area {
       margin-top: 20px;
+      margin-bottom: 14px;
+      padding: 16px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #fafafa;
+    }
+
+    .filter-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
       margin-bottom: 14px;
     }
 
+    .filter-row:last-child {
+      margin-bottom: 0;
+    }
 
-    .filters-title {
-      display: block;
-      margin-bottom: 9px;
+    .filter-label {
+      min-width: 105px;
       font-size: 13px;
       font-weight: 600;
       color: var(--muted);
     }
 
+    .week-select {
+      min-width: 230px;
+      padding: 9px 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #ffffff;
+      color: var(--text);
+      font-size: 14px;
+      cursor: pointer;
+    }
+
+    .week-select:focus {
+      outline: 2px solid rgba(47, 111, 237, 0.15);
+      border-color: var(--primary);
+    }
 
     .department-filters {
       display: flex;
@@ -145,7 +158,6 @@
       gap: 8px;
       flex-wrap: wrap;
     }
-
 
     .department-btn {
       padding: 8px 14px;
@@ -156,17 +168,11 @@
       font-size: 14px;
       font-weight: 600;
       color: var(--text);
-      transition:
-        background 0.15s,
-        border-color 0.15s,
-        color 0.15s;
     }
-
 
     .department-btn:hover {
       background: #f3f4f6;
     }
-
 
     .department-btn.active {
       background: var(--primary);
@@ -174,17 +180,15 @@
       color: #ffffff;
     }
 
-
     .department-btn.active:hover {
       background: var(--primary-hover);
       border-color: var(--primary-hover);
     }
 
 
-
-    /* =========================================
+    /* =========================
        TABLEAU
-       ========================================= */
+       ========================= */
 
     .table-wrap {
       overflow: auto;
@@ -194,14 +198,12 @@
       margin-top: 12px;
     }
 
-
     table {
       width: 100%;
       min-width: 950px;
       border-collapse: collapse;
       background: #ffffff;
     }
-
 
     th,
     td {
@@ -210,7 +212,6 @@
       border-bottom: 1px solid var(--line);
       white-space: nowrap;
     }
-
 
     th {
       position: sticky;
@@ -221,16 +222,13 @@
       color: #475467;
     }
 
-
     tr:last-child td {
       border-bottom: none;
     }
 
-
     tr:hover td {
       background: #fafafa;
     }
-
 
     .empty-table {
       padding: 32px 20px;
@@ -239,10 +237,9 @@
     }
 
 
-
-    /* =========================================
+    /* =========================
        PAGINATION
-       ========================================= */
+       ========================= */
 
     .pagination {
       display: flex;
@@ -253,14 +250,12 @@
       margin-top: 14px;
     }
 
-
     .pagination-controls {
       display: flex;
       align-items: center;
       gap: 8px;
       flex-wrap: wrap;
     }
-
 
     .page-btn {
       padding: 8px 12px;
@@ -272,11 +267,9 @@
       color: var(--text);
     }
 
-
     .page-btn:hover:not(:disabled) {
       background: #f3f4f6;
     }
-
 
     .page-btn.active {
       background: var(--primary);
@@ -284,33 +277,26 @@
       border-color: var(--primary);
     }
 
-
     .page-btn:disabled {
       opacity: 0.45;
       cursor: not-allowed;
     }
-
 
     .pagination-info {
       color: var(--muted);
       font-size: 14px;
     }
 
-
   </style>
 
 </head>
 
-
 <body>
-
 
 <div class="page">
 
 
-  <!-- =========================================
-       EN-TÊTE
-       ========================================= -->
+  <!-- EN-TÊTE -->
 
   <section class="hero">
 
@@ -330,10 +316,7 @@
   </section>
 
 
-
-  <!-- =========================================
-       PREMIER TABLEAU
-       ========================================= -->
+  <!-- PREMIER TABLEAU -->
 
   <section class="section">
 
@@ -343,7 +326,6 @@
       Tableau des faits avec les informations principales.
     </p>
 
-
     <div
       id="diagnostic"
       class="diagnostic"
@@ -352,23 +334,46 @@
     </div>
 
 
-
     <!-- FILTRES -->
 
-    <div class="filters-container">
+    <div class="filters-area">
 
-      <span class="filters-title">
-        Filtrer par département
-      </span>
+      <div class="filter-row">
 
-      <div
-        id="department-filters"
-        class="department-filters"
-      >
+        <span class="filter-label">
+          Semaine
+        </span>
+
+        <select
+          id="week-filter"
+          class="week-select"
+          onchange="setWeek(this.value)"
+        >
+
+          <option value="all">
+            Toutes les semaines
+          </option>
+
+        </select>
+
+      </div>
+
+
+      <div class="filter-row">
+
+        <span class="filter-label">
+          Département
+        </span>
+
+        <div
+          id="department-filters"
+          class="department-filters"
+        >
+        </div>
+
       </div>
 
     </div>
-
 
 
     <!-- TABLEAU -->
@@ -380,7 +385,6 @@
     </div>
 
 
-
     <!-- PAGINATION -->
 
     <div
@@ -389,39 +393,28 @@
     >
     </div>
 
-
   </section>
 
 
-
-  <!-- =========================================
-       INFORMATIONS COMPLÉMENTAIRES
-       ========================================= -->
+  <!-- INFORMATIONS -->
 
   <section class="section">
 
     <h2>Informations complémentaires</h2>
 
     <div class="note">
-
       Ce bloc peut servir à mettre en évidence une procédure,
-      une consigne importante, une explication ou un rappel
-      entre deux tableaux.
-
+      une consigne importante, une explication ou un rappel.
     </div>
 
     <p>
-      Le contenu n'est pas enfermé dans une cellule Grist :
-      la mise en page de cette page reste totalement libre.
+      Le contenu de cette page reste totalement libre.
     </p>
 
   </section>
 
 
-
-  <!-- =========================================
-       DEUXIÈME TABLEAU
-       ========================================= -->
+  <!-- DEUXIÈME TABLEAU -->
 
   <section class="section">
 
@@ -434,10 +427,7 @@
   </section>
 
 
-
-  <!-- =========================================
-       DOCUMENTS
-       ========================================= -->
+  <!-- DOCUMENTS -->
 
   <section class="section">
 
@@ -454,21 +444,13 @@
 </div>
 
 
-
 <script>
-
 
   /*
     ==================================================
-    COLONNES AFFICHÉES
+    COLONNES
     ==================================================
-
-    _departement n'existe PAS dans Grist.
-
-    Cette valeur est calculée automatiquement
-    depuis ID_et_Nom.
   */
-
 
   const COLUMNS = [
 
@@ -487,205 +469,142 @@
   ];
 
 
-
   /*
     ==================================================
-    CONFIGURATION
+    CONFIG
     ==================================================
   */
-
 
   const PAGE_SIZE = 10;
 
-
   let allRecords = [];
-
 
   let currentPage = 1;
 
-
-  /*
-    "all" = tous les départements
-  */
-
   let selectedDepartment = "all";
 
+  let selectedWeek = "all";
 
 
   const diagnostic =
     document.getElementById("diagnostic");
 
 
-
   /*
     ==================================================
-    CONNEXION GRIST
+    GRIST
     ==================================================
   */
-
 
   grist.ready({
-
     requiredAccess: "read table"
-
   });
-
-
-
-  /*
-    ==================================================
-    RÉCEPTION DES DONNÉES GRIST
-    ==================================================
-  */
 
 
   grist.onRecords(function(records) {
 
-
-    console.log(
-      "Données reçues depuis Grist :",
-      records
-    );
-
-
-
     if (!Array.isArray(records)) {
-
 
       diagnostic.textContent =
         "Erreur : les données reçues ne sont pas valides.";
 
-
       diagnostic.className =
         "diagnostic error";
 
-
       return;
-
     }
-
 
 
     if (records.length === 0) {
 
+      allRecords = [];
 
       diagnostic.textContent =
-        "Connexion réussie, mais aucune ligne n'a été reçue.";
-
+        "Connexion réussie, mais aucun fait n'a été reçu.";
 
       diagnostic.className =
         "diagnostic error";
 
-
-      allRecords = [];
-
+      renderWeekFilter();
 
       renderDepartmentFilters();
 
       renderTable();
 
-
       return;
-
     }
 
 
-
     /*
-      ==================================================
-      CRÉATION DU DÉPARTEMENT
-      ==================================================
-
-      Exemple :
-
-      ID_et_Nom :
-
-      0342397W - ECOLE PRIMAIRE...
-
-      Les trois premiers chiffres sont :
-
-      034
-
-      On enlève le zéro initial :
-
-      34
+      Enrichissement des données
     */
-
 
     allRecords = records.map(function(record) {
 
+      const date =
+        parseGristDate(
+          record.Date_de_saisie
+        );
+
+      const weekInfo =
+        date
+          ? getISOWeekInfo(date)
+          : null;
 
       return {
 
         ...record,
 
         _departement:
-          getDepartement(record)
+          getDepartement(record),
+
+        _date:
+          date,
+
+        _weekKey:
+          weekInfo
+            ? weekInfo.key
+            : "",
+
+        _weekNumber:
+          weekInfo
+            ? weekInfo.week
+            : null,
+
+        _weekYear:
+          weekInfo
+            ? weekInfo.year
+            : null
 
       };
 
-
     });
 
 
-
     /*
-      ==================================================
-      TRI DES FE
-      ==================================================
-
-      Numéro FE le plus grand en premier.
-
-      Exemple :
-
-      5574502
-      5574490
-      5574428
-      5574416
-      5574411
+      Tri FE décroissant
     */
-
 
     allRecords.sort(function(a, b) {
 
-
-      const numeroA =
-        getNumeroFE(a.Numero_FE);
-
-
-      const numeroB =
-        getNumeroFE(b.Numero_FE);
-
-
-      return numeroB - numeroA;
-
+      return (
+        getNumeroFE(b.Numero_FE)
+        -
+        getNumeroFE(a.Numero_FE)
+      );
 
     });
-
-
-
-    /*
-      Retour page 1
-    */
 
 
     currentPage = 1;
 
 
-
     /*
-      ==================================================
-      VÉRIFICATION DES COLONNES GRIST
-      ==================================================
-
-      On ne vérifie PAS _departement puisqu'il
-      est créé par notre JavaScript.
+      Vérification colonnes
     */
-
 
     const receivedColumns =
       Object.keys(records[0]);
-
 
 
     const gristColumns =
@@ -694,42 +613,33 @@
         .filter(column => column !== "_departement");
 
 
-
     const missingColumns =
-      gristColumns.filter(
+      gristColumns.filter(function(id) {
 
-        id =>
-          !receivedColumns.includes(id)
+        return !receivedColumns.includes(id);
 
-      );
-
+      });
 
 
     if (missingColumns.length > 0) {
 
-
       diagnostic.textContent =
         "Connexion réussie : " +
         records.length +
-        " lignes reçues. " +
-        "Colonnes introuvables : " +
+        " lignes reçues. Colonnes introuvables : " +
         missingColumns.join(", ");
-
 
       diagnostic.className =
         "diagnostic error";
 
     }
 
-
     else {
-
 
       diagnostic.textContent =
         "Connexion réussie : " +
         records.length +
         " faits reçus.";
-
 
       diagnostic.className =
         "diagnostic ok";
@@ -737,257 +647,606 @@
     }
 
 
-
-    /*
-      Création des boutons département
-    */
-
+    renderWeekFilter();
 
     renderDepartmentFilters();
 
-
-
-    /*
-      Affichage du tableau
-    */
-
-
     renderTable();
-
 
   });
 
 
-
   /*
     ==================================================
-    EXTRACTION DU NUMÉRO FE
+    NUMÉRO FE
     ==================================================
-
-    Exemple :
-
-    Fait Nº 2026-011-5574411
-
-    devient :
-
-    5574411
   */
 
-
   function getNumeroFE(value) {
-
 
     if (
       value === null ||
       value === undefined ||
       value === ""
     ) {
-
       return 0;
-
     }
-
-
 
     const texte =
       String(value);
 
-
-
     const nombres =
       texte.match(/\d+/g);
-
-
 
     if (
       !nombres ||
       nombres.length === 0
     ) {
-
       return 0;
-
     }
 
-
-
     return Number(
-
       nombres[
         nombres.length - 1
       ]
-
     );
 
   }
 
 
-
   /*
     ==================================================
-    EXTRACTION DU DÉPARTEMENT
+    DÉPARTEMENT
     ==================================================
-
-    Exemples :
-
-    0342397W
-    -> 034
-    -> 34
-
-    0661234A
-    -> 066
-    -> 66
-
-    0481234B
-    -> 048
-    -> 48
-
-    0111234C
-    -> 011
-    -> 11
   */
-
 
   function getDepartement(record) {
 
-
-    if (!record) {
-
+    if (
+      !record ||
+      !record.ID_et_Nom
+    ) {
       return "";
-
     }
 
+    const texte =
+      String(
+        record.ID_et_Nom
+      ).trim();
+
+    const match =
+      texte.match(/^(\d{3})/);
+
+    if (!match) {
+      return "";
+    }
+
+    return String(
+      Number(match[1])
+    );
+
+  }
 
 
-    const value =
-      record.ID_et_Nom;
+  /*
+    ==================================================
+    PARSE DATE GRIST
+    ==================================================
+  */
 
-
+  function parseGristDate(value) {
 
     if (
       value === null ||
       value === undefined ||
       value === ""
     ) {
+      return null;
+    }
 
-      return "";
+    if (value instanceof Date) {
+
+      return new Date(
+        value.getTime()
+      );
 
     }
 
 
+    let texte;
 
-    const texte =
-      String(value).trim();
+    if (
+      typeof value === "object"
+    ) {
 
+      try {
+        texte =
+          JSON.stringify(value);
+      }
 
+      catch {
+        texte =
+          String(value);
+      }
 
-    /*
-      On récupère les trois premiers chiffres.
-    */
+    }
 
+    else {
 
-    const match =
-      texte.match(/^(\d{3})/);
-
-
-
-    if (!match) {
-
-      return "";
+      texte =
+        String(value);
 
     }
 
 
+    texte =
+      texte
+        .trim()
+        .replace(
+          /^["']+|["']+$/g,
+          ""
+        );
+
+
+    const isoMatch =
+      texte.match(
+        /^(\d{4})-(\d{2})-(\d{2})/
+      );
+
+
+    if (isoMatch) {
+
+      return new Date(
+        Number(isoMatch[1]),
+        Number(isoMatch[2]) - 1,
+        Number(isoMatch[3])
+      );
+
+    }
+
+
+    const parsed =
+      new Date(texte);
+
+
+    if (
+      isNaN(
+        parsed.getTime()
+      )
+    ) {
+
+      return null;
+
+    }
+
+
+    return parsed;
+
+  }
+
+
+  /*
+    ==================================================
+    SEMAINE ISO
+    lundi -> dimanche
+    ==================================================
+  */
+
+  function getISOWeekInfo(date) {
+
+    const d =
+      new Date(
+        Date.UTC(
+          date.getFullYear(),
+          date.getMonth(),
+          date.getDate()
+        )
+      );
+
+
+    let day =
+      d.getUTCDay();
+
+
+    if (day === 0) {
+      day = 7;
+    }
+
 
     /*
-      Number("034") = 34
-      Number("048") = 48
-      Number("066") = 66
+      Jeudi de la semaine ISO
     */
 
+    d.setUTCDate(
+      d.getUTCDate()
+      + 4
+      - day
+    );
 
-    return String(
 
-      Number(match[1])
+    const isoYear =
+      d.getUTCFullYear();
 
+
+    const yearStart =
+      new Date(
+        Date.UTC(
+          isoYear,
+          0,
+          1
+        )
+      );
+
+
+    const week =
+      Math.ceil(
+        (
+          (
+            d - yearStart
+          ) / 86400000
+          + 1
+        ) / 7
+      );
+
+
+    const monday =
+      getMondayOfISOWeek(
+        isoYear,
+        week
+      );
+
+
+    const sunday =
+      new Date(monday);
+
+
+    sunday.setDate(
+      monday.getDate() + 6
+    );
+
+
+    return {
+
+      year: isoYear,
+
+      week: week,
+
+      key:
+        isoYear +
+        "-" +
+        String(week).padStart(2, "0"),
+
+      monday: monday,
+
+      sunday: sunday
+
+    };
+
+  }
+
+
+  /*
+    ==================================================
+    LUNDI D'UNE SEMAINE ISO
+    ==================================================
+  */
+
+  function getMondayOfISOWeek(year, week) {
+
+    const january4 =
+      new Date(
+        year,
+        0,
+        4
+      );
+
+
+    const day =
+      january4.getDay() || 7;
+
+
+    const mondayWeek1 =
+      new Date(january4);
+
+
+    mondayWeek1.setDate(
+      january4.getDate()
+      - day
+      + 1
+    );
+
+
+    const monday =
+      new Date(mondayWeek1);
+
+
+    monday.setDate(
+      mondayWeek1.getDate()
+      + (week - 1) * 7
+    );
+
+
+    monday.setHours(
+      0,
+      0,
+      0,
+      0
+    );
+
+
+    return monday;
+
+  }
+
+
+  /*
+    ==================================================
+    FORMAT JJ/MM
+    ==================================================
+  */
+
+  function formatDayMonth(date) {
+
+    const day =
+      String(
+        date.getDate()
+      ).padStart(
+        2,
+        "0"
+      );
+
+
+    const month =
+      String(
+        date.getMonth() + 1
+      ).padStart(
+        2,
+        "0"
+      );
+
+
+    return (
+      day +
+      "/" +
+      month
     );
 
   }
 
 
-
   /*
     ==================================================
-    LISTE DES DÉPARTEMENTS DISPONIBLES
+    LISTE DES SEMAINES
     ==================================================
   */
 
+  function getAvailableWeeks() {
+
+    const weeks =
+      new Map();
+
+
+    allRecords.forEach(function(record) {
+
+      if (
+        !record._weekKey ||
+        !record._date
+      ) {
+        return;
+      }
+
+
+      if (
+        !weeks.has(
+          record._weekKey
+        )
+      ) {
+
+        const info =
+          getISOWeekInfo(
+            record._date
+          );
+
+
+        weeks.set(
+          record._weekKey,
+          info
+        );
+
+      }
+
+    });
+
+
+    /*
+      Semaine la plus récente
+      en premier
+    */
+
+    return Array
+      .from(
+        weeks.values()
+      )
+      .sort(function(a, b) {
+
+        if (
+          a.year !== b.year
+        ) {
+
+          return (
+            b.year - a.year
+          );
+
+        }
+
+        return (
+          b.week - a.week
+        );
+
+      });
+
+  }
+
+
+  /*
+    ==================================================
+    AFFICHAGE SÉLECTEUR SEMAINE
+    ==================================================
+  */
+
+  function renderWeekFilter() {
+
+    const select =
+      document.getElementById(
+        "week-filter"
+      );
+
+
+    const weeks =
+      getAvailableWeeks();
+
+
+    /*
+      Si la semaine sélectionnée
+      n'existe plus, retour à "all"
+    */
+
+    const validKeys =
+      weeks.map(
+        item => item.key
+      );
+
+
+    if (
+      selectedWeek !== "all" &&
+      !validKeys.includes(
+        selectedWeek
+      )
+    ) {
+
+      selectedWeek =
+        "all";
+
+    }
+
+
+    let html = `
+
+      <option value="all">
+        Toutes les semaines
+      </option>
+
+    `;
+
+
+    weeks.forEach(function(info) {
+
+      const selected =
+        selectedWeek === info.key
+          ? "selected"
+          : "";
+
+
+      const label =
+        "S" +
+        info.week +
+        " — " +
+        formatDayMonth(
+          info.monday
+        ) +
+        " au " +
+        formatDayMonth(
+          info.sunday
+        );
+
+
+      html += `
+
+        <option
+          value="${info.key}"
+          ${selected}
+        >
+          ${escapeHtml(label)}
+        </option>
+
+      `;
+
+    });
+
+
+    select.innerHTML =
+      html;
+
+  }
+
+
+  /*
+    ==================================================
+    CHANGEMENT DE SEMAINE
+    ==================================================
+  */
+
+  function setWeek(value) {
+
+    selectedWeek =
+      value;
+
+    currentPage =
+      1;
+
+    renderTable();
+
+  }
+
+
+  /*
+    ==================================================
+    DÉPARTEMENTS DISPONIBLES
+    ==================================================
+  */
 
   function getDepartments() {
 
-
     const departments =
       allRecords
-
         .map(function(record) {
 
           return record._departement;
 
         })
-
-        .filter(function(departement) {
-
-          return departement !== "";
-
-        });
+        .filter(Boolean);
 
 
-
-    /*
-      Suppression des doublons
-    */
-
-
-    const uniqueDepartments =
-      [...new Set(departments)];
+    const unique =
+      [
+        ...new Set(
+          departments
+        )
+      ];
 
 
+    unique.sort(function(a, b) {
 
-    /*
-      Tri numérique :
+      return (
+        Number(a) -
+        Number(b)
+      );
 
-      11
-      30
-      34
-      48
-      66
-    */
+    });
 
 
-    uniqueDepartments.sort(
-      function(a, b) {
-
-        return Number(a) - Number(b);
-
-      }
-    );
-
-
-
-    return uniqueDepartments;
+    return unique;
 
   }
 
 
-
   /*
     ==================================================
-    AFFICHAGE DES BOUTONS DÉPARTEMENT
+    BOUTONS DÉPARTEMENT
     ==================================================
   */
 
-
   function renderDepartmentFilters() {
-
 
     const target =
       document.getElementById(
@@ -995,22 +1254,11 @@
       );
 
 
-
     const departments =
       getDepartments();
 
 
-
-    let html = "";
-
-
-
-    /*
-      Bouton TOUS
-    */
-
-
-    html += `
+    let html = `
 
       <button
         type="button"
@@ -1027,183 +1275,122 @@
     `;
 
 
+    departments.forEach(function(departement) {
 
-    /*
-      Boutons département
-    */
+      html += `
 
+        <button
+          type="button"
+          class="department-btn ${
+            selectedDepartment === departement
+              ? "active"
+              : ""
+          }"
+          onclick="setDepartment('${departement}')"
+        >
+          ${escapeHtml(departement)}
+        </button>
 
-    departments.forEach(
-      function(departement) {
+      `;
 
-
-        const active =
-          selectedDepartment === departement
-            ? "active"
-            : "";
-
-
-
-        html += `
-
-          <button
-            type="button"
-            class="department-btn ${active}"
-            onclick="setDepartment('${departement}')"
-          >
-            ${escapeHtml(departement)}
-          </button>
-
-        `;
+    });
 
 
-      }
-    );
-
-
-
-    target.innerHTML = html;
+    target.innerHTML =
+      html;
 
   }
 
 
-
   /*
     ==================================================
-    CHANGEMENT DE DÉPARTEMENT
+    CHANGEMENT DÉPARTEMENT
     ==================================================
   */
 
-
   function setDepartment(departement) {
-
 
     selectedDepartment =
       departement;
 
-
-
-    /*
-      Lorsqu'on change de département,
-      retour automatique à la page 1.
-    */
-
-
-    currentPage = 1;
-
-
-
-    /*
-      Mise à jour des boutons
-    */
-
+    currentPage =
+      1;
 
     renderDepartmentFilters();
 
-
-
-    /*
-      Mise à jour du tableau
-    */
-
-
     renderTable();
-
 
   }
 
 
-
   /*
     ==================================================
-    RÉCUPÉRATION DES FE FILTRÉS
+    FILTRES COMBINÉS
     ==================================================
   */
-
 
   function getFilteredRecords() {
 
-
-    /*
-      Aucun filtre :
-      on retourne tous les FE.
-    */
+    return allRecords.filter(function(record) {
 
 
-    if (
-      selectedDepartment === "all"
-    ) {
+      /*
+        Filtre département
+      */
 
-      return allRecords;
-
-    }
-
-
-
-    /*
-      Sinon uniquement le département choisi.
-    */
+      const departmentOk =
+        selectedDepartment === "all"
+        ||
+        record._departement === selectedDepartment;
 
 
-    return allRecords.filter(
-      function(record) {
+      /*
+        Filtre semaine
+      */
+
+      const weekOk =
+        selectedWeek === "all"
+        ||
+        record._weekKey === selectedWeek;
 
 
-        return (
-          record._departement ===
-          selectedDepartment
-        );
+      return (
+        departmentOk &&
+        weekOk
+      );
 
-
-      }
-    );
+    });
 
   }
 
 
-
   /*
     ==================================================
-    AFFICHAGE DU TABLEAU
+    TABLEAU
     ==================================================
   */
 
-
   function renderTable() {
 
-
     const tableContainer =
-      document.getElementById("table1");
-
-
-
-    /*
-      Données après filtrage
-    */
+      document.getElementById(
+        "table1"
+      );
 
 
     const filteredRecords =
       getFilteredRecords();
 
 
-
-    /*
-      Si aucun résultat
-    */
-
-
     if (
       filteredRecords.length === 0
     ) {
 
-
       tableContainer.innerHTML = `
 
         <div class="empty-table">
-
           Aucun fait à afficher
-          pour ce département.
-
+          avec ces filtres.
         </div>
 
       `;
@@ -1219,22 +1406,16 @@
     }
 
 
-
-    /*
-      Pagination
-    */
-
-
     const startIndex =
-      (currentPage - 1) *
+      (currentPage - 1)
+      *
       PAGE_SIZE;
-
 
 
     const endIndex =
-      startIndex +
+      startIndex
+      +
       PAGE_SIZE;
-
 
 
     const visibleRecords =
@@ -1244,121 +1425,85 @@
       );
 
 
-
-    /*
-      Création du tableau
-    */
-
-
     let html =
       "<table>";
 
 
-
     /*
-      EN-TÊTES
+      EN-TÊTE
     */
-
 
     html +=
       "<thead><tr>";
 
 
+    COLUMNS.forEach(function(column) {
 
-    COLUMNS.forEach(
-      function(column) {
+      html +=
+        "<th>" +
+        escapeHtml(
+          column[1]
+        ) +
+        "</th>";
 
-
-        html +=
-          "<th>" +
-          escapeHtml(column[1]) +
-          "</th>";
-
-
-      }
-    );
-
+    });
 
 
     html +=
       "</tr></thead>";
 
 
-
     /*
-      CORPS DU TABLEAU
+      LIGNES
     */
-
 
     html +=
       "<tbody>";
 
 
+    visibleRecords.forEach(function(record) {
 
-    visibleRecords.forEach(
-      function(record) {
-
-
-        html +=
-          "<tr>";
+      html +=
+        "<tr>";
 
 
+      COLUMNS.forEach(function(column) {
 
-        COLUMNS.forEach(
-          function(column) {
-
-
-            const columnId =
-              column[0];
+        const columnId =
+          column[0];
 
 
-
-            const value =
-              formatValue(
-                record[columnId],
-                columnId
-              );
-
-
-
-            html +=
-              "<td>" +
-              escapeHtml(value) +
-              "</td>";
-
-
-          }
-        );
-
+        const value =
+          formatValue(
+            record[columnId],
+            columnId
+          );
 
 
         html +=
-          "</tr>";
+          "<td>" +
+          escapeHtml(value) +
+          "</td>";
+
+      });
 
 
-      }
-    );
+      html +=
+        "</tr>";
 
+    });
 
 
     html +=
       "</tbody>";
 
 
-
     html +=
       "</table>";
 
 
-
     tableContainer.innerHTML =
       html;
-
-
-
-    /*
-      Mise à jour pagination
-    */
 
 
     renderPagination(
@@ -1368,16 +1513,13 @@
   }
 
 
-
   /*
     ==================================================
     PAGINATION
     ==================================================
   */
 
-
   function renderPagination(records) {
-
 
     const pagination =
       document.getElementById(
@@ -1385,19 +1527,13 @@
       );
 
 
-
     const totalRecords =
       records.length;
 
 
-
-    /*
-      Aucun résultat
-    */
-
-
-    if (totalRecords === 0) {
-
+    if (
+      totalRecords === 0
+    ) {
 
       pagination.innerHTML = `
 
@@ -1407,31 +1543,19 @@
 
       `;
 
-
       return;
 
     }
 
 
-
     const totalPages =
       Math.max(
-
         1,
-
         Math.ceil(
           totalRecords /
           PAGE_SIZE
         )
-
       );
-
-
-
-    /*
-      Sécurité au cas où la page actuelle
-      serait supérieure au nombre de pages.
-    */
 
 
     if (
@@ -1445,34 +1569,23 @@
     }
 
 
-
     const firstRow =
       (
-        (currentPage - 1) *
+        (currentPage - 1)
+        *
         PAGE_SIZE
       ) + 1;
 
 
-
     const lastRow =
       Math.min(
-
         currentPage *
         PAGE_SIZE,
-
         totalRecords
-
       );
 
 
-
     let buttons = "";
-
-
-
-    /*
-      Création des numéros de pages
-    */
 
 
     for (
@@ -1481,25 +1594,22 @@
       page++
     ) {
 
-
       const closeToCurrent =
         Math.abs(
           page - currentPage
         ) <= 2;
 
 
-
       const edgePage =
-        page === 1 ||
+        page === 1
+        ||
         page === totalPages;
-
 
 
       if (
         closeToCurrent ||
         edgePage
       ) {
-
 
         buttons += `
 
@@ -1519,31 +1629,28 @@
 
       }
 
-
       else if (
 
         (
-          page === 2 &&
+          page === 2
+          &&
           currentPage > 4
         )
 
         ||
 
         (
-          page === totalPages - 1 &&
-          currentPage <
-          totalPages - 3
+          page === totalPages - 1
+          &&
+          currentPage < totalPages - 3
         )
 
       ) {
 
-
         buttons += `
-
           <span class="pagination-info">
             …
           </span>
-
         `;
 
       }
@@ -1551,16 +1658,9 @@
     }
 
 
-
-    /*
-      Affichage pagination
-    */
-
-
     pagination.innerHTML = `
 
       <div class="pagination-controls">
-
 
         <button
           type="button"
@@ -1575,9 +1675,7 @@
           ← Précédent
         </button>
 
-
         ${buttons}
-
 
         <button
           type="button"
@@ -1592,9 +1690,7 @@
           Suivant →
         </button>
 
-
       </div>
-
 
       <div class="pagination-info">
 
@@ -1610,66 +1706,47 @@
   }
 
 
-
   /*
     ==================================================
-    CHANGEMENT DE PAGE
+    CHANGEMENT PAGE
     ==================================================
   */
 
-
   function goToPage(page) {
-
 
     const filteredRecords =
       getFilteredRecords();
 
 
-
     const totalPages =
       Math.max(
-
         1,
-
         Math.ceil(
           filteredRecords.length /
           PAGE_SIZE
         )
-
       );
-
 
 
     if (
       page < 1 ||
       page > totalPages
     ) {
-
       return;
-
     }
-
 
 
     currentPage =
       page;
 
 
-
     renderTable();
-
-
-
-    /*
-      Retour en haut du tableau
-    */
 
 
     const table =
       document.getElementById(
         "table1"
       );
-
 
 
     if (table) {
@@ -1683,162 +1760,119 @@
   }
 
 
-
   /*
     ==================================================
-    FORMATAGE DES VALEURS
+    FORMAT DES VALEURS
     ==================================================
   */
-
 
   function formatValue(
     value,
     columnId = ""
   ) {
 
-
-    /*
-      Valeur vide
-    */
-
-
     if (
       value === null ||
       value === undefined ||
       value === ""
     ) {
-
       return "";
-
     }
 
 
-
     /*
-      ==================================================
-      NUMÉRO FE
-      ==================================================
-
-      Fait Nº 2026-011-5574411
-
-      devient :
-
-      5574411
+      Numéro FE
     */
 
-
     if (
-      columnId ===
-      "Numero_FE"
+      columnId === "Numero_FE"
     ) {
-
 
       const numero =
         getNumeroFE(value);
 
+      return numero
+        ? String(numero)
+        : String(value);
+
+    }
 
 
-      if (
-        numero !== 0
-      ) {
+    /*
+      Département calculé
+    */
 
-        return String(numero);
+    if (
+      columnId === "_departement"
+    ) {
+
+      return String(value);
+
+    }
+
+
+    /*
+      Date
+    */
+
+    if (
+      columnId === "Date_de_saisie"
+    ) {
+
+      const date =
+        parseGristDate(value);
+
+
+      if (date) {
+
+        const day =
+          String(
+            date.getDate()
+          ).padStart(
+            2,
+            "0"
+          );
+
+
+        const month =
+          String(
+            date.getMonth() + 1
+          ).padStart(
+            2,
+            "0"
+          );
+
+
+        const year =
+          String(
+            date.getFullYear()
+          ).slice(-2);
+
+
+        return (
+          day +
+          "/" +
+          month +
+          "/" +
+          year
+        );
 
       }
 
-
-
-      return String(value);
-
     }
 
 
-
     /*
-      ==================================================
-      DÉPARTEMENT
-      ==================================================
+      Listes Grist
     */
-
-
-    if (
-      columnId ===
-      "_departement"
-    ) {
-
-      return String(value);
-
-    }
-
-
-
-    /*
-      ==================================================
-      DATE JAVASCRIPT
-      ==================================================
-    */
-
-
-    if (
-      value instanceof Date
-    ) {
-
-
-      const jour =
-        String(
-          value.getUTCDate()
-        ).padStart(
-          2,
-          "0"
-        );
-
-
-
-      const mois =
-        String(
-          value.getUTCMonth() + 1
-        ).padStart(
-          2,
-          "0"
-        );
-
-
-
-      const annee =
-        String(
-          value.getUTCFullYear()
-        ).slice(-2);
-
-
-
-      return (
-        jour +
-        "/" +
-        mois +
-        "/" +
-        annee
-      );
-
-    }
-
-
-
-    /*
-      ==================================================
-      LISTES GRIST
-      ==================================================
-    */
-
 
     if (
       Array.isArray(value)
     ) {
 
-
       if (
         value[0] === "L"
       ) {
-
 
         return value
           .slice(1)
@@ -1846,143 +1880,39 @@
 
       }
 
-
-
       return value.join(", ");
 
     }
 
 
-
     /*
-      ==================================================
-      CONVERSION EN TEXTE
-      ==================================================
+      Objet
     */
 
-
-    let texte;
-
-
-
     if (
-      typeof value ===
-      "object"
+      typeof value === "object"
     ) {
-
 
       try {
 
-
-        texte =
-          JSON.stringify(value);
-
+        return JSON.stringify(
+          value
+        );
 
       }
 
+      catch {
 
-      catch (error) {
-
-
-        texte =
-          String(value);
-
+        return String(value);
 
       }
 
     }
 
 
-    else {
-
-
-      texte =
-        String(value);
-
-    }
-
-
-
-    texte =
-      texte.trim();
-
-
-
-    /*
-      Suppression des guillemets éventuels
-    */
-
-
-    texte =
-      texte.replace(
-        /^["']+|["']+$/g,
-        ""
-      );
-
-
-
-    /*
-      ==================================================
-      FORMAT DATE
-      ==================================================
-
-      2026-08-31T00:00:00.000Z
-
-      devient :
-
-      31/08/26
-    */
-
-
-    const dateMatch =
-      texte.match(
-
-        /^(\d{4})-(\d{2})-(\d{2})(?:T.*)?$/
-
-      );
-
-
-
-    if (dateMatch) {
-
-
-      const annee =
-        dateMatch[1]
-          .slice(-2);
-
-
-
-      const mois =
-        dateMatch[2];
-
-
-
-      const jour =
-        dateMatch[3];
-
-
-
-      return (
-        jour +
-        "/" +
-        mois +
-        "/" +
-        annee
-      );
-
-    }
-
-
-
-    /*
-      AUTRES VALEURS
-    */
-
-
-    return texte;
+    return String(value);
 
   }
-
 
 
   /*
@@ -1991,9 +1921,7 @@
     ==================================================
   */
 
-
   function escapeHtml(value) {
-
 
     return String(value)
 
@@ -2024,9 +1952,7 @@
 
   }
 
-
 </script>
-
 
 </body>
 
