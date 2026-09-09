@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta http-equiv="Content-Security-Policy" content="img-src 'self' data: https:; script-src 'self' https://docs.getgrist.com; connect-src 'self' https://docs.getgrist.com https://*.getgrist.com">
+  <meta http-equiv="Content-Security-Policy" content="img-src 'self' data: https:; script-src 'self' 'unsafe-inline' https://docs.getgrist.com; connect-src 'self' https://docs.getgrist.com https://*.getgrist.com">
   <title>Portail Grist</title>
   <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
   <style>
@@ -20,7 +20,17 @@
     h2{margin:0 0 12px;font-size:22px}
     p{line-height:1.6;margin:8px 0 14px}
     .muted{color:var(--muted)}
-    .table-wrap{overflow:auto;border:1px solid var(--line);border-radius:10px;margin-top:16px}
+    .table-scroll-top{overflow-x:auto;overflow-y:hidden;height:16px;margin-top:16px;border-radius:8px 8px 0 0}
+    .table-scroll-top-inner{height:1px}
+    .table-wrap{overflow:auto;max-height:520px;border:1px solid var(--line);border-radius:10px;margin-top:4px}
+    .table-wrap table{min-width:1100px}
+    .pagination{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:14px 0 0}
+    .pagination-controls{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+    .page-btn{padding:8px 12px;border:1px solid var(--line);background:#fff;border-radius:8px;cursor:pointer;font-weight:600;color:var(--text)}
+    .page-btn:hover:not(:disabled){background:#f3f4f6}
+    .page-btn.active{background:var(--primary);color:#fff;border-color:var(--primary)}
+    .page-btn:disabled{opacity:.45;cursor:not-allowed}
+    .pagination-info{color:var(--muted);font-size:14px}
     table{width:100%;border-collapse:collapse;background:#fff}
     th,td{padding:12px 14px;text-align:left;border-bottom:1px solid var(--line);white-space:nowrap}
     th{font-size:13px;background:#f9fafb;color:#475467}
@@ -51,7 +61,11 @@
     <p>
       Tableau des faits avec les informations principales.
     </p>
+    <div id="table1-scroll-top" class="table-scroll-top">
+      <div id="table1-scroll-top-inner" class="table-scroll-top-inner"></div>
+    </div>
     <div id="table1" class="table-wrap"><div class="empty">Chargement…</div></div>
+    <div id="pagination1" class="pagination"></div>
   </section>
 
   <section class="section">
@@ -92,7 +106,7 @@
 */
 const CONFIG = {
   table1: {
-    id: "Faits",
+    id: "FElignes",
     columns: [
       ["Numero_FE", "Numéro FE"],
       ["Date_de_saisie", "Date de saisie"],
@@ -148,17 +162,170 @@ function displayValue(value) {
   return value;
 }
 
-function renderTable(targetId, rows, columns) {
+const TABLE_STATE = {
+  table1: {
+    page: 1,
+    pageSize: 10,
+    rows: [],
+    columns: []
+  }
+};
+
+function renderTable(targetId, rows, columns, page = 1, pageSize = 10) {
   const target = document.getElementById(targetId);
+
   if (!rows.length) {
     target.innerHTML = '<div class="empty">Aucune donnée à afficher.</div>';
+    const pagination = document.getElementById(`pagination${targetId.replace("table", "")}`);
+    if (pagination) pagination.innerHTML = "";
     return;
   }
-  const head = columns.map(([,label]) => `<th>${escapeHtml(label)}</th>`).join("");
-  const body = rows.map(row => `
-    <tr>${columns.map(([key]) => `<td>${escapeHtml(displayValue(row[key]))}</td>`).join("")}</tr>
+
+  const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
+  page = Math.min(Math.max(page, 1), totalPages);
+
+  const startIndex = (page - 1) * pageSize;
+  const visibleRows = rows.slice(startIndex, startIndex + pageSize);
+
+  const head = columns
+    .map(([, label]) => `<th>${escapeHtml(label)}</th>`)
+    .join("");
+
+  const body = visibleRows.map(row => `
+    <tr>
+      ${columns.map(([key]) =>
+        `<td>${escapeHtml(displayValue(row[key]))}</td>`
+      ).join("")}
+    </tr>
   `).join("");
-  target.innerHTML = `<table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`;
+
+  target.innerHTML = `
+    <table>
+      <thead><tr>${head}</tr></thead>
+      <tbody>${body}</tbody>
+    </table>
+  `;
+
+  renderPagination(targetId, rows.length, page, pageSize);
+
+  if (targetId === "table1") {
+    requestAnimationFrame(setupTopScrollbar);
+  }
+}
+
+function renderPagination(targetId, totalRows, currentPage, pageSize) {
+  const paginationId = `pagination${targetId.replace("table", "")}`;
+  const target = document.getElementById(paginationId);
+  if (!target) return;
+
+  const totalPages = Math.max(1, Math.ceil(totalRows / pageSize));
+  const firstRow = totalRows ? ((currentPage - 1) * pageSize) + 1 : 0;
+  const lastRow = Math.min(currentPage * pageSize, totalRows);
+
+  let buttons = "";
+
+  for (let p = 1; p <= totalPages; p++) {
+    const closeToCurrent = Math.abs(p - currentPage) <= 2;
+    const edgePage = p === 1 || p === totalPages;
+
+    if (closeToCurrent || edgePage) {
+      buttons += `
+        <button
+          class="page-btn ${p === currentPage ? "active" : ""}"
+          onclick="goToPage('${targetId}', ${p})">
+          ${p}
+        </button>
+      `;
+    } else if (
+      (p === 2 && currentPage > 4) ||
+      (p === totalPages - 1 && currentPage < totalPages - 3)
+    ) {
+      buttons += '<span class="pagination-info">…</span>';
+    }
+  }
+
+  target.innerHTML = `
+    <div class="pagination-controls">
+      <button
+        class="page-btn"
+        ${currentPage === 1 ? "disabled" : ""}
+        onclick="goToPage('${targetId}', ${currentPage - 1})">
+        ← Précédent
+      </button>
+
+      ${buttons}
+
+      <button
+        class="page-btn"
+        ${currentPage === totalPages ? "disabled" : ""}
+        onclick="goToPage('${targetId}', ${currentPage + 1})">
+        Suivant →
+      </button>
+    </div>
+
+    <div class="pagination-info">
+      ${firstRow}–${lastRow} sur ${totalRows} faits
+    </div>
+  `;
+}
+
+function goToPage(targetId, page) {
+  const state = TABLE_STATE[targetId];
+  if (!state) return;
+
+  state.page = page;
+
+  renderTable(
+    targetId,
+    state.rows,
+    state.columns,
+    state.page,
+    state.pageSize
+  );
+
+  const table = document.getElementById(targetId);
+  if (table) {
+    table.scrollTop = 0;
+    table.scrollLeft = 0;
+  }
+
+  const topScroll = document.getElementById(`${targetId}-scroll-top`);
+  if (topScroll) topScroll.scrollLeft = 0;
+}
+
+function setupTopScrollbar() {
+  const bottom = document.getElementById("table1");
+  const top = document.getElementById("table1-scroll-top");
+  const topInner = document.getElementById("table1-scroll-top-inner");
+
+  if (!bottom || !top || !topInner) return;
+
+  const table = bottom.querySelector("table");
+  if (!table) return;
+
+  topInner.style.width = `${table.scrollWidth}px`;
+
+  if (top.dataset.bound === "1") return;
+  top.dataset.bound = "1";
+
+  let syncingTop = false;
+  let syncingBottom = false;
+
+  top.addEventListener("scroll", () => {
+    if (syncingBottom) return;
+    syncingTop = true;
+    bottom.scrollLeft = top.scrollLeft;
+    syncingTop = false;
+  });
+
+  bottom.addEventListener("scroll", () => {
+    if (syncingTop) return;
+    syncingBottom = true;
+    top.scrollLeft = bottom.scrollLeft;
+    syncingBottom = false;
+  });
+
+  window.addEventListener("resize", setupTopScrollbar);
 }
 
 function attachmentIds(value) {
@@ -205,7 +372,16 @@ async function load() {
       grist.docApi.fetchTable(CONFIG.documents.id)
     ]);
 
-    renderTable("table1", rowsFromFetchTable(raw1), CONFIG.table1.columns);
+    TABLE_STATE.table1.rows = rowsFromFetchTable(raw1);
+    TABLE_STATE.table1.columns = CONFIG.table1.columns;
+    TABLE_STATE.table1.page = 1;
+    renderTable(
+      "table1",
+      TABLE_STATE.table1.rows,
+      TABLE_STATE.table1.columns,
+      TABLE_STATE.table1.page,
+      TABLE_STATE.table1.pageSize
+    );
     renderTable("table2", rowsFromFetchTable(raw2), CONFIG.table2.columns);
     await renderDownloads(rowsFromFetchTable(rawDocs));
   } catch (err) {
