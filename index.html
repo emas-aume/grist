@@ -2,6 +2,7 @@
 <html lang="fr">
 
 <head>
+
   <meta charset="utf-8">
 
   <meta
@@ -13,6 +14,7 @@
 
   <!-- API Grist -->
   <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
+
 
   <style>
 
@@ -27,9 +29,11 @@
       --radius: 14px;
     }
 
+
     * {
       box-sizing: border-box;
     }
+
 
     body {
       margin: 0;
@@ -38,11 +42,13 @@
       font-family: Inter, Segoe UI, Arial, sans-serif;
     }
 
+
     .page {
       max-width: 1180px;
       margin: 0 auto;
       padding: 34px 24px 60px;
     }
+
 
     .hero,
     .section {
@@ -53,24 +59,29 @@
       margin-bottom: 22px;
     }
 
+
     .hero h1 {
       margin: 0 0 10px;
       font-size: 30px;
     }
+
 
     h2 {
       margin: 0 0 12px;
       font-size: 22px;
     }
 
+
     p {
       line-height: 1.6;
       margin: 8px 0 14px;
     }
 
+
     .muted {
       color: var(--muted);
     }
+
 
     .note {
       padding: 14px 16px;
@@ -79,6 +90,7 @@
       border-radius: 8px;
       margin: 16px 0;
     }
+
 
 
     /* =========================================
@@ -94,15 +106,80 @@
       font-size: 14px;
     }
 
+
     .diagnostic.ok {
       background: #ecfdf3;
       color: #067647;
     }
 
+
     .diagnostic.error {
       background: #fef3f2;
       color: #b42318;
     }
+
+
+
+    /* =========================================
+       FILTRES DÉPARTEMENT
+       ========================================= */
+
+    .filters-container {
+      margin-top: 20px;
+      margin-bottom: 14px;
+    }
+
+
+    .filters-title {
+      display: block;
+      margin-bottom: 9px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--muted);
+    }
+
+
+    .department-filters {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+
+    .department-btn {
+      padding: 8px 14px;
+      border: 1px solid var(--line);
+      background: #ffffff;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text);
+      transition:
+        background 0.15s,
+        border-color 0.15s,
+        color 0.15s;
+    }
+
+
+    .department-btn:hover {
+      background: #f3f4f6;
+    }
+
+
+    .department-btn.active {
+      background: var(--primary);
+      border-color: var(--primary);
+      color: #ffffff;
+    }
+
+
+    .department-btn.active:hover {
+      background: var(--primary-hover);
+      border-color: var(--primary-hover);
+    }
+
 
 
     /* =========================================
@@ -114,15 +191,17 @@
       max-height: 520px;
       border: 1px solid var(--line);
       border-radius: 10px;
-      margin-top: 16px;
+      margin-top: 12px;
     }
+
 
     table {
       width: 100%;
       min-width: 950px;
       border-collapse: collapse;
-      background: #fff;
+      background: #ffffff;
     }
+
 
     th,
     td {
@@ -131,6 +210,7 @@
       border-bottom: 1px solid var(--line);
       white-space: nowrap;
     }
+
 
     th {
       position: sticky;
@@ -141,13 +221,23 @@
       color: #475467;
     }
 
+
     tr:last-child td {
       border-bottom: none;
     }
 
+
     tr:hover td {
       background: #fafafa;
     }
+
+
+    .empty-table {
+      padding: 32px 20px;
+      text-align: center;
+      color: var(--muted);
+    }
+
 
 
     /* =========================================
@@ -163,6 +253,7 @@
       margin-top: 14px;
     }
 
+
     .pagination-controls {
       display: flex;
       align-items: center;
@@ -170,35 +261,41 @@
       flex-wrap: wrap;
     }
 
+
     .page-btn {
       padding: 8px 12px;
       border: 1px solid var(--line);
-      background: #fff;
+      background: #ffffff;
       border-radius: 8px;
       cursor: pointer;
       font-weight: 600;
       color: var(--text);
     }
 
+
     .page-btn:hover:not(:disabled) {
       background: #f3f4f6;
     }
 
+
     .page-btn.active {
       background: var(--primary);
-      color: #fff;
+      color: #ffffff;
       border-color: var(--primary);
     }
+
 
     .page-btn:disabled {
       opacity: 0.45;
       cursor: not-allowed;
     }
 
+
     .pagination-info {
       color: var(--muted);
       font-size: 14px;
     }
+
 
   </style>
 
@@ -206,6 +303,7 @@
 
 
 <body>
+
 
 <div class="page">
 
@@ -245,6 +343,7 @@
       Tableau des faits avec les informations principales.
     </p>
 
+
     <div
       id="diagnostic"
       class="diagnostic"
@@ -252,17 +351,44 @@
       Connexion au widget Grist...
     </div>
 
+
+
+    <!-- FILTRES -->
+
+    <div class="filters-container">
+
+      <span class="filters-title">
+        Filtrer par département
+      </span>
+
+      <div
+        id="department-filters"
+        class="department-filters"
+      >
+      </div>
+
+    </div>
+
+
+
+    <!-- TABLEAU -->
+
     <div
       id="table1"
       class="table-wrap"
     >
     </div>
 
+
+
+    <!-- PAGINATION -->
+
     <div
       id="pagination"
       class="pagination"
     >
     </div>
+
 
   </section>
 
@@ -331,14 +457,18 @@
 
 <script>
 
+
   /*
     ==================================================
-    COLONNES À AFFICHER
+    COLONNES AFFICHÉES
     ==================================================
 
-    1er élément = ID technique de la colonne Grist
-    2e élément = nom affiché dans le tableau HTML
+    _departement n'existe PAS dans Grist.
+
+    Cette valeur est calculée automatiquement
+    depuis ID_et_Nom.
   */
+
 
   const COLUMNS = [
 
@@ -350,11 +480,12 @@
 
     ["Ville", "Ville"],
 
-    ["Departement", "Département"],
+    ["_departement", "Département"],
 
     ["Redacteur", "Rédacteur"]
 
   ];
+
 
 
   /*
@@ -363,11 +494,22 @@
     ==================================================
   */
 
+
   const PAGE_SIZE = 10;
+
 
   let allRecords = [];
 
+
   let currentPage = 1;
+
+
+  /*
+    "all" = tous les départements
+  */
+
+  let selectedDepartment = "all";
+
 
 
   const diagnostic =
@@ -377,23 +519,28 @@
 
   /*
     ==================================================
-    CONNEXION À GRIST
+    CONNEXION GRIST
     ==================================================
   */
 
+
   grist.ready({
+
     requiredAccess: "read table"
+
   });
 
 
 
   /*
     ==================================================
-    RÉCEPTION DES DONNÉES
+    RÉCEPTION DES DONNÉES GRIST
     ==================================================
   */
 
+
   grist.onRecords(function(records) {
+
 
     console.log(
       "Données reçues depuis Grist :",
@@ -401,28 +548,84 @@
     );
 
 
+
     if (!Array.isArray(records)) {
+
 
       diagnostic.textContent =
         "Erreur : les données reçues ne sont pas valides.";
 
+
       diagnostic.className =
         "diagnostic error";
 
+
       return;
+
     }
+
 
 
     if (records.length === 0) {
 
+
       diagnostic.textContent =
         "Connexion réussie, mais aucune ligne n'a été reçue.";
+
 
       diagnostic.className =
         "diagnostic error";
 
+
+      allRecords = [];
+
+
+      renderDepartmentFilters();
+
+      renderTable();
+
+
       return;
+
     }
+
+
+
+    /*
+      ==================================================
+      CRÉATION DU DÉPARTEMENT
+      ==================================================
+
+      Exemple :
+
+      ID_et_Nom :
+
+      0342397W - ECOLE PRIMAIRE...
+
+      Les trois premiers chiffres sont :
+
+      034
+
+      On enlève le zéro initial :
+
+      34
+    */
+
+
+    allRecords = records.map(function(record) {
+
+
+      return {
+
+        ...record,
+
+        _departement:
+          getDepartement(record)
+
+      };
+
+
+    });
 
 
 
@@ -431,7 +634,7 @@
       TRI DES FE
       ==================================================
 
-      Les FE sont triés par numéro décroissant.
+      Numéro FE le plus grand en premier.
 
       Exemple :
 
@@ -440,15 +643,15 @@
       5574428
       5574416
       5574411
-
-      Le FE avec le numéro le plus grand
-      apparaît donc en premier.
     */
 
-    allRecords = [...records].sort(function(a, b) {
+
+    allRecords.sort(function(a, b) {
+
 
       const numeroA =
         getNumeroFE(a.Numero_FE);
+
 
       const numeroB =
         getNumeroFE(b.Numero_FE);
@@ -456,13 +659,15 @@
 
       return numeroB - numeroA;
 
+
     });
 
 
+
     /*
-      On revient toujours à la première page
-      lorsqu'on reçoit de nouvelles données.
+      Retour page 1
     */
+
 
     currentPage = 1;
 
@@ -470,29 +675,38 @@
 
     /*
       ==================================================
-      VÉRIFICATION DES COLONNES
+      VÉRIFICATION DES COLONNES GRIST
       ==================================================
+
+      On ne vérifie PAS _departement puisqu'il
+      est créé par notre JavaScript.
     */
+
 
     const receivedColumns =
       Object.keys(records[0]);
 
 
-    console.log(
-      "Colonnes reçues depuis Grist :",
-      receivedColumns
-    );
+
+    const gristColumns =
+      COLUMNS
+        .map(column => column[0])
+        .filter(column => column !== "_departement");
+
 
 
     const missingColumns =
-      COLUMNS
-        .map(column => column[0])
-        .filter(
-          id => !receivedColumns.includes(id)
-        );
+      gristColumns.filter(
+
+        id =>
+          !receivedColumns.includes(id)
+
+      );
+
 
 
     if (missingColumns.length > 0) {
+
 
       diagnostic.textContent =
         "Connexion réussie : " +
@@ -501,17 +715,21 @@
         "Colonnes introuvables : " +
         missingColumns.join(", ");
 
+
       diagnostic.className =
         "diagnostic error";
 
     }
 
+
     else {
+
 
       diagnostic.textContent =
         "Connexion réussie : " +
         records.length +
         " faits reçus.";
+
 
       diagnostic.className =
         "diagnostic ok";
@@ -519,7 +737,23 @@
     }
 
 
+
+    /*
+      Création des boutons département
+    */
+
+
+    renderDepartmentFilters();
+
+
+
+    /*
+      Affichage du tableau
+    */
+
+
     renderTable();
+
 
   });
 
@@ -527,19 +761,21 @@
 
   /*
     ==================================================
-    RÉCUPÉRATION DU NUMÉRO FE
+    EXTRACTION DU NUMÉRO FE
     ==================================================
 
     Exemple :
 
     Fait Nº 2026-011-5574411
 
-    retourne :
+    devient :
 
     5574411
   */
 
+
   function getNumeroFE(value) {
+
 
     if (
       value === null ||
@@ -552,24 +788,375 @@
     }
 
 
+
     const texte =
       String(value);
 
 
-    const match =
-      texte.match(
-        /(\d+)\s*$/
-      );
+
+    const nombres =
+      texte.match(/\d+/g);
 
 
-    if (match) {
 
-      return Number(match[1]);
+    if (
+      !nombres ||
+      nombres.length === 0
+    ) {
+
+      return 0;
 
     }
 
 
-    return 0;
+
+    return Number(
+
+      nombres[
+        nombres.length - 1
+      ]
+
+    );
+
+  }
+
+
+
+  /*
+    ==================================================
+    EXTRACTION DU DÉPARTEMENT
+    ==================================================
+
+    Exemples :
+
+    0342397W
+    -> 034
+    -> 34
+
+    0661234A
+    -> 066
+    -> 66
+
+    0481234B
+    -> 048
+    -> 48
+
+    0111234C
+    -> 011
+    -> 11
+  */
+
+
+  function getDepartement(record) {
+
+
+    if (!record) {
+
+      return "";
+
+    }
+
+
+
+    const value =
+      record.ID_et_Nom;
+
+
+
+    if (
+      value === null ||
+      value === undefined ||
+      value === ""
+    ) {
+
+      return "";
+
+    }
+
+
+
+    const texte =
+      String(value).trim();
+
+
+
+    /*
+      On récupère les trois premiers chiffres.
+    */
+
+
+    const match =
+      texte.match(/^(\d{3})/);
+
+
+
+    if (!match) {
+
+      return "";
+
+    }
+
+
+
+    /*
+      Number("034") = 34
+      Number("048") = 48
+      Number("066") = 66
+    */
+
+
+    return String(
+
+      Number(match[1])
+
+    );
+
+  }
+
+
+
+  /*
+    ==================================================
+    LISTE DES DÉPARTEMENTS DISPONIBLES
+    ==================================================
+  */
+
+
+  function getDepartments() {
+
+
+    const departments =
+      allRecords
+
+        .map(function(record) {
+
+          return record._departement;
+
+        })
+
+        .filter(function(departement) {
+
+          return departement !== "";
+
+        });
+
+
+
+    /*
+      Suppression des doublons
+    */
+
+
+    const uniqueDepartments =
+      [...new Set(departments)];
+
+
+
+    /*
+      Tri numérique :
+
+      11
+      30
+      34
+      48
+      66
+    */
+
+
+    uniqueDepartments.sort(
+      function(a, b) {
+
+        return Number(a) - Number(b);
+
+      }
+    );
+
+
+
+    return uniqueDepartments;
+
+  }
+
+
+
+  /*
+    ==================================================
+    AFFICHAGE DES BOUTONS DÉPARTEMENT
+    ==================================================
+  */
+
+
+  function renderDepartmentFilters() {
+
+
+    const target =
+      document.getElementById(
+        "department-filters"
+      );
+
+
+
+    const departments =
+      getDepartments();
+
+
+
+    let html = "";
+
+
+
+    /*
+      Bouton TOUS
+    */
+
+
+    html += `
+
+      <button
+        type="button"
+        class="department-btn ${
+          selectedDepartment === "all"
+            ? "active"
+            : ""
+        }"
+        onclick="setDepartment('all')"
+      >
+        Tous
+      </button>
+
+    `;
+
+
+
+    /*
+      Boutons département
+    */
+
+
+    departments.forEach(
+      function(departement) {
+
+
+        const active =
+          selectedDepartment === departement
+            ? "active"
+            : "";
+
+
+
+        html += `
+
+          <button
+            type="button"
+            class="department-btn ${active}"
+            onclick="setDepartment('${departement}')"
+          >
+            ${escapeHtml(departement)}
+          </button>
+
+        `;
+
+
+      }
+    );
+
+
+
+    target.innerHTML = html;
+
+  }
+
+
+
+  /*
+    ==================================================
+    CHANGEMENT DE DÉPARTEMENT
+    ==================================================
+  */
+
+
+  function setDepartment(departement) {
+
+
+    selectedDepartment =
+      departement;
+
+
+
+    /*
+      Lorsqu'on change de département,
+      retour automatique à la page 1.
+    */
+
+
+    currentPage = 1;
+
+
+
+    /*
+      Mise à jour des boutons
+    */
+
+
+    renderDepartmentFilters();
+
+
+
+    /*
+      Mise à jour du tableau
+    */
+
+
+    renderTable();
+
+
+  }
+
+
+
+  /*
+    ==================================================
+    RÉCUPÉRATION DES FE FILTRÉS
+    ==================================================
+  */
+
+
+  function getFilteredRecords() {
+
+
+    /*
+      Aucun filtre :
+      on retourne tous les FE.
+    */
+
+
+    if (
+      selectedDepartment === "all"
+    ) {
+
+      return allRecords;
+
+    }
+
+
+
+    /*
+      Sinon uniquement le département choisi.
+    */
+
+
+    return allRecords.filter(
+      function(record) {
+
+
+        return (
+          record._departement ===
+          selectedDepartment
+        );
+
+
+      }
+    );
 
   }
 
@@ -581,28 +1168,90 @@
     ==================================================
   */
 
+
   function renderTable() {
+
 
     const tableContainer =
       document.getElementById("table1");
 
 
+
+    /*
+      Données après filtrage
+    */
+
+
+    const filteredRecords =
+      getFilteredRecords();
+
+
+
+    /*
+      Si aucun résultat
+    */
+
+
+    if (
+      filteredRecords.length === 0
+    ) {
+
+
+      tableContainer.innerHTML = `
+
+        <div class="empty-table">
+
+          Aucun fait à afficher
+          pour ce département.
+
+        </div>
+
+      `;
+
+
+      renderPagination(
+        filteredRecords
+      );
+
+
+      return;
+
+    }
+
+
+
+    /*
+      Pagination
+    */
+
+
     const startIndex =
-      (currentPage - 1) * PAGE_SIZE;
+      (currentPage - 1) *
+      PAGE_SIZE;
+
 
 
     const endIndex =
-      startIndex + PAGE_SIZE;
+      startIndex +
+      PAGE_SIZE;
+
 
 
     const visibleRecords =
-      allRecords.slice(
+      filteredRecords.slice(
         startIndex,
         endIndex
       );
 
 
-    let html = "<table>";
+
+    /*
+      Création du tableau
+    */
+
+
+    let html =
+      "<table>";
 
 
 
@@ -610,71 +1259,111 @@
       EN-TÊTES
     */
 
-    html += "<thead><tr>";
+
+    html +=
+      "<thead><tr>";
 
 
-    COLUMNS.forEach(function(column) {
 
-      html +=
-        "<th>" +
-        escapeHtml(column[1]) +
-        "</th>";
-
-    });
+    COLUMNS.forEach(
+      function(column) {
 
 
-    html += "</tr></thead>";
+        html +=
+          "<th>" +
+          escapeHtml(column[1]) +
+          "</th>";
+
+
+      }
+    );
+
+
+
+    html +=
+      "</tr></thead>";
 
 
 
     /*
-      LIGNES
+      CORPS DU TABLEAU
     */
 
-    html += "<tbody>";
+
+    html +=
+      "<tbody>";
 
 
-    visibleRecords.forEach(function(record) {
 
-      html += "<tr>";
-
-
-      COLUMNS.forEach(function(column) {
-
-        const columnId =
-          column[0];
-
-
-        const value =
-          formatValue(
-            record[columnId],
-            columnId
-          );
+    visibleRecords.forEach(
+      function(record) {
 
 
         html +=
-          "<td>" +
-          escapeHtml(value) +
-          "</td>";
-
-      });
+          "<tr>";
 
 
-      html += "</tr>";
 
-    });
+        COLUMNS.forEach(
+          function(column) {
 
 
-    html += "</tbody>";
+            const columnId =
+              column[0];
 
-    html += "</table>";
+
+
+            const value =
+              formatValue(
+                record[columnId],
+                columnId
+              );
+
+
+
+            html +=
+              "<td>" +
+              escapeHtml(value) +
+              "</td>";
+
+
+          }
+        );
+
+
+
+        html +=
+          "</tr>";
+
+
+      }
+    );
+
+
+
+    html +=
+      "</tbody>";
+
+
+
+    html +=
+      "</table>";
+
 
 
     tableContainer.innerHTML =
       html;
 
 
-    renderPagination();
+
+    /*
+      Mise à jour pagination
+    */
+
+
+    renderPagination(
+      filteredRecords
+    );
 
   }
 
@@ -686,35 +1375,104 @@
     ==================================================
   */
 
-  function renderPagination() {
+
+  function renderPagination(records) {
+
 
     const pagination =
-      document.getElementById("pagination");
+      document.getElementById(
+        "pagination"
+      );
+
+
+
+    const totalRecords =
+      records.length;
+
+
+
+    /*
+      Aucun résultat
+    */
+
+
+    if (totalRecords === 0) {
+
+
+      pagination.innerHTML = `
+
+        <div class="pagination-info">
+          0 fait
+        </div>
+
+      `;
+
+
+      return;
+
+    }
+
 
 
     const totalPages =
       Math.max(
+
         1,
+
         Math.ceil(
-          allRecords.length / PAGE_SIZE
+          totalRecords /
+          PAGE_SIZE
         )
+
       );
 
 
+
+    /*
+      Sécurité au cas où la page actuelle
+      serait supérieure au nombre de pages.
+    */
+
+
+    if (
+      currentPage >
+      totalPages
+    ) {
+
+      currentPage =
+        totalPages;
+
+    }
+
+
+
     const firstRow =
-      allRecords.length
-        ? ((currentPage - 1) * PAGE_SIZE) + 1
-        : 0;
+      (
+        (currentPage - 1) *
+        PAGE_SIZE
+      ) + 1;
+
 
 
     const lastRow =
       Math.min(
-        currentPage * PAGE_SIZE,
-        allRecords.length
+
+        currentPage *
+        PAGE_SIZE,
+
+        totalRecords
+
       );
 
 
+
     let buttons = "";
+
+
+
+    /*
+      Création des numéros de pages
+    */
 
 
     for (
@@ -723,10 +1481,12 @@
       page++
     ) {
 
+
       const closeToCurrent =
         Math.abs(
           page - currentPage
         ) <= 2;
+
 
 
       const edgePage =
@@ -734,15 +1494,22 @@
         page === totalPages;
 
 
+
       if (
         closeToCurrent ||
         edgePage
       ) {
 
+
         buttons += `
 
           <button
-            class="page-btn ${page === currentPage ? "active" : ""}"
+            type="button"
+            class="page-btn ${
+              page === currentPage
+                ? "active"
+                : ""
+            }"
             onclick="goToPage(${page})"
           >
             ${page}
@@ -751,6 +1518,7 @@
         `;
 
       }
+
 
       else if (
 
@@ -763,27 +1531,46 @@
 
         (
           page === totalPages - 1 &&
-          currentPage < totalPages - 3
+          currentPage <
+          totalPages - 3
         )
 
       ) {
 
-        buttons +=
-          '<span class="pagination-info">…</span>';
+
+        buttons += `
+
+          <span class="pagination-info">
+            …
+          </span>
+
+        `;
 
       }
 
     }
 
 
+
+    /*
+      Affichage pagination
+    */
+
+
     pagination.innerHTML = `
 
       <div class="pagination-controls">
 
+
         <button
+          type="button"
           class="page-btn"
           onclick="goToPage(${currentPage - 1})"
-          ${currentPage === 1 ? "disabled" : ""}
+          ${
+            currentPage === 1
+              ? "disabled"
+              : ""
+          }
         >
           ← Précédent
         </button>
@@ -793,12 +1580,18 @@
 
 
         <button
+          type="button"
           class="page-btn"
           onclick="goToPage(${currentPage + 1})"
-          ${currentPage === totalPages ? "disabled" : ""}
+          ${
+            currentPage === totalPages
+              ? "disabled"
+              : ""
+          }
         >
           Suivant →
         </button>
+
 
       </div>
 
@@ -807,7 +1600,7 @@
 
         ${firstRow}–${lastRow}
         sur
-        ${allRecords.length}
+        ${totalRecords}
         faits
 
       </div>
@@ -824,15 +1617,27 @@
     ==================================================
   */
 
+
   function goToPage(page) {
+
+
+    const filteredRecords =
+      getFilteredRecords();
+
+
 
     const totalPages =
       Math.max(
+
         1,
+
         Math.ceil(
-          allRecords.length / PAGE_SIZE
+          filteredRecords.length /
+          PAGE_SIZE
         )
+
       );
+
 
 
     if (
@@ -845,14 +1650,26 @@
     }
 
 
-    currentPage = page;
+
+    currentPage =
+      page;
+
 
 
     renderTable();
 
 
+
+    /*
+      Retour en haut du tableau
+    */
+
+
     const table =
-      document.getElementById("table1");
+      document.getElementById(
+        "table1"
+      );
+
 
 
     if (table) {
@@ -869,15 +1686,21 @@
 
   /*
     ==================================================
-    FORMATAGE DES DONNÉES
+    FORMATAGE DES VALEURS
     ==================================================
   */
 
-  function formatValue(value, columnId = "") {
+
+  function formatValue(
+    value,
+    columnId = ""
+  ) {
+
 
     /*
       Valeur vide
     */
+
 
     if (
       value === null ||
@@ -903,17 +1726,26 @@
       5574411
     */
 
-    if (columnId === "Numero_FE") {
+
+    if (
+      columnId ===
+      "Numero_FE"
+    ) {
+
 
       const numero =
         getNumeroFE(value);
 
 
-      if (numero !== 0) {
+
+      if (
+        numero !== 0
+      ) {
 
         return String(numero);
 
       }
+
 
 
       return String(value);
@@ -924,28 +1756,59 @@
 
     /*
       ==================================================
-      OBJET DATE JAVASCRIPT
+      DÉPARTEMENT
       ==================================================
     */
 
-    if (value instanceof Date) {
+
+    if (
+      columnId ===
+      "_departement"
+    ) {
+
+      return String(value);
+
+    }
+
+
+
+    /*
+      ==================================================
+      DATE JAVASCRIPT
+      ==================================================
+    */
+
+
+    if (
+      value instanceof Date
+    ) {
+
 
       const jour =
         String(
           value.getUTCDate()
-        ).padStart(2, "0");
+        ).padStart(
+          2,
+          "0"
+        );
+
 
 
       const mois =
         String(
           value.getUTCMonth() + 1
-        ).padStart(2, "0");
+        ).padStart(
+          2,
+          "0"
+        );
+
 
 
       const annee =
         String(
           value.getUTCFullYear()
         ).slice(-2);
+
 
 
       return (
@@ -966,15 +1829,23 @@
       ==================================================
     */
 
-    if (Array.isArray(value)) {
 
-      if (value[0] === "L") {
+    if (
+      Array.isArray(value)
+    ) {
+
+
+      if (
+        value[0] === "L"
+      ) {
+
 
         return value
           .slice(1)
           .join(", ");
 
       }
+
 
 
       return value.join(", ");
@@ -989,33 +1860,47 @@
       ==================================================
     */
 
+
     let texte;
 
 
-    if (typeof value === "object") {
+
+    if (
+      typeof value ===
+      "object"
+    ) {
+
 
       try {
+
 
         texte =
           JSON.stringify(value);
 
+
       }
+
 
       catch (error) {
 
+
         texte =
           String(value);
+
 
       }
 
     }
 
+
     else {
+
 
       texte =
         String(value);
 
     }
+
 
 
     texte =
@@ -1025,13 +1910,8 @@
 
     /*
       Suppression des guillemets éventuels
-
-      "2026-08-31T00:00:00.000Z"
-
-      devient :
-
-      2026-08-31T00:00:00.000Z
     */
+
 
     texte =
       texte.replace(
@@ -1043,40 +1923,43 @@
 
     /*
       ==================================================
-      DATES
+      FORMAT DATE
       ==================================================
-
-      Exemples reconnus :
 
       2026-08-31T00:00:00.000Z
 
-      "2026-08-31T00:00:00.000Z"
-
-      2026-08-31
-
-      deviennent :
+      devient :
 
       31/08/26
     */
 
+
     const dateMatch =
       texte.match(
+
         /^(\d{4})-(\d{2})-(\d{2})(?:T.*)?$/
+
       );
+
 
 
     if (dateMatch) {
 
+
       const annee =
-        dateMatch[1].slice(-2);
+        dateMatch[1]
+          .slice(-2);
+
 
 
       const mois =
         dateMatch[2];
 
 
+
       const jour =
         dateMatch[3];
+
 
 
       return (
@@ -1092,10 +1975,9 @@
 
 
     /*
-      ==================================================
       AUTRES VALEURS
-      ==================================================
     */
+
 
     return texte;
 
@@ -1109,7 +1991,9 @@
     ==================================================
   */
 
+
   function escapeHtml(value) {
+
 
     return String(value)
 
@@ -1140,7 +2024,9 @@
 
   }
 
+
 </script>
+
 
 </body>
 
