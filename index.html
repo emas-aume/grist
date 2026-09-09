@@ -1,468 +1,266 @@
 <!DOCTYPE html>
 <html lang="fr">
+
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta http-equiv="Content-Security-Policy" content="img-src 'self' data: https:; script-src 'self' 'unsafe-inline' https://docs.getgrist.com; connect-src 'self' https://docs.getgrist.com https://*.getgrist.com">
-  <title>Portail Grist</title>
+  <meta charset="UTF-8">
+
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  >
+
+  <title>Test Grist - FELIGNES</title>
+
+  <!-- API officielle des widgets Grist -->
   <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
+
   <style>
-    :root{
-      --bg:#f6f7f9; --card:#ffffff; --text:#1f2937; --muted:#667085;
-      --line:#e5e7eb; --primary:#2f6fed; --primary-hover:#245bcc;
-      --radius:14px;
+    body {
+      font-family: Arial, sans-serif;
+      background: #f6f7f9;
+      margin: 0;
+      padding: 30px;
+      color: #1f2937;
     }
-    *{box-sizing:border-box}
-    body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,Segoe UI,Arial,sans-serif}
-    .page{max-width:1180px;margin:0 auto;padding:34px 24px 60px}
-    .hero,.section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px;margin-bottom:22px}
-    .hero h1{margin:0 0 10px;font-size:30px}
-    h2{margin:0 0 12px;font-size:22px}
-    p{line-height:1.6;margin:8px 0 14px}
-    .muted{color:var(--muted)}
-    .table-scroll-top{overflow-x:auto;overflow-y:hidden;height:16px;margin-top:16px;border-radius:8px 8px 0 0}
-    .table-scroll-top-inner{height:1px}
-    .table-wrap{overflow:auto;max-height:520px;border:1px solid var(--line);border-radius:10px;margin-top:4px}
-    .table-wrap table{min-width:1100px}
-    .pagination{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:14px 0 0}
-    .pagination-controls{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-    .page-btn{padding:8px 12px;border:1px solid var(--line);background:#fff;border-radius:8px;cursor:pointer;font-weight:600;color:var(--text)}
-    .page-btn:hover:not(:disabled){background:#f3f4f6}
-    .page-btn.active{background:var(--primary);color:#fff;border-color:var(--primary)}
-    .page-btn:disabled{opacity:.45;cursor:not-allowed}
-    .pagination-info{color:var(--muted);font-size:14px}
-    table{width:100%;border-collapse:collapse;background:#fff}
-    th,td{padding:12px 14px;text-align:left;border-bottom:1px solid var(--line);white-space:nowrap}
-    th{font-size:13px;background:#f9fafb;color:#475467}
-    tr:last-child td{border-bottom:none}
-    .downloads{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
-    .btn{display:inline-flex;align-items:center;gap:8px;padding:10px 14px;border-radius:9px;background:var(--primary);color:white;text-decoration:none;font-weight:600;border:0;cursor:pointer}
-    .btn:hover{background:var(--primary-hover)}
-    .btn.secondary{background:#fff;color:var(--text);border:1px solid var(--line)}
-    .empty,.error{padding:18px;color:var(--muted)}
-    .error{color:#b42318;background:#fef3f2;border-radius:9px}
-    .note{padding:14px 16px;background:#f8fafc;border-left:4px solid #98a2b3;border-radius:8px;margin:16px 0}
-    .diagnostic{padding:12px 14px;margin-top:14px;border-radius:9px;background:#f8fafc;color:var(--muted);font-size:14px;white-space:pre-wrap}
-    .diagnostic.ok{background:#ecfdf3;color:#067647}
-    .diagnostic.error{background:#fef3f2;color:#b42318}
+
+    .container {
+      max-width: 1200px;
+      margin: auto;
+      background: white;
+      padding: 30px;
+      border-radius: 12px;
+      border: 1px solid #e5e7eb;
+    }
+
+    #diagnostic {
+      padding: 15px;
+      margin: 20px 0;
+      background: #f3f4f6;
+      border-radius: 8px;
+      white-space: pre-wrap;
+    }
+
+    .success {
+      background: #ecfdf3 !important;
+      color: #067647;
+    }
+
+    .error {
+      background: #fef3f2 !important;
+      color: #b42318;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+    }
+
+    th,
+    td {
+      border: 1px solid #e5e7eb;
+      padding: 10px;
+      text-align: left;
+    }
+
+    th {
+      background: #f9fafb;
+    }
   </style>
 </head>
+
 <body>
-<div class="page">
 
-  <section class="hero">
-    <h1>Ressources et suivi</h1>
+  <div class="container">
+
+    <h1>Test FELIGNES</h1>
+
     <p>
-      Bienvenue sur cet espace. Ce texte est totalement libre : vous pouvez écrire des
-      explications, consignes, informations pratiques ou présenter le contenu de la page.
+      Test de connexion entre le widget personnalisé et Grist.
     </p>
-    <p class="muted">Les tableaux ci-dessous sont alimentés automatiquement par les tables du document Grist.</p>
-  </section>
 
-  <section class="section">
-    <h2>Premier tableau</h2>
-    <p>
-      Tableau des faits avec les informations principales.
-    </p>
-    <div id="diagnostic1" class="diagnostic">Connexion au widget Grist…</div>
-    <div id="table1-scroll-top" class="table-scroll-top">
-      <div id="table1-scroll-top-inner" class="table-scroll-top-inner"></div>
-    </div>
-    <div id="table1" class="table-wrap"><div class="empty">Chargement…</div></div>
-    <div id="pagination1" class="pagination"></div>
-  </section>
-
-  <section class="section">
-    <h2>Informations complémentaires</h2>
-    <div class="note">
-      Ce bloc peut servir à mettre en évidence une procédure, une consigne importante,
-      une explication ou un rappel entre deux tableaux.
-    </div>
-    <p>
-      Le contenu n'est pas enfermé dans une cellule Grist : la mise en page est libre.
-    </p>
-  </section>
-
-  <section class="section">
-    <h2>Deuxième tableau</h2>
-    <p>Voici un second tableau provenant d'une autre table Grist.</p>
-    <div id="table2" class="table-wrap"><div class="empty">Chargement…</div></div>
-  </section>
-
-  <section class="section">
-    <h2>Documents à télécharger</h2>
-    <p>
-      Les boutons ci-dessous sont générés depuis la table <strong>Documents</strong>.
-      Chaque ligne peut contenir un libellé et une pièce jointe PDF ou Word.
-    </p>
-    <div id="downloads" class="downloads"><span class="empty">Chargement…</span></div>
-  </section>
-
-</div>
-
-<script>
-/*
-  ==========================
-  CONFIGURATION À ADAPTER
-  ==========================
-  Utilisez les identifiants techniques des tables/colonnes Grist.
-  Exemple : une colonne affichée "Nom établissement" peut avoir l'id "Nom_etablissement".
-*/
-const CONFIG = {
-  table1: {
-    id: "FElignes",
-    columns: [
-      ["$Numero_FE", "Numéro FE"],
-      ["$Date_de_saisie", "Date de saisie"],
-      ["$ID_et_Nom", "ID et Nom"],
-      ["$Ville", "Ville"],
-      ["$Departement", "Département"],
-      ["$Redacteur", "Rédacteur"]
-    ]
-  },
-  table2: {
-    id: "Faits",
-    columns: [
-      ["Type", "Type"],
-      ["Resume", "Résumé"],
-      ["Traitement", "Traitement"]
-    ]
-  },
-  documents: {
-    id: "Documents",
-    labelColumn: "Nom",
-    attachmentColumn: "Fichier"
-  }
-};
-
-grist.ready({requiredAccess: "read table"});
-
-function rowsFromFetchTable(data) {
-  if (!data || !data.id) return [];
-  return data.id.map((id, i) => {
-    const row = {id};
-    for (const [key, values] of Object.entries(data)) {
-      if (key !== "id") row[key] = values[i];
-    }
-    return row;
-  });
-}
-
-function escapeHtml(value) {
-  return String(value ?? "")
-    .replaceAll("&","&amp;").replaceAll("<","&lt;")
-    .replaceAll(">","&gt;").replaceAll('"',"&quot;")
-    .replaceAll("'","&#039;");
-}
-
-function displayValue(value) {
-  if (value === null || value === undefined) return "";
-  if (Array.isArray(value)) {
-    // Grist peut renvoyer certaines valeurs typées sous forme ["L", ...].
-    if (value[0] === "L") return value.slice(1).join(", ");
-    return value.join(", ");
-  }
-  if (typeof value === "object") return JSON.stringify(value);
-  return value;
-}
-
-function setDiagnostic(message, type = "") {
-  const el = document.getElementById("diagnostic1");
-  if (!el) return;
-  el.textContent = message;
-  el.className = "diagnostic" + (type ? " " + type : "");
-}
-
-const TABLE_STATE = {
-  table1: {
-    page: 1,
-    pageSize: 10,
-    rows: [],
-    columns: []
-  }
-};
-
-function renderTable(targetId, rows, columns, page = 1, pageSize = 10) {
-  const target = document.getElementById(targetId);
-
-  if (!rows.length) {
-    target.innerHTML = '<div class="empty">Aucune donnée à afficher.</div>';
-    const pagination = document.getElementById(`pagination${targetId.replace("table", "")}`);
-    if (pagination) pagination.innerHTML = "";
-    return;
-  }
-
-  const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
-  page = Math.min(Math.max(page, 1), totalPages);
-
-  const startIndex = (page - 1) * pageSize;
-  const visibleRows = rows.slice(startIndex, startIndex + pageSize);
-
-  const head = columns
-    .map(([, label]) => `<th>${escapeHtml(label)}</th>`)
-    .join("");
-
-  const body = visibleRows.map(row => `
-    <tr>
-      ${columns.map(([key]) =>
-        `<td>${escapeHtml(displayValue(row[key]))}</td>`
-      ).join("")}
-    </tr>
-  `).join("");
-
-  target.innerHTML = `
-    <table>
-      <thead><tr>${head}</tr></thead>
-      <tbody>${body}</tbody>
-    </table>
-  `;
-
-  renderPagination(targetId, rows.length, page, pageSize);
-
-  if (targetId === "table1") {
-    requestAnimationFrame(setupTopScrollbar);
-  }
-}
-
-function renderPagination(targetId, totalRows, currentPage, pageSize) {
-  const paginationId = `pagination${targetId.replace("table", "")}`;
-  const target = document.getElementById(paginationId);
-  if (!target) return;
-
-  const totalPages = Math.max(1, Math.ceil(totalRows / pageSize));
-  const firstRow = totalRows ? ((currentPage - 1) * pageSize) + 1 : 0;
-  const lastRow = Math.min(currentPage * pageSize, totalRows);
-
-  let buttons = "";
-
-  for (let p = 1; p <= totalPages; p++) {
-    const closeToCurrent = Math.abs(p - currentPage) <= 2;
-    const edgePage = p === 1 || p === totalPages;
-
-    if (closeToCurrent || edgePage) {
-      buttons += `
-        <button
-          class="page-btn ${p === currentPage ? "active" : ""}"
-          onclick="goToPage('${targetId}', ${p})">
-          ${p}
-        </button>
-      `;
-    } else if (
-      (p === 2 && currentPage > 4) ||
-      (p === totalPages - 1 && currentPage < totalPages - 3)
-    ) {
-      buttons += '<span class="pagination-info">…</span>';
-    }
-  }
-
-  target.innerHTML = `
-    <div class="pagination-controls">
-      <button
-        class="page-btn"
-        ${currentPage === 1 ? "disabled" : ""}
-        onclick="goToPage('${targetId}', ${currentPage - 1})">
-        ← Précédent
-      </button>
-
-      ${buttons}
-
-      <button
-        class="page-btn"
-        ${currentPage === totalPages ? "disabled" : ""}
-        onclick="goToPage('${targetId}', ${currentPage + 1})">
-        Suivant →
-      </button>
+    <div id="diagnostic">
+      Étape 1 : HTML chargé.
     </div>
 
-    <div class="pagination-info">
-      ${firstRow}–${lastRow} sur ${totalRows} faits
-    </div>
-  `;
-}
+    <div id="table-container"></div>
 
-function goToPage(targetId, page) {
-  const state = TABLE_STATE[targetId];
-  if (!state) return;
+  </div>
 
-  state.page = page;
 
-  renderTable(
-    targetId,
-    state.rows,
-    state.columns,
-    state.page,
-    state.pageSize
-  );
+  <script>
 
-  const table = document.getElementById(targetId);
-  if (table) {
-    table.scrollTop = 0;
-    table.scrollLeft = 0;
-  }
+    const diagnostic = document.getElementById("diagnostic");
+    const tableContainer = document.getElementById("table-container");
 
-  const topScroll = document.getElementById(`${targetId}-scroll-top`);
-  if (topScroll) topScroll.scrollLeft = 0;
-}
 
-function setupTopScrollbar() {
-  const bottom = document.getElementById("table1");
-  const top = document.getElementById("table1-scroll-top");
-  const topInner = document.getElementById("table1-scroll-top-inner");
+    /*
+     * ÉTAPE 1
+     * Vérifier que l'API Grist existe
+     */
 
-  if (!bottom || !top || !topInner) return;
+    if (typeof grist === "undefined") {
 
-  const table = bottom.querySelector("table");
-  if (!table) return;
+      diagnostic.textContent =
+        "ERREUR : l'API Grist n'a pas été chargée.";
 
-  topInner.style.width = `${table.scrollWidth}px`;
+      diagnostic.className = "error";
 
-  if (top.dataset.bound === "1") return;
-  top.dataset.bound = "1";
+    } else {
 
-  let syncingTop = false;
-  let syncingBottom = false;
+      diagnostic.textContent =
+        "Étape 2 : API Grist chargée. Attente des données...";
 
-  top.addEventListener("scroll", () => {
-    if (syncingBottom) return;
-    syncingTop = true;
-    bottom.scrollLeft = top.scrollLeft;
-    syncingTop = false;
-  });
 
-  bottom.addEventListener("scroll", () => {
-    if (syncingTop) return;
-    syncingBottom = true;
-    top.scrollLeft = bottom.scrollLeft;
-    syncingBottom = false;
-  });
+      /*
+       * ÉTAPE 2
+       * Déclarer le widget auprès de Grist
+       */
 
-  window.addEventListener("resize", setupTopScrollbar);
-}
+      grist.ready({
+        requiredAccess: "read table"
+      });
 
-function attachmentIds(value) {
-  if (!value) return [];
-  if (Array.isArray(value)) {
-    if (value[0] === "L") return value.slice(1).filter(Number.isFinite);
-    return value.filter(Number.isFinite);
-  }
-  if (Number.isFinite(value)) return [value];
-  return [];
-}
 
-async function renderDownloads(rows) {
-  const target = document.getElementById("downloads");
-  if (!rows.length) {
-    target.innerHTML = '<span class="empty">Aucun document disponible.</span>';
-    return;
-  }
+      /*
+       * ÉTAPE 3
+       * Recevoir les lignes de la table
+       * sélectionnée dans le widget Grist
+       */
 
-  const tokenInfo = await grist.docApi.getAccessToken({readOnly: true});
-  const buttons = [];
+      grist.onRecords(function(records) {
 
-  for (const row of rows) {
-    const label = row[CONFIG.documents.labelColumn] || "Télécharger le document";
-    const ids = attachmentIds(row[CONFIG.documents.attachmentColumn]);
-    for (const id of ids) {
-      const url = `${tokenInfo.baseUrl}/attachments/${id}/download?auth=${encodeURIComponent(tokenInfo.token)}`;
-      buttons.push(
-        `<a class="btn" href="${escapeHtml(url)}" target="_blank" rel="noopener">↓ ${escapeHtml(label)}</a>`
-      );
-    }
-  }
+        console.log("Données reçues :", records);
 
-  target.innerHTML = buttons.length
-    ? buttons.join("")
-    : '<span class="empty">Les lignes existent, mais aucune pièce jointe n\'a été trouvée.</span>';
-}
+        if (!records) {
 
-async function loadSecondarySections() {
-  // Les sections 2 et Documents restent présentes.
-  // Elles sont chargées indépendamment afin qu'une table absente
-  // n'empêche jamais le premier tableau FElignes de fonctionner.
-  try {
-    const raw2 = await grist.docApi.fetchTable(CONFIG.table2.id);
-    renderTable("table2", rowsFromFetchTable(raw2), CONFIG.table2.columns);
-  } catch (err) {
-    console.warn("Deuxième tableau non chargé :", err);
-    document.getElementById("table2").innerHTML =
-      '<div class="empty">Deuxième tableau non configuré ou inaccessible.</div>';
-  }
+          diagnostic.textContent =
+            "ERREUR : Grist n'a retourné aucune donnée.";
 
-  try {
-    const rawDocs = await grist.docApi.fetchTable(CONFIG.documents.id);
-    await renderDownloads(rowsFromFetchTable(rawDocs));
-  } catch (err) {
-    console.warn("Documents non chargés :", err);
-    document.getElementById("downloads").innerHTML =
-      '<span class="empty">Section Documents non configurée ou inaccessible.</span>';
-  }
-}
+          diagnostic.className = "error";
 
-function startMainTable() {
-  try {
-    setDiagnostic("Connexion à Grist…");
-
-    grist.onRecords(function(records) {
-      try {
-        const rows = Array.isArray(records) ? records : [];
-
-        TABLE_STATE.table1.rows = rows;
-        TABLE_STATE.table1.columns = CONFIG.table1.columns;
-        TABLE_STATE.table1.page = 1;
-
-        if (!rows.length) {
-          setDiagnostic(
-            "Connexion réussie, mais aucune ligne n'a été reçue depuis la source FElignes.",
-            "error"
-          );
-          renderTable("table1", [], CONFIG.table1.columns);
           return;
         }
 
-        const receivedColumns = Object.keys(rows[0]);
-        const requestedColumns = CONFIG.table1.columns.map(([id]) => id);
-        const missing = requestedColumns.filter(id => !receivedColumns.includes(id));
 
-        if (missing.length) {
-          setDiagnostic(
-            "Connexion Grist réussie : " + rows.length + " lignes reçues.\n\n" +
-            "IDs demandés introuvables : " + missing.join(", ") + "\n\n" +
-            "Colonnes réellement reçues : " + receivedColumns.join(", "),
-            "error"
-          );
-        } else {
-          setDiagnostic(
-            "Connexion Grist réussie : " + rows.length + " faits reçus.\n\n" +
-            "Colonnes réellement reçues : " + receivedColumns.join(", "),
-            "ok"
-          );
+        if (records.length === 0) {
+
+          diagnostic.textContent =
+            "Connexion Grist réussie, mais 0 ligne reçue.";
+
+          diagnostic.className = "error";
+
+          return;
         }
 
-        renderTable(
-          "table1",
-          TABLE_STATE.table1.rows,
-          TABLE_STATE.table1.columns,
-          TABLE_STATE.table1.page,
-          TABLE_STATE.table1.pageSize
-        );
-      } catch (err) {
-        console.error(err);
-        setDiagnostic("Erreur pendant l'affichage : " + (err.message || err), "error");
+
+        /*
+         * ÉTAPE 4
+         * Afficher les IDs des colonnes reçues
+         */
+
+        const columns = Object.keys(records[0]);
+
+        diagnostic.textContent =
+          "CONNEXION RÉUSSIE !\n\n" +
+          records.length +
+          " lignes reçues.\n\n" +
+          "IDs des colonnes reçues :\n" +
+          columns.join("\n");
+
+        diagnostic.className = "success";
+
+
+        /*
+         * ÉTAPE 5
+         * Créer automatiquement un tableau
+         * avec TOUTES les colonnes reçues.
+         *
+         * On ne renseigne volontairement aucun
+         * ID de colonne manuellement pour le test.
+         */
+
+        let html = "<table>";
+
+        html += "<thead><tr>";
+
+        columns.forEach(function(column) {
+
+          html += "<th>" +
+            escapeHtml(column) +
+            "</th>";
+
+        });
+
+        html += "</tr></thead>";
+
+
+        html += "<tbody>";
+
+
+        records.slice(0, 20).forEach(function(record) {
+
+          html += "<tr>";
+
+          columns.forEach(function(column) {
+
+            html += "<td>" +
+              escapeHtml(formatValue(record[column])) +
+              "</td>";
+
+          });
+
+          html += "</tr>";
+
+        });
+
+
+        html += "</tbody>";
+        html += "</table>";
+
+
+        tableContainer.innerHTML = html;
+
+      });
+
+    }
+
+
+    /*
+     * Fonctions utilitaires
+     */
+
+    function formatValue(value) {
+
+      if (value === null || value === undefined) {
+        return "";
       }
-    });
 
-  } catch (err) {
-    console.error(err);
-    setDiagnostic("Erreur de connexion Grist : " + (err.message || err), "error");
-  }
-}
+      if (Array.isArray(value)) {
+        return value.join(", ");
+      }
 
-startMainTable();
+      if (typeof value === "object") {
+        return JSON.stringify(value);
+      }
 
-// On garde les autres sections de la page.
-// Si l'accès "read table" ne permet pas de lire d'autres tables,
-// elles afficheront simplement un message sans bloquer FElignes.
-loadSecondarySections();
-</script>
+      return String(value);
+    }
+
+
+    function escapeHtml(value) {
+
+      return String(value)
+
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+
+    }
+
+  </script>
+
 </body>
 </html>
