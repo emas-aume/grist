@@ -1,900 +1,146 @@
-<!DOCTYPE html>
-<html lang="fr">
-
-<head>
-  <meta charset="utf-8">
-
-  <meta
-    name="viewport"
-    content="width=device-width, initial-scale=1"
-  >
-
-  <title>Portail Grist</title>
-
-  <!-- API Grist -->
-  <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
-
-  <style>
-    :root {
-      --bg: #f6f7f9;
-      --card: #ffffff;
-      --text: #1f2937;
-      --muted: #667085;
-      --line: #e5e7eb;
-      --primary: #2f6fed;
-      --primary-hover: #245bcc;
-      --radius: 14px;
-    }
-
-    * {
-      box-sizing: border-box;
-    }
-
-    body {
-      margin: 0;
-      background: var(--bg);
-      color: var(--text);
-      font-family: Inter, Segoe UI, Arial, sans-serif;
-    }
-
-    .page {
-      max-width: 1180px;
-      margin: 0 auto;
-      padding: 34px 24px 60px;
-    }
-
-    .hero,
-    .section {
-      background: var(--card);
-      border: 1px solid var(--line);
-      border-radius: var(--radius);
-      padding: 28px;
-      margin-bottom: 22px;
-    }
-
-    .hero h1 {
-      margin: 0 0 10px;
-      font-size: 30px;
-    }
-
-    h2 {
-      margin: 0 0 12px;
-      font-size: 22px;
-    }
-
-    p {
-      line-height: 1.6;
-      margin: 8px 0 14px;
-    }
-
-    .muted {
-      color: var(--muted);
-    }
-
-    .note {
-      padding: 14px 16px;
-      background: #f8fafc;
-      border-left: 4px solid #98a2b3;
-      border-radius: 8px;
-      margin: 16px 0;
-    }
-
-    .diagnostic {
-      padding: 12px 14px;
-      margin-top: 14px;
-      border-radius: 9px;
-      background: #f8fafc;
-      color: var(--muted);
-      font-size: 14px;
-    }
-
-    .diagnostic.ok {
-      background: #ecfdf3;
-      color: #067647;
-    }
-
-    .diagnostic.error {
-      background: #fef3f2;
-      color: #b42318;
-    }
-
-    .table-wrap {
-      overflow: auto;
-      max-height: 520px;
-      border: 1px solid var(--line);
-      border-radius: 10px;
-      margin-top: 16px;
-    }
-
-    table {
-      width: 100%;
-      min-width: 950px;
-      border-collapse: collapse;
-      background: #fff;
-    }
-
-    th,
-    td {
-      padding: 12px 14px;
-      text-align: left;
-      border-bottom: 1px solid var(--line);
-      white-space: nowrap;
-    }
-
-    th {
-      position: sticky;
-      top: 0;
-      z-index: 1;
-      font-size: 13px;
-      background: #f9fafb;
-      color: #475467;
-    }
-
-    tr:last-child td {
-      border-bottom: none;
-    }
-
-    tr:hover td {
-      background: #fafafa;
-    }
-
-    .pagination {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
-      flex-wrap: wrap;
-      margin-top: 14px;
-    }
-
-    .pagination-controls {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      flex-wrap: wrap;
-    }
-
-    .page-btn {
-      padding: 8px 12px;
-      border: 1px solid var(--line);
-      background: #fff;
-      border-radius: 8px;
-      cursor: pointer;
-      font-weight: 600;
-      color: var(--text);
-    }
-
-    .page-btn:hover:not(:disabled) {
-      background: #f3f4f6;
-    }
-
-    .page-btn.active {
-      background: var(--primary);
-      color: #fff;
-      border-color: var(--primary);
-    }
-
-    .page-btn:disabled {
-      opacity: .45;
-      cursor: not-allowed;
-    }
-
-    .pagination-info {
-      color: var(--muted);
-      font-size: 14px;
-    }
-  </style>
-
-</head>
-
-<body>
-
-<div class="page">
-
-  <!-- EN-TÊTE -->
-
-  <section class="hero">
-
-    <h1>Ressources et suivi</h1>
-
-    <p>
-      Bienvenue sur cet espace. Ce texte est totalement libre :
-      vous pouvez écrire des explications, consignes,
-      informations pratiques ou présenter le contenu de la page.
-    </p>
-
-    <p class="muted">
-      Les tableaux ci-dessous sont alimentés automatiquement
-      par les données du document Grist.
-    </p>
-
-  </section>
-
-
-  <!-- PREMIER TABLEAU -->
-
-  <section class="section">
-
-    <h2>Premier tableau</h2>
-
-    <p>
-      Tableau des faits avec les informations principales.
-    </p>
-
-    <div
-      id="diagnostic"
-      class="diagnostic"
-    >
-      Connexion au widget Grist...
-    </div>
-
-    <div
-      id="table1"
-      class="table-wrap"
-    >
-    </div>
-
-    <div
-      id="pagination"
-      class="pagination"
-    >
-    </div>
-
-  </section>
-
-
-  <!-- INFORMATIONS COMPLÉMENTAIRES -->
-
-  <section class="section">
-
-    <h2>Informations complémentaires</h2>
-
-    <div class="note">
-      Ce bloc peut servir à mettre en évidence une procédure,
-      une consigne importante, une explication ou un rappel
-      entre deux tableaux.
-    </div>
-
-    <p>
-      Le contenu n'est pas enfermé dans une cellule Grist :
-      la mise en page de cette page reste totalement libre.
-    </p>
-
-  </section>
-
-
-  <!-- DEUXIÈME TABLEAU -->
-
-  <section class="section">
-
-    <h2>Deuxième tableau</h2>
-
-    <p>
-      Un second tableau pourra être ajouté ici ultérieurement.
-    </p>
-
-  </section>
-
-
-  <!-- DOCUMENTS -->
-
-  <section class="section">
-
-    <h2>Documents à télécharger</h2>
-
-    <p>
-      Cette section pourra ensuite servir à proposer
-      différents documents ou ressources.
-    </p>
-
-  </section>
-
-</div>
-
-
-<script>
-
-  /*
-    ============================================
-    COLONNES À AFFICHER
-    ============================================
-
-    Premier élément = ID technique Grist
-    Deuxième élément = nom affiché
-  */
-
-  const COLUMNS = [
-
-    ["Numero_FE", "Numéro FE"],
-
-    ["Date_de_saisie", "Date de saisie"],
-
-    ["ID_et_Nom", "ID et Nom"],
-
-    ["Ville", "Ville"],
-
-    ["Departement", "Département"],
-
-    ["Redacteur", "Rédacteur"]
-
-  ];
-
-
-  /*
-    Nombre de lignes par page
-  */
-
-  const PAGE_SIZE = 10;
-
-
-  let allRecords = [];
-
-  let currentPage = 1;
-
-
-  const diagnostic =
-    document.getElementById("diagnostic");
-
-
-  /*
-    ============================================
-    CONNEXION GRIST
-    ============================================
-  */
-
-  grist.ready({
-    requiredAccess: "read table"
-  });
-
-
-  /*
-    ============================================
-    RÉCEPTION DES DONNÉES
-    ============================================
-  */
-
-  grist.onRecords(function(records) {
-
-    console.log(
-      "Données reçues depuis Grist :",
-      records
-    );
-
-
-    if (!Array.isArray(records)) {
-
-      diagnostic.textContent =
-        "Erreur : les données reçues ne sont pas valides.";
-
-      diagnostic.className =
-        "diagnostic error";
-
-      return;
-    }
-
-
-    if (records.length === 0) {
-
-      diagnostic.textContent =
-        "Connexion réussie, mais aucune ligne n'a été reçue.";
-
-      diagnostic.className =
-        "diagnostic error";
-
-      return;
-    }
-
-
-    allRecords = records;
-
-    currentPage = 1;
-
-
-    const receivedColumns =
-      Object.keys(records[0]);
-
-
-    const missingColumns =
-      COLUMNS
-        .map(column => column[0])
-        .filter(
-          id => !receivedColumns.includes(id)
-        );
-
-
-    if (missingColumns.length > 0) {
-
-      diagnostic.textContent =
-        "Connexion réussie : " +
-        records.length +
-        " lignes reçues. " +
-        "Colonnes introuvables : " +
-        missingColumns.join(", ");
-
-      diagnostic.className =
-        "diagnostic error";
-
-    } else {
-
-      diagnostic.textContent =
-        "Connexion réussie : " +
-        records.length +
-        " faits reçus.";
-
-      diagnostic.className =
-        "diagnostic ok";
-
-    }
-
-
-    renderTable();
-
-  });
-
-
-  /*
-    ============================================
-    AFFICHAGE DU TABLEAU
-    ============================================
-  */
-
-  function renderTable() {
-
-    const tableContainer =
-      document.getElementById("table1");
-
-
-    const startIndex =
-      (currentPage - 1) * PAGE_SIZE;
-
-
-    const endIndex =
-      startIndex + PAGE_SIZE;
-
-
-    const visibleRecords =
-      allRecords.slice(
-        startIndex,
-        endIndex
-      );
-
-
-    let html = "<table>";
-
-
-    /*
-      EN-TÊTES
-    */
-
-    html += "<thead><tr>";
-
-
-    COLUMNS.forEach(function(column) {
-
-      html +=
-        "<th>" +
-        escapeHtml(column[1]) +
-        "</th>";
-
-    });
-
-
-    html += "</tr></thead>";
-
-
-    /*
-      LIGNES
-    */
-
-    html += "<tbody>";
-
-
-    visibleRecords.forEach(function(record) {
-
-      html += "<tr>";
-
-
-      COLUMNS.forEach(function(column) {
-
-        const columnId =
-          column[0];
-
-
-        const value =
-          formatValue(
-            record[columnId],
-            columnId
-          );
-
-
-        html +=
-          "<td>" +
-          escapeHtml(value) +
-          "</td>";
-
-      });
-
-
-      html += "</tr>";
-
-    });
-
-
-    html += "</tbody>";
-
-    html += "</table>";
-
-
-    tableContainer.innerHTML =
-      html;
-
-
-    renderPagination();
-
+function formatValue(value, columnId = "") {
+
+  if (
+    value === null ||
+    value === undefined ||
+    value === ""
+  ) {
+    return "";
   }
 
 
   /*
-    ============================================
-    PAGINATION
-    ============================================
+    ==========================
+    NUMÉRO FE
+    ==========================
+
+    Fait Nº 2026-011-5574411
+    devient
+    5574411
   */
 
-  function renderPagination() {
+  if (columnId === "Numero_FE") {
 
-    const pagination =
-      document.getElementById("pagination");
+    const texte = String(value);
 
+    const match = texte.match(/(\d+)\s*$/);
 
-    const totalPages =
-      Math.max(
-        1,
-        Math.ceil(
-          allRecords.length / PAGE_SIZE
-        )
-      );
-
-
-    const firstRow =
-      allRecords.length
-        ? ((currentPage - 1) * PAGE_SIZE) + 1
-        : 0;
-
-
-    const lastRow =
-      Math.min(
-        currentPage * PAGE_SIZE,
-        allRecords.length
-      );
-
-
-    let buttons = "";
-
-
-    for (
-      let page = 1;
-      page <= totalPages;
-      page++
-    ) {
-
-      const closeToCurrent =
-        Math.abs(
-          page - currentPage
-        ) <= 2;
-
-
-      const edgePage =
-        page === 1 ||
-        page === totalPages;
-
-
-      if (
-        closeToCurrent ||
-        edgePage
-      ) {
-
-        buttons += `
-
-          <button
-            class="page-btn ${page === currentPage ? "active" : ""}"
-            onclick="goToPage(${page})"
-          >
-            ${page}
-          </button>
-
-        `;
-
-      }
-
-      else if (
-
-        (
-          page === 2 &&
-          currentPage > 4
-        )
-
-        ||
-
-        (
-          page === totalPages - 1 &&
-          currentPage < totalPages - 3
-        )
-
-      ) {
-
-        buttons +=
-          '<span class="pagination-info">…</span>';
-
-      }
-
+    if (match) {
+      return match[1];
     }
 
-
-    pagination.innerHTML = `
-
-      <div class="pagination-controls">
-
-        <button
-          class="page-btn"
-          onclick="goToPage(${currentPage - 1})"
-          ${currentPage === 1 ? "disabled" : ""}
-        >
-          ← Précédent
-        </button>
-
-        ${buttons}
-
-        <button
-          class="page-btn"
-          onclick="goToPage(${currentPage + 1})"
-          ${currentPage === totalPages ? "disabled" : ""}
-        >
-          Suivant →
-        </button>
-
-      </div>
-
-
-      <div class="pagination-info">
-
-        ${firstRow}–${lastRow}
-        sur
-        ${allRecords.length}
-        faits
-
-      </div>
-
-    `;
-
-  }
-
-
-  function goToPage(page) {
-
-    const totalPages =
-      Math.ceil(
-        allRecords.length / PAGE_SIZE
-      );
-
-
-    if (
-      page < 1 ||
-      page > totalPages
-    ) {
-      return;
-    }
-
-
-    currentPage = page;
-
-
-    renderTable();
-
-
-    const table =
-      document.getElementById("table1");
-
-
-    if (table) {
-
-      table.scrollTop = 0;
-
-      table.scrollLeft = 0;
-
-    }
-
+    return texte;
   }
 
 
   /*
-    ============================================
-    FORMATAGE DES DONNÉES
-    ============================================
+    ==========================
+    OBJET DATE JAVASCRIPT
+    ==========================
   */
 
-  function formatValue(value, columnId = "") {
+  if (value instanceof Date) {
 
-    if (
-      value === null ||
-      value === undefined ||
-      value === ""
-    ) {
+    const jour =
+      String(value.getUTCDate()).padStart(2, "0");
 
-      return "";
+    const mois =
+      String(value.getUTCMonth() + 1).padStart(2, "0");
 
-    }
+    const annee =
+      String(value.getUTCFullYear()).slice(-2);
 
-
-    /*
-      NUMÉRO FE
-
-      Exemple :
-
-      Fait Nº 2026-011-5574411
-
-      devient :
-
-      5574411
-    */
-
-    if (columnId === "Numero_FE") {
-
-      const texte =
-        String(value);
-
-
-      const match =
-        texte.match(
-          /(\d+)\s*$/
-        );
-
-
-      if (match) {
-
-        return match[1];
-
-      }
-
-
-      return texte;
-
-    }
-
-
-    /*
-      DATES ISO
-
-      Ce traitement s'applique automatiquement
-      à TOUTES les colonnes contenant une date
-      au format ISO.
-
-      Exemple :
-
-      2026-08-31T00:00:00.000Z
-
-      devient :
-
-      31/08/26
-    */
-
-    if (
-      typeof value === "string" &&
-      /^\d{4}-\d{2}-\d{2}T/.test(value)
-    ) {
-
-      const match =
-        value.match(
-          /^(\d{4})-(\d{2})-(\d{2})/
-        );
-
-
-      if (match) {
-
-        const annee =
-          match[1].slice(-2);
-
-
-        const mois =
-          match[2];
-
-
-        const jour =
-          match[3];
-
-
-        return (
-          jour +
-          "/" +
-          mois +
-          "/" +
-          annee
-        );
-
-      }
-
-    }
-
-
-    /*
-      LISTES GRIST
-    */
-
-    if (Array.isArray(value)) {
-
-      if (value[0] === "L") {
-
-        return value
-          .slice(1)
-          .join(", ");
-
-      }
-
-
-      return value.join(", ");
-
-    }
-
-
-    /*
-      OBJETS
-    */
-
-    if (
-      typeof value === "object"
-    ) {
-
-      return JSON.stringify(value);
-
-    }
-
-
-    /*
-      VALEUR NORMALE
-    */
-
-    return String(value);
-
+    return `${jour}/${mois}/${annee}`;
   }
 
 
   /*
-    ============================================
-    PROTECTION HTML
-    ============================================
+    ==========================
+    DATES ISO
+    ==========================
+
+    Fonctionne avec :
+
+    2026-08-31T00:00:00.000Z
+
+    mais aussi :
+
+    "2026-08-31T00:00:00.000Z"
   */
 
-  function escapeHtml(value) {
+  let texte = String(value).trim();
 
-    return String(value)
 
-      .replaceAll(
-        "&",
-        "&amp;"
-      )
+  /*
+    Supprime d'éventuels guillemets
+    autour de la valeur
+  */
 
-      .replaceAll(
-        "<",
-        "&lt;"
-      )
+  texte = texte.replace(
+    /^["']|["']$/g,
+    ""
+  );
 
-      .replaceAll(
-        ">",
-        "&gt;"
-      )
 
-      .replaceAll(
-        '"',
-        "&quot;"
-      )
+  const dateMatch = texte.match(
+    /^(\d{4})-(\d{2})-(\d{2})(?:T.*)?$/
+  );
 
-      .replaceAll(
-        "'",
-        "&#039;"
-      );
 
+  if (dateMatch) {
+
+    const annee =
+      dateMatch[1].slice(-2);
+
+    const mois =
+      dateMatch[2];
+
+    const jour =
+      dateMatch[3];
+
+    return `${jour}/${mois}/${annee}`;
   }
 
-</script>
 
-</body>
-</html>
+  /*
+    ==========================
+    LISTES GRIST
+    ==========================
+  */
+
+  if (Array.isArray(value)) {
+
+    if (value[0] === "L") {
+
+      return value
+        .slice(1)
+        .join(", ");
+
+    }
+
+    return value.join(", ");
+  }
+
+
+  /*
+    ==========================
+    AUTRES OBJETS
+    ==========================
+  */
+
+  if (
+    typeof value === "object"
+  ) {
+
+    return JSON.stringify(value);
+  }
+
+
+  /*
+    ==========================
+    VALEUR NORMALE
+    ==========================
+  */
+
+  return texte;
+}
