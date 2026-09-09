@@ -49,8 +49,7 @@
   <section class="section">
     <h2>Premier tableau</h2>
     <p>
-      Vous pouvez placer ici autant de texte que nécessaire avant le tableau.
-      Modifiez simplement ce paragraphe dans le fichier HTML.
+      Tableau des faits avec les informations principales.
     </p>
     <div id="table1" class="table-wrap"><div class="empty">Chargement…</div></div>
   </section>
@@ -93,11 +92,14 @@
 */
 const CONFIG = {
   table1: {
-    id: "Interventions",
+    id: "Faits",
     columns: [
+      ["Numero_FE", "Numéro FE"],
+      ["Date_de_saisie", "Date de saisie"],
+      ["ID_et_Nom", "ID et Nom"],
+      ["Ville", "Ville"],
       ["Departement", "Département"],
-      ["Etablissement", "Établissement"],
-      ["Statut", "Statut"]
+      ["Redacteur", "Rédacteur"]
     ]
   },
   table2: {
