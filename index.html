@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Portail Grist</title>
+  <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
+  <style>
+    :root{
+      --bg:#f6f7f9; --card:#ffffff; --text:#1f2937; --muted:#667085;
+      --line:#e5e7eb; --primary:#2f6fed; --primary-hover:#245bcc;
+      --radius:14px;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,Segoe UI,Arial,sans-serif}
+    .page{max-width:1180px;margin:0 auto;padding:34px 24px 60px}
+    .hero,.section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px;margin-bottom:22px}
+    .hero h1{margin:0 0 10px;font-size:30px}
+    h2{margin:0 0 12px;font-size:22px}
+    p{line-height:1.6;margin:8px 0 14px}
+    .muted{color:var(--muted)}
+    .table-wrap{overflow:auto;border:1px solid var(--line);border-radius:10px;margin-top:16px}
+    table{width:100%;border-collapse:collapse;background:#fff}
+    th,td{padding:12px 14px;text-align:left;border-bottom:1px solid var(--line);white-space:nowrap}
+    th{font-size:13px;background:#f9fafb;color:#475467}
+    tr:last-child td{border-bottom:none}
+    .downloads{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
+    .btn{display:inline-flex;align-items:center;gap:8px;padding:10px 14px;border-radius:9px;background:var(--primary);color:white;text-decoration:none;font-weight:600;border:0;cursor:pointer}
+    .btn:hover{background:var(--primary-hover)}
+    .btn.secondary{background:#fff;color:var(--text);border:1px solid var(--line)}
+    .empty,.error{padding:18px;color:var(--muted)}
+    .error{color:#b42318;background:#fef3f2;border-radius:9px}
+    .note{padding:14px 16px;background:#f8fafc;border-left:4px solid #98a2b3;border-radius:8px;margin:16px 0}
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <section class="hero">
+    <h1>Ressources et suivi</h1>
+    <p>
+      Bienvenue sur cet espace. Ce texte est totalement libre : vous pouvez écrire des
+      explications, consignes, informations pratiques ou présenter le contenu de la page.
+    </p>
+    <p class="muted">Les tableaux ci-dessous sont alimentés automatiquement par les tables du document Grist.</p>
+  </section>
+
+  <section class="section">
+    <h2>Premier tableau</h2>
+    <p>
+      Vous pouvez placer ici autant de texte que nécessaire avant le tableau.
+      Modifiez simplement ce paragraphe dans le fichier HTML.
+    </p>
+    <div id="table1" class="table-wrap"><div class="empty">Chargement…</div></div>
+  </section>
+
+  <section class="section">
+    <h2>Informations complémentaires</h2>
+    <div class="note">
+      Ce bloc peut servir à mettre en évidence une procédure, une consigne importante,
+      une explication ou un rappel entre deux tableaux.
+    </div>
+    <p>
+      Le contenu n'est pas enfermé dans une cellule Grist : la mise en page est libre.
+    </p>
+  </section>
+
+  <section class="section">
+    <h2>Deuxième tableau</h2>
+    <p>Voici un second tableau provenant d'une autre table Grist.</p>
+    <div id="table2" class="table-wrap"><div class="empty">Chargement…</div></div>
+  </section>
+
+  <section class="section">
+    <h2>Documents à télécharger</h2>
+    <p>
+      Les boutons ci-dessous sont générés depuis la table <strong>Documents</strong>.
+      Chaque ligne peut contenir un libellé et une pièce jointe PDF ou Word.
+    </p>
+    <div id="downloads" class="downloads"><span class="empty">Chargement…</span></div>
+  </section>
+
+</div>
+
+<script>
+/*
+  ==========================
+  CONFIGURATION À ADAPTER
+  ==========================
+  Utilisez les identifiants techniques des tables/colonnes Grist.
+  Exemple : une colonne affichée "Nom établissement" peut avoir l'id "Nom_etablissement".
+*/
+const CONFIG = {
+  table1: {
+    id: "Interventions",
+    columns: [
+      ["Departement", "Département"],
+      ["Etablissement", "Établissement"],
+      ["Statut", "Statut"]
+    ]
+  },
+  table2: {
+    id: "Faits",
+    columns: [
+      ["Type", "Type"],
+      ["Resume", "Résumé"],
+      ["Traitement", "Traitement"]
+    ]
+  },
+  documents: {
+    id: "Documents",
+    labelColumn: "Nom",
+    attachmentColumn: "Fichier"
+  }
+};
+
+grist.ready({requiredAccess: "full"});
+
+function rowsFromFetchTable(data) {
+  if (!data || !data.id) return [];
+  return data.id.map((id, i) => {
+    const row = {id};
+    for (const [key, values] of Object.entries(data)) {
+      if (key !== "id") row[key] = values[i];
+    }
+    return row;
+  });
+}
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replaceAll("&","&amp;").replaceAll("<","&lt;")
+    .replaceAll(">","&gt;").replaceAll('"',"&quot;")
+    .replaceAll("'","&#039;");
+}
+
+function displayValue(value) {
+  if (value === null || value === undefined) return "";
+  if (Array.isArray(value)) {
+    // Grist peut renvoyer certaines valeurs typées sous forme ["L", ...].
+    if (value[0] === "L") return value.slice(1).join(", ");
+    return value.join(", ");
+  }
+  if (typeof value === "object") return JSON.stringify(value);
+  return value;
+}
+
+function renderTable(targetId, rows, columns) {
+  const target = document.getElementById(targetId);
+  if (!rows.length) {
+    target.innerHTML = '<div class="empty">Aucune donnée à afficher.</div>';
+    return;
+  }
+  const head = columns.map(([,label]) => `<th>${escapeHtml(label)}</th>`).join("");
+  const body = rows.map(row => `
+    <tr>${columns.map(([key]) => `<td>${escapeHtml(displayValue(row[key]))}</td>`).join("")}</tr>
+  `).join("");
+  target.innerHTML = `<table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`;
+}
+
+function attachmentIds(value) {
+  if (!value) return [];
+  if (Array.isArray(value)) {
+    if (value[0] === "L") return value.slice(1).filter(Number.isFinite);
+    return value.filter(Number.isFinite);
+  }
+  if (Number.isFinite(value)) return [value];
+  return [];
+}
+
+async function renderDownloads(rows) {
+  const target = document.getElementById("downloads");
+  if (!rows.length) {
+    target.innerHTML = '<span class="empty">Aucun document disponible.</span>';
+    return;
+  }
+
+  const tokenInfo = await grist.docApi.getAccessToken({readOnly: true});
+  const buttons = [];
+
+  for (const row of rows) {
+    const label = row[CONFIG.documents.labelColumn] || "Télécharger le document";
+    const ids = attachmentIds(row[CONFIG.documents.attachmentColumn]);
+    for (const id of ids) {
+      const url = `${tokenInfo.baseUrl}/attachments/${id}/download?auth=${encodeURIComponent(tokenInfo.token)}`;
+      buttons.push(
+        `<a class="btn" href="${escapeHtml(url)}" target="_blank" rel="noopener">↓ ${escapeHtml(label)}</a>`
+      );
+    }
+  }
+
+  target.innerHTML = buttons.length
+    ? buttons.join("")
+    : '<span class="empty">Les lignes existent, mais aucune pièce jointe n'a été trouvée.</span>';
+}
+
+async function load() {
+  try {
+    const [raw1, raw2, rawDocs] = await Promise.all([
+      grist.docApi.fetchTable(CONFIG.table1.id),
+      grist.docApi.fetchTable(CONFIG.table2.id),
+      grist.docApi.fetchTable(CONFIG.documents.id)
+    ]);
+
+    renderTable("table1", rowsFromFetchTable(raw1), CONFIG.table1.columns);
+    renderTable("table2", rowsFromFetchTable(raw2), CONFIG.table2.columns);
+    await renderDownloads(rowsFromFetchTable(rawDocs));
+  } catch (err) {
+    console.error(err);
+    const msg = `<div class="error">
+      Impossible de charger les données. Vérifiez les noms techniques des tables/colonnes
+      dans CONFIG et accordez au widget l'accès complet au document.<br><br>
+      Détail : ${escapeHtml(err.message || err)}
+    </div>`;
+    document.getElementById("table1").innerHTML = msg;
+    document.getElementById("table2").innerHTML = msg;
+    document.getElementById("downloads").innerHTML = msg;
+  }
+}
+
+load();
+</script>
+</body>
+</html>
