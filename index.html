@@ -1,17 +1,786 @@
 <!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8">
-    <title>onRecords</title>
-    <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
-  </head>
-  <body>
-    <pre id="readout">Waiting for data...</pre>
-    <script>
-      grist.ready();
-      grist.onRecords(function(records) {
-        document.getElementById('readout').textContent = JSON.stringify(records, null, 2);
+<html lang="fr">
+
+<head>
+  <meta charset="utf-8">
+
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1"
+  >
+
+  <title>Portail Grist</title>
+
+  <!-- API Grist -->
+  <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
+
+  <style>
+
+    :root {
+      --bg: #f6f7f9;
+      --card: #ffffff;
+      --text: #1f2937;
+      --muted: #667085;
+      --line: #e5e7eb;
+      --primary: #2f6fed;
+      --radius: 14px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Inter, Segoe UI, Arial, sans-serif;
+    }
+
+    .page {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 34px 24px 60px;
+    }
+
+    .hero,
+    .section {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 28px;
+      margin-bottom: 22px;
+    }
+
+    .hero h1 {
+      margin: 0 0 10px;
+      font-size: 30px;
+    }
+
+    h2 {
+      margin: 0 0 12px;
+      font-size: 22px;
+    }
+
+    p {
+      line-height: 1.6;
+      margin: 8px 0 14px;
+    }
+
+    .muted {
+      color: var(--muted);
+    }
+
+    /*
+      Zone du tableau
+    */
+
+    .table-wrap {
+      overflow: auto;
+      max-height: 520px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      margin-top: 16px;
+    }
+
+    table {
+      width: 100%;
+      min-width: 900px;
+      border-collapse: collapse;
+      background: white;
+    }
+
+    th,
+    td {
+      padding: 12px 14px;
+      text-align: left;
+      border-bottom: 1px solid var(--line);
+      white-space: nowrap;
+    }
+
+    th {
+      position: sticky;
+      top: 0;
+      z-index: 1;
+      font-size: 13px;
+      background: #f9fafb;
+      color: #475467;
+    }
+
+    tr:last-child td {
+      border-bottom: none;
+    }
+
+    tr:hover td {
+      background: #fafafa;
+    }
+
+    /*
+      Diagnostic / chargement
+    */
+
+    .diagnostic {
+      padding: 12px 14px;
+      margin-top: 14px;
+      border-radius: 9px;
+      background: #f8fafc;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .diagnostic.ok {
+      background: #ecfdf3;
+      color: #067647;
+    }
+
+    .diagnostic.error {
+      background: #fef3f2;
+      color: #b42318;
+    }
+
+    /*
+      Bloc information
+    */
+
+    .note {
+      padding: 14px 16px;
+      background: #f8fafc;
+      border-left: 4px solid #98a2b3;
+      border-radius: 8px;
+      margin: 16px 0;
+    }
+
+    /*
+      Pagination
+    */
+
+    .pagination {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-top: 14px;
+      flex-wrap: wrap;
+    }
+
+    .pagination-buttons {
+      display: flex;
+      gap: 8px;
+    }
+
+    button {
+      padding: 8px 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: white;
+      cursor: pointer;
+      font-weight: 600;
+    }
+
+    button:hover:not(:disabled) {
+      background: #f3f4f6;
+    }
+
+    button:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
+    .pagination-info {
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+  </style>
+
+</head>
+
+
+<body>
+
+<div class="page">
+
+
+  <!-- ============================= -->
+  <!-- EN-TÊTE -->
+  <!-- ============================= -->
+
+  <section class="hero">
+
+    <h1>Ressources et suivi</h1>
+
+    <p>
+      Bienvenue sur cet espace. Ce texte est totalement libre :
+      vous pouvez écrire des explications, consignes,
+      informations pratiques ou présenter le contenu de la page.
+    </p>
+
+    <p class="muted">
+      Les tableaux ci-dessous sont alimentés automatiquement
+      par les données du document Grist.
+    </p>
+
+  </section>
+
+
+
+  <!-- ============================= -->
+  <!-- PREMIER TABLEAU -->
+  <!-- ============================= -->
+
+  <section class="section">
+
+    <h2>Premier tableau</h2>
+
+    <p>
+      Tableau des faits avec les informations principales.
+    </p>
+
+    <div
+      id="diagnostic"
+      class="diagnostic"
+    >
+      Connexion au widget Grist...
+    </div>
+
+
+    <div
+      id="table1"
+      class="table-wrap"
+    >
+    </div>
+
+
+    <div
+      id="pagination"
+      class="pagination"
+    >
+    </div>
+
+  </section>
+
+
+
+  <!-- ============================= -->
+  <!-- INFORMATIONS -->
+  <!-- ============================= -->
+
+  <section class="section">
+
+    <h2>Informations complémentaires</h2>
+
+    <div class="note">
+
+      Ce bloc peut servir à mettre en évidence une procédure,
+      une consigne importante, une explication ou un rappel
+      entre deux tableaux.
+
+    </div>
+
+    <p>
+      Le contenu n'est pas enfermé dans une cellule Grist :
+      la mise en page de cette page reste totalement libre.
+    </p>
+
+  </section>
+
+
+
+  <!-- ============================= -->
+  <!-- DEUXIÈME TABLEAU -->
+  <!-- ============================= -->
+
+  <section class="section">
+
+    <h2>Deuxième tableau</h2>
+
+    <p>
+      Un second tableau pourra être ajouté ici ultérieurement.
+    </p>
+
+  </section>
+
+
+
+  <!-- ============================= -->
+  <!-- DOCUMENTS -->
+  <!-- ============================= -->
+
+  <section class="section">
+
+    <h2>Documents à télécharger</h2>
+
+    <p>
+      Cette section pourra ensuite servir à proposer
+      différents documents ou ressources.
+    </p>
+
+  </section>
+
+
+</div>
+
+
+
+<script>
+
+  /*
+    ==================================================
+    CONFIGURATION DU TABLEAU
+    ==================================================
+
+    PREMIÈRE valeur = ID technique Grist
+    DEUXIÈME valeur = titre affiché dans le tableau
+  */
+
+  const COLUMNS = [
+
+    ["Numero_FE", "Numéro FE"],
+
+    ["Date_de_saisie", "Date de saisie"],
+
+    ["ID_et_Nom", "ID et Nom"],
+
+    ["Ville", "Ville"],
+
+    ["Departement", "Département"],
+
+    ["Redacteur", "Rédacteur"]
+
+  ];
+
+
+
+  /*
+    Nombre de lignes affichées par page
+  */
+
+  const PAGE_SIZE = 10;
+
+
+  let allRecords = [];
+
+  let currentPage = 1;
+
+
+
+  /*
+    ==================================================
+    CONNEXION À GRIST
+    ==================================================
+  */
+
+  const diagnostic =
+    document.getElementById("diagnostic");
+
+
+  grist.ready({
+
+    requiredAccess: "read table"
+
+  });
+
+
+
+  /*
+    ==================================================
+    RÉCEPTION DES DONNÉES
+    ==================================================
+  */
+
+  grist.onRecords(function(records) {
+
+
+    console.log(
+      "Données reçues depuis Grist :",
+      records
+    );
+
+
+    if (!Array.isArray(records)) {
+
+      diagnostic.textContent =
+        "Erreur : les données reçues ne sont pas valides.";
+
+      diagnostic.className =
+        "diagnostic error";
+
+      return;
+
+    }
+
+
+
+    if (records.length === 0) {
+
+      diagnostic.textContent =
+        "Connexion réussie, mais aucune ligne n'a été reçue.";
+
+      diagnostic.className =
+        "diagnostic error";
+
+      return;
+
+    }
+
+
+
+    /*
+      On conserve toutes les lignes
+    */
+
+    allRecords = records;
+
+    currentPage = 1;
+
+
+
+    /*
+      Vérification des IDs reçus
+    */
+
+    const receivedColumns =
+      Object.keys(records[0]);
+
+
+    console.log(
+      "IDs des colonnes Grist :",
+      receivedColumns
+    );
+
+
+
+    const missingColumns =
+      COLUMNS
+        .map(column => column[0])
+        .filter(
+          id => !receivedColumns.includes(id)
+        );
+
+
+
+    if (missingColumns.length > 0) {
+
+      diagnostic.textContent =
+        "Connexion réussie : " +
+        records.length +
+        " lignes reçues. " +
+        "Certaines colonnes sont introuvables : " +
+        missingColumns.join(", ");
+
+      diagnostic.className =
+        "diagnostic error";
+
+    }
+
+    else {
+
+      diagnostic.textContent =
+        "Connexion réussie : " +
+        records.length +
+        " faits reçus.";
+
+      diagnostic.className =
+        "diagnostic ok";
+
+    }
+
+
+
+    renderTable();
+
+  });
+
+
+
+  /*
+    ==================================================
+    AFFICHAGE DU TABLEAU
+    ==================================================
+  */
+
+  function renderTable() {
+
+
+    const tableContainer =
+      document.getElementById("table1");
+
+
+    const start =
+      (currentPage - 1) * PAGE_SIZE;
+
+
+    const end =
+      start + PAGE_SIZE;
+
+
+    const visibleRecords =
+      allRecords.slice(start, end);
+
+
+
+    /*
+      En-têtes
+    */
+
+    let html = "<table>";
+
+    html += "<thead>";
+
+    html += "<tr>";
+
+
+    COLUMNS.forEach(function(column) {
+
+      html +=
+        "<th>" +
+        escapeHtml(column[1]) +
+        "</th>";
+
+    });
+
+
+    html += "</tr>";
+
+    html += "</thead>";
+
+
+
+    /*
+      Lignes
+    */
+
+    html += "<tbody>";
+
+
+    visibleRecords.forEach(function(record) {
+
+      html += "<tr>";
+
+
+      COLUMNS.forEach(function(column) {
+
+        const columnId =
+          column[0];
+
+
+        html +=
+          "<td>" +
+          escapeHtml(
+            formatValue(
+              record[columnId]
+            )
+          ) +
+          "</td>";
+
       });
-    </script>
-  </body>
+
+
+      html += "</tr>";
+
+    });
+
+
+    html += "</tbody>";
+
+    html += "</table>";
+
+
+
+    tableContainer.innerHTML =
+      html;
+
+
+    renderPagination();
+
+  }
+
+
+
+  /*
+    ==================================================
+    PAGINATION
+    ==================================================
+  */
+
+  function renderPagination() {
+
+
+    const pagination =
+      document.getElementById("pagination");
+
+
+    const totalPages =
+      Math.ceil(
+        allRecords.length / PAGE_SIZE
+      );
+
+
+    const start =
+      (currentPage - 1) * PAGE_SIZE + 1;
+
+
+    const end =
+      Math.min(
+        currentPage * PAGE_SIZE,
+        allRecords.length
+      );
+
+
+    pagination.innerHTML = `
+
+      <div class="pagination-buttons">
+
+        <button
+          onclick="previousPage()"
+          ${currentPage === 1 ? "disabled" : ""}
+        >
+          ← Précédent
+        </button>
+
+
+        <button
+          onclick="nextPage()"
+          ${currentPage === totalPages ? "disabled" : ""}
+        >
+          Suivant →
+        </button>
+
+      </div>
+
+
+      <div class="pagination-info">
+
+        ${start}–${end}
+        sur
+        ${allRecords.length}
+        faits
+
+        · Page
+        ${currentPage}
+        /
+        ${totalPages}
+
+      </div>
+
+    `;
+
+  }
+
+
+
+  function previousPage() {
+
+    if (currentPage > 1) {
+
+      currentPage--;
+
+      renderTable();
+
+    }
+
+  }
+
+
+
+  function nextPage() {
+
+    const totalPages =
+      Math.ceil(
+        allRecords.length / PAGE_SIZE
+      );
+
+
+    if (currentPage < totalPages) {
+
+      currentPage++;
+
+      renderTable();
+
+    }
+
+  }
+
+
+
+  /*
+    ==================================================
+    FORMATAGE DES VALEURS
+    ==================================================
+  */
+
+  function formatValue(value) {
+
+
+    if (
+      value === null ||
+      value === undefined
+    ) {
+
+      return "";
+
+    }
+
+
+    /*
+      Valeurs Grist de type liste :
+      ["L", valeur1, valeur2]
+    */
+
+    if (Array.isArray(value)) {
+
+      if (value[0] === "L") {
+
+        return value
+          .slice(1)
+          .join(", ");
+
+      }
+
+
+      return value.join(", ");
+
+    }
+
+
+    if (typeof value === "object") {
+
+      return JSON.stringify(value);
+
+    }
+
+
+    return String(value);
+
+  }
+
+
+
+  /*
+    ==================================================
+    PROTECTION HTML
+    ==================================================
+  */
+
+  function escapeHtml(value) {
+
+    return String(value)
+
+      .replaceAll("&", "&amp;")
+
+      .replaceAll("<", "&lt;")
+
+      .replaceAll(">", "&gt;")
+
+      .replaceAll('"', "&quot;")
+
+      .replaceAll("'", "&#039;");
+
+  }
+
+</script>
+
+
+</body>
+
 </html>
