@@ -441,7 +441,7 @@
 
   <section class="section">
 
-    <h2>Premier tableau - Test1</h2>
+    <h2>Premier tableau</h2>
 
     <p>
       Tableau des faits avec les informations principales.
@@ -755,75 +755,190 @@
       ""
     );
 
-    allRecords = records.map(function(record) {
-
-      const rawDate = record[FIELD.DATE_SAISIE];
-      const date = parseGristDate(rawDate);
-      const weekInfo = date ? getISOWeekInfo(date) : null;
-
-      /*
-        UNE SEULE lecture de la ligne pour :
-        - Niveau
-        - Degré
-        - Type de fait
-      */
-      const analysis = analyzeRecordFast(record);
-
-      return {
-        ...record,
-
-        _departement: getDepartement(record),
-
-        _rawDateDeSaisie: rawDate,
-        _date: date,
-
-        _weekKey: weekInfo ? weekInfo.key : "",
-        _weekNumber: weekInfo ? weekInfo.week : null,
-        _weekYear: weekInfo ? weekInfo.year : null,
-
-        _dateKey: date ? formatDateKey(date) : "",
-
-        _niveau: analysis.level,
-        _degre: analysis.degree,
-        _typeFait: analysis.types
-      };
-    });
-
     /*
-      Tri par numéro FE décroissant.
+      Traitement par petits lots pour éviter qu'une ligne atypique
+      bloque tout le widget. Le message d'analyse reste visible et
+      affiche la progression.
     */
-    allRecords.sort(function(a, b) {
-      return (
-        getNumeroFE(b[FIELD.NUMERO_FE]) -
-        getNumeroFE(a[FIELD.NUMERO_FE])
-      );
-    });
-
+    allRecords = [];
     currentPage = 1;
 
-    if (missingColumns.length > 0) {
+    const BATCH_SIZE = 20;
+    let index = 0;
+    let analysisErrors = 0;
+
+    function processBatch() {
+
+      const batchEnd =
+        Math.min(index + BATCH_SIZE, records.length);
+
+      for (; index < batchEnd; index++) {
+
+        const record = records[index];
+
+        try {
+
+          const rawDate =
+            record[FIELD.DATE_SAISIE];
+
+          const date =
+            parseGristDate(rawDate);
+
+          const weekInfo =
+            date ? getISOWeekInfo(date) : null;
+
+          const analysis =
+            analyzeRecordFast(record);
+
+          allRecords.push({
+            ...record,
+
+            _departement:
+              getDepartement(record),
+
+            _rawDateDeSaisie:
+              rawDate,
+
+            _date:
+              date,
+
+            _weekKey:
+              weekInfo ? weekInfo.key : "",
+
+            _weekNumber:
+              weekInfo ? weekInfo.week : null,
+
+            _weekYear:
+              weekInfo ? weekInfo.year : null,
+
+            _dateKey:
+              date ? formatDateKey(date) : "",
+
+            _niveau:
+              analysis.level,
+
+            _degre:
+              analysis.degree,
+
+            _typeFait:
+              analysis.types
+          });
+
+        }
+        catch (error) {
+
+          analysisErrors++;
+
+          /*
+            Une ligne problématique ne bloque plus tout le tableau.
+            On conserve tout de même les champs essentiels.
+          */
+          allRecords.push({
+            ...record,
+
+            _departement:
+              getDepartement(record),
+
+            _rawDateDeSaisie:
+              record[FIELD.DATE_SAISIE],
+
+            _date:
+              null,
+
+            _weekKey:
+              "",
+
+            _weekNumber:
+              null,
+
+            _weekYear:
+              null,
+
+            _dateKey:
+              "",
+
+            _niveau:
+              "",
+
+            _degre:
+              "",
+
+            _typeFait:
+              []
+          });
+
+          console.error(
+            "Erreur d'analyse sur le FE à l'index",
+            index,
+            error
+          );
+        }
+      }
+
       showDiagnostic(
-        "Connexion réussie : " +
+        "Données reçues : analyse des " +
         records.length +
-        " lignes reçues. IDs de colonnes introuvables : " +
-        missingColumns.join(", "),
-        "error"
+        " faits en cours… " +
+        index +
+        "/" +
+        records.length,
+        ""
       );
-    } else {
-      showDiagnostic(
-        "Connexion réussie : " +
-        records.length +
-        " faits reçus.",
-        "ok"
-      );
+
+      if (index < records.length) {
+        setTimeout(processBatch, 0);
+        return;
+      }
+
+      allRecords.sort(function(a, b) {
+        return (
+          getNumeroFE(b[FIELD.NUMERO_FE]) -
+          getNumeroFE(a[FIELD.NUMERO_FE])
+        );
+      });
+
+      if (missingColumns.length > 0) {
+
+        showDiagnostic(
+          "Connexion réussie : " +
+          records.length +
+          " lignes reçues. IDs de colonnes introuvables : " +
+          missingColumns.join(", "),
+          "error"
+        );
+
+      }
+      else if (analysisErrors > 0) {
+
+        showDiagnostic(
+          "Connexion réussie : " +
+          records.length +
+          " faits reçus. " +
+          analysisErrors +
+          " ligne(s) atypique(s) ignorée(s) pendant l'analyse.",
+          "error"
+        );
+
+      }
+      else {
+
+        showDiagnostic(
+          "Connexion réussie : " +
+          records.length +
+          " faits reçus.",
+          "ok"
+        );
+      }
+
+      renderWeekFilter();
+      renderDateFilter();
+      renderDegreeFilters();
+      renderDepartmentFilters();
+      renderLevelFilters();
+      renderTable();
     }
 
-    renderWeekFilter();
-    renderDateFilter();
-    renderDegreeFilters();
-    renderDepartmentFilters();
-    renderLevelFilters();
-    renderTable();
+    setTimeout(processBatch, 0);
   });
 
 
@@ -1036,11 +1151,11 @@
         textValue = value.join(" ");
       }
       else if (typeof value === "object") {
-        try {
-          textValue = JSON.stringify(value);
-        } catch (e) {
-          textValue = "";
-        }
+        /*
+          Les objets internes Grist ne sont pas utiles pour nos filtres
+          et peuvent être très coûteux à sérialiser.
+        */
+        return;
       }
       else {
         textValue = String(value);
@@ -1048,6 +1163,13 @@
 
       if (!textValue) {
         return;
+      }
+
+      /*
+        Protection contre une cellule anormalement volumineuse.
+      */
+      if (textValue.length > 20000) {
+        textValue = textValue.slice(0, 20000);
       }
 
       values.push(textValue);
