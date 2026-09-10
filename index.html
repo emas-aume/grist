@@ -415,8 +415,9 @@
     }
 
     .summary-cell {
-      min-width: 420px;
-      max-width: 560px;
+      min-width: 360px;
+      width: 420px;
+      max-width: 520px;
       white-space: normal;
       line-height: 1.45;
       font-size: 13px;
@@ -650,7 +651,7 @@
     DATE_SAISIE: "Date_de_saisie",
     ID_NOM: "ID_et_Nom",
     VILLE: "Ville",
-    RESUME: "$Resume_du_fait"
+    RESUME: "Resume_du_fait"
   });
 
   const COLUMNS = Object.freeze([
@@ -749,13 +750,28 @@
       Vérification des IDs techniques réellement reçus.
       Cette vérification ne dépend pas de l'ordre des colonnes.
     */
-    const receivedColumns = new Set(Object.keys(records[0]));
+    /*
+      On construit la liste des colonnes à partir de TOUTES les lignes reçues,
+      et pas uniquement de records[0].
+
+      C'est important pour Resume : si la première ligne n'a pas encore de
+      résumé, Grist peut ne pas inclure la propriété Resume sur cette ligne,
+      alors qu'elle existe bien sur d'autres FE.
+    */
+    const receivedColumns = new Set();
+
+    records.forEach(function(record) {
+      Object.keys(record || {}).forEach(function(columnId) {
+        receivedColumns.add(columnId);
+      });
+    });
 
     const requiredColumns = [
       FIELD.NUMERO_FE,
       FIELD.DATE_SAISIE,
       FIELD.ID_NOM,
-      FIELD.VILLE
+      FIELD.VILLE,
+      FIELD.RESUME
     ];
 
     const missingColumns = requiredColumns.filter(
@@ -998,9 +1014,1962 @@
 
 
   /*
-[...]
+    ==================================================
+    DIAGNOSTIC
+    ==================================================
+  */
 
-*/
+  function showDiagnostic(message, type) {
+    diagnostic.textContent = message;
+    diagnostic.className =
+      "diagnostic" + (type ? " " + type : "");
+  }
+
+
+  /*
+    ==================================================
+    NUMÉRO FE
+    ==================================================
+  */
+
+  function getNumeroFE(value) {
+
+    if (
+      value === null ||
+      value === undefined ||
+      value === ""
+    ) {
+      return 0;
+    }
+
+    const texte = String(value);
+    const nombres = texte.match(/\d+/g);
+
+    if (!nombres || nombres.length === 0) {
+      return 0;
+    }
+
+    return Number(nombres[nombres.length - 1]);
+  }
+
+
+  /*
+    ==================================================
+    DÉPARTEMENT
+    ==================================================
+  */
+
+  function getDepartement(record) {
+
+    if (!record) {
+      return "";
+    }
+
+    /*
+      Là encore, on lit l'ID Grist "ID_et_Nom",
+      jamais la position de la colonne.
+    */
+    const value = record[FIELD.ID_NOM];
+
+    if (
+      value === null ||
+      value === undefined ||
+      value === ""
+    ) {
+      return "";
+    }
+
+    const texte = String(value).trim();
+
+    /*
+      Exemples :
+      0341949J -> département 34
+      0300036B -> département 30
+      0660905A -> département 66
+      011....  -> département 11
+      048....  -> département 48
+    */
+    const match = texte.match(/^(\d{3})/);
+
+    if (!match) {
+      return "";
+    }
+
+    return String(Number(match[1]));
+  }
+
+
+
+  /*
+    ==================================================
+    ANALYSE DE LA LIGNE : NIVEAU / TYPE DE FAIT
+    ==================================================
+
+    Le widget ne modifie aucune donnée Grist.
+    Il lit les valeurs de la ligne et calcule seulement
+    ce qui doit être affiché dans le tableau.
+  */
+
+  function valueToDetectionStrings(value) {
+
+    if (
+      value === null ||
+      value === undefined ||
+      value === ""
+    ) {
+      return [];
+    }
+
+    if (Array.isArray(value)) {
+
+      const source =
+        value[0] === "L"
+          ? value.slice(1)
+          : value;
+
+      return source
+        .filter(item =>
+          item !== null &&
+          item !== undefined &&
+          item !== ""
+        )
+        .map(item => String(item));
+    }
+
+    /*
+      Les cellules Grist utiles à cette analyse sont normalement
+      primitives ou des listes. Pour éviter toute récursion coûteuse
+      ou objet circulaire, on ne parcourt pas les objets complexes.
+    */
+    if (typeof value === "object") {
+
+      if (value instanceof Date) {
+        return [value.toISOString()];
+      }
+
+      try {
+        return [JSON.stringify(value)];
+      }
+      catch {
+        return [];
+      }
+    }
+
+    return [String(value)];
+  }
+
+
+  function normalizeDetectionText(value) {
+
+    return String(value)
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[’‘]/g, "'")
+      .toLowerCase()
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+
+  /*
+    ==================================================
+    ANALYSE UNIQUE D'UN RECORD
+    ==================================================
+
+    Une ligne est parcourue UNE SEULE FOIS.
+    On en extrait à la fois :
+      - le niveau 2 / 3 ;
+      - les catégories de faits.
+
+    Cela reste une analyse d'affichage :
+    aucune donnée n'est écrite dans Grist.
+  */
+
+  function normalizeText(value) {
+
+    return String(value || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .trim();
+  }
+
+
+  function extractFactDate(value) {
+
+    const text =
+      String(value || "").trim();
+
+    const match =
+      text.match(
+        /(\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{2,4}|\d{4}[\/\-.]\d{1,2}[\/\-.]\d{1,2})/
+      );
+
+    if (!match) {
+      return "";
+    }
+
+    const raw = match[1];
+
+    let parts =
+      raw.split(/[\/\-.]/);
+
+    if (
+      parts.length !== 3
+    ) {
+      return "";
+    }
+
+    /*
+      AAAA-MM-JJ
+    */
+    if (parts[0].length === 4) {
+      return (
+        String(Number(parts[2])).padStart(2, "0") +
+        "/" +
+        String(Number(parts[1])).padStart(2, "0") +
+        "/" +
+        parts[0]
+      );
+    }
+
+    /*
+      JJ/MM/AAAA ou JJ/MM/AA
+    */
+    let year =
+      Number(parts[2]);
+
+    if (year < 100) {
+      year += year >= 70 ? 1900 : 2000;
+    }
+
+    return (
+      String(Number(parts[0])).padStart(2, "0") +
+      "/" +
+      String(Number(parts[1])).padStart(2, "0") +
+      "/" +
+      year
+    );
+  }
+
+
+  function analyzeRecordFast(record) {
+
+    const values = [];
+    const levelCandidates = [];
+
+    let hasValRep = false;
+    let hasHarassment = false;
+    let hasGoods = false;
+    let hasSecurityClimate = false;
+    let hasPersonsGeneric = false;
+    let hasPhysical = false;
+    let hasSexual = false;
+    let hasVerbal = false;
+
+    let hasSecondDegree = false;
+    let hasFirstDegree = false;
+
+    let dateDuFait = "";
+    let dateDuFaitExpectedNext = false;
+
+    Object.keys(record || {}).forEach(function(key) {
+
+      const value = record[key];
+
+      if (
+        value === null ||
+        value === undefined
+      ) {
+        return;
+      }
+
+      let textValue = "";
+
+      if (value instanceof Date) {
+        textValue = "";
+      }
+      else if (Array.isArray(value)) {
+        textValue = value.join(" ");
+      }
+      else if (typeof value === "object") {
+        /*
+          Les objets internes Grist ne sont pas utiles pour nos filtres
+          et peuvent être très coûteux à sérialiser.
+        */
+        return;
+      }
+      else {
+        textValue = String(value);
+      }
+
+      if (!textValue) {
+        return;
+      }
+
+      /*
+        Protection contre une cellule anormalement volumineuse.
+      */
+      if (textValue.length > 20000) {
+        textValue = textValue.slice(0, 20000);
+      }
+
+      values.push(textValue);
+
+      const normalizedKey = normalizeText(key);
+      const normalizedValue = normalizeText(textValue);
+
+      /*
+        Date du fait :
+        intégrée à CETTE MÊME boucle d'analyse.
+
+        Cas gérés :
+        - une colonne dont l'identifiant contient "Date du fait" ;
+        - une cellule contenant "Date du fait : 10/09/2026" ;
+        - une cellule "Date du fait", suivie de la date dans la valeur suivante.
+      */
+      if (!dateDuFait) {
+
+        if (
+          normalizedKey.includes("date du fait") ||
+          normalizedKey.includes("date_du_fait") ||
+          normalizedKey.includes("datedufait")
+        ) {
+          dateDuFait =
+            extractFactDate(textValue);
+        }
+
+        if (!dateDuFait) {
+
+          const phrasePosition =
+            normalizedValue.indexOf("date du fait");
+
+          if (phrasePosition !== -1) {
+
+            const originalLower =
+              textValue.toLowerCase();
+
+            const originalPhrasePosition =
+              originalLower.indexOf("date du fait");
+
+            const afterPhrase =
+              originalPhrasePosition !== -1
+                ? textValue.slice(
+                    originalPhrasePosition +
+                    "date du fait".length
+                  )
+                : textValue;
+
+            dateDuFait =
+              extractFactDate(afterPhrase);
+
+            if (!dateDuFait) {
+              dateDuFaitExpectedNext = true;
+            }
+          }
+          else if (dateDuFaitExpectedNext) {
+
+            dateDuFait =
+              extractFactDate(textValue);
+
+            /*
+              On ne garde l'attente que sur la valeur immédiatement suivante.
+            */
+            dateDuFaitExpectedNext = false;
+          }
+        }
+      }
+
+      /*
+        Niveau :
+        on ne cherche 2/3 comme valeurs isolées que dans
+        les colonnes dont le nom évoque le niveau.
+      */
+      if (
+        normalizedKey.includes("niveau") ||
+        normalizedKey.includes("level")
+      ) {
+        const levelMatch =
+          normalizedValue.match(/(?:^|\D)([23])(?:\D|$)/);
+
+        if (levelMatch) {
+          levelCandidates.push(levelMatch[1]);
+        }
+      }
+
+      /*
+        Détection explicite "niveau 2" / "niveau 3"
+        dans n'importe quelle cellule.
+      */
+      if (/\bniveau\s*3\b/.test(normalizedValue)) {
+        levelCandidates.push("3");
+      }
+      else if (/\bniveau\s*2\b/.test(normalizedValue)) {
+        levelCandidates.push("2");
+      }
+
+      /*
+        Degré
+      */
+      if (
+        /\bcollege\b/.test(normalizedValue) ||
+        /\blycee\b/.test(normalizedValue)
+      ) {
+        hasSecondDegree = true;
+      }
+
+      if (
+        /\bcirconscription\b/.test(normalizedValue) ||
+        /\becole maternelle\b/.test(normalizedValue) ||
+        /\becole elementaire\b/.test(normalizedValue) ||
+        /\becole primaire\b/.test(normalizedValue)
+      ) {
+        hasFirstDegree = true;
+      }
+    });
+
+    /*
+      Une seule normalisation globale pour les catégories.
+    */
+    const text =
+      normalizeText(values.join(" "));
+
+    hasValRep =
+      text.includes(
+        "atteintes aux valeurs de la republique"
+      );
+
+    hasHarassment =
+      text.includes(
+        "harcelement ou suspicion de harcelement"
+      ) ||
+      text.includes(
+        "cyber-harcelement"
+      ) ||
+      text.includes(
+        "cyber harcelement"
+      );
+
+    hasGoods =
+      text.includes(
+        "atteintes aux biens"
+      );
+
+    hasSecurityClimate =
+      text.includes("atteintes a la securite") ||
+      text.includes("atteinte a la securite") ||
+      text.includes("climat de l'etablissement") ||
+      text.includes("climat scolaire");
+
+    hasPersonsGeneric =
+      text.includes(
+        "atteintes aux personnes"
+      );
+
+    hasPhysical =
+      text.includes(
+        "violences physiques"
+      );
+
+    hasSexual =
+      text.includes(
+        "violences sexuelles"
+      );
+
+    hasVerbal =
+      text.includes(
+        "violences verbales"
+      );
+
+    const types = [];
+
+    if (hasValRep) {
+      types.push("AttValRep");
+    }
+
+    if (hasHarassment) {
+      types.push("Harcel");
+    }
+
+    if (hasGoods) {
+      types.push("AttBiens");
+    }
+
+    if (
+      hasPhysical &&
+      hasSexual &&
+      hasVerbal
+    ) {
+      types.push(
+        "AttPers: VP + VS + VV"
+      );
+    }
+    else if (
+      hasPhysical &&
+      hasSexual
+    ) {
+      types.push(
+        "AttPers: VP + VS"
+      );
+    }
+    else if (
+      hasPhysical &&
+      hasVerbal
+    ) {
+      types.push(
+        "AttPers: VP + VV"
+      );
+    }
+    else if (
+      hasSexual &&
+      hasVerbal
+    ) {
+      types.push(
+        "AttPers: VS + VV"
+      );
+    }
+    else if (hasPhysical) {
+      types.push(
+        "AttPers: VP"
+      );
+    }
+    else if (hasSexual) {
+      types.push(
+        "AttPers: VS"
+      );
+    }
+    else if (hasVerbal) {
+      types.push(
+        "AttPers: VV"
+      );
+    }
+    else if (hasPersonsGeneric) {
+      types.push(
+        "AttPers"
+      );
+    }
+
+    if (hasSecurityClimate) {
+      types.push(
+        "AttSecu"
+      );
+    }
+
+    let level = "";
+
+    if (levelCandidates.includes("3")) {
+      level = "3";
+    }
+    else if (levelCandidates.includes("2")) {
+      level = "2";
+    }
+
+    let degree = "";
+
+    if (hasSecondDegree) {
+      degree = "2nd";
+    }
+    else if (hasFirstDegree) {
+      degree = "1er";
+    }
+
+    return {
+      level,
+      degree,
+      types,
+      dateDuFait
+    };
+  }
+
+
+  function renderLevelBadge(level) {
+
+    if (!level) {
+      return "";
+    }
+
+    const levelClass =
+      String(level) === "3"
+        ? "level-badge level-3"
+        : "level-badge";
+
+    return `
+      <span class="${levelClass}">
+        ${escapeHtml(level)}
+      </span>
+    `;
+  }
+
+
+  function getFullFactLabel(type) {
+
+    const labels = {
+      "AttValRep":
+        "Atteintes aux valeurs de la République",
+
+      "Harcel":
+        "Harcèlement ou suspicion de harcèlement / Cyber-harcèlement",
+
+      "AttBiens":
+        "Atteintes aux biens",
+
+      "AttSecu":
+        "Atteintes à la sécurité, au climat de l'établissement",
+
+      "AttPers":
+        "Atteintes aux personnes",
+
+      "AttPers: VP":
+        "Atteintes aux personnes : Violences physiques",
+
+      "AttPers: VS":
+        "Atteintes aux personnes : Violences sexuelles",
+
+      "AttPers: VV":
+        "Atteintes aux personnes : Violences verbales",
+
+      "AttPers: VP + VS":
+        "Atteintes aux personnes : Violences physiques et sexuelles",
+
+      "AttPers: VP + VV":
+        "Atteintes aux personnes : Violences physiques et verbales",
+
+      "AttPers: VS + VV":
+        "Atteintes aux personnes : Violences sexuelles et verbales",
+
+      "AttPers: VP + VS + VV":
+        "Atteintes aux personnes : Violences physiques, sexuelles et verbales"
+    };
+
+    return labels[type] || type;
+  }
+
+
+  function renderFactBadges(types) {
+
+    if (
+      !Array.isArray(types) ||
+      types.length === 0
+    ) {
+      return "";
+    }
+
+    return `
+      <div class="fact-badges">
+        ${types.map(function(type) {
+
+          const fullLabel =
+            getFullFactLabel(type);
+
+          return `
+            <span
+              class="fact-badge"
+              title="${escapeHtml(fullLabel)}"
+            >
+              ${escapeHtml(type)}
+            </span>
+          `;
+        }).join("")}
+      </div>
+    `;
+  }
+
+
+  /*
+    ==================================================
+    DATE GRIST
+    ==================================================
+
+    Cette fonction accepte :
+    - un objet Date JavaScript ;
+    - un timestamp Grist en secondes ;
+    - un timestamp JavaScript en millisecondes ;
+    - YYYY-MM-DD ;
+    - YYYY-MM-DDTHH:mm:ss...
+    - DD/MM/YYYY ;
+    - DD/MM/YY.
+
+    Toutes les dates sont ensuite ramenées à une date "civile"
+    en UTC afin d'éviter les décalages de fuseau horaire.
+  */
+
+  function parseGristDate(value) {
+
+    if (
+      value === null ||
+      value === undefined ||
+      value === ""
+    ) {
+      return null;
+    }
+
+    /*
+      Cas 1 : Date JavaScript.
+    */
+    if (value instanceof Date) {
+
+      if (isNaN(value.getTime())) {
+        return null;
+      }
+
+      return new Date(Date.UTC(
+        value.getUTCFullYear(),
+        value.getUTCMonth(),
+        value.getUTCDate()
+      ));
+    }
+
+    /*
+      Cas 2 : valeur numérique Grist.
+
+      Grist transmet couramment les Date/DateTime comme timestamp
+      Unix en secondes. Si la valeur est déjà en millisecondes,
+      on la conserve telle quelle.
+    */
+    if (
+      typeof value === "number" &&
+      Number.isFinite(value)
+    ) {
+
+      const milliseconds =
+        Math.abs(value) < 100000000000
+          ? value * 1000
+          : value;
+
+      const parsed = new Date(milliseconds);
+
+      if (isNaN(parsed.getTime())) {
+        return null;
+      }
+
+      return new Date(Date.UTC(
+        parsed.getUTCFullYear(),
+        parsed.getUTCMonth(),
+        parsed.getUTCDate()
+      ));
+    }
+
+    /*
+      Cas 3 : chaîne de caractères.
+    */
+    let texte = String(value)
+      .trim()
+      .replace(/^["']+|["']+$/g, "");
+
+    if (!texte) {
+      return null;
+    }
+
+    /*
+      YYYY-MM-DD ou YYYY-MM-DDTHH...
+    */
+    let match = texte.match(
+      /^(\d{4})-(\d{1,2})-(\d{1,2})(?:[T\s].*)?$/
+    );
+
+    if (match) {
+      return makeUTCDate(
+        Number(match[1]),
+        Number(match[2]),
+        Number(match[3])
+      );
+    }
+
+    /*
+      DD/MM/YYYY ou DD-MM-YYYY
+    */
+    match = texte.match(
+      /^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})$/
+    );
+
+    if (match) {
+      return makeUTCDate(
+        Number(match[3]),
+        Number(match[2]),
+        Number(match[1])
+      );
+    }
+
+    /*
+      DD/MM/YY ou DD-MM-YY
+      00-69 -> 2000-2069
+      70-99 -> 1970-1999
+    */
+    match = texte.match(
+      /^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{2})$/
+    );
+
+    if (match) {
+
+      const yy = Number(match[3]);
+      const year = yy <= 69 ? 2000 + yy : 1900 + yy;
+
+      return makeUTCDate(
+        year,
+        Number(match[2]),
+        Number(match[1])
+      );
+    }
+
+    /*
+      Dernier recours : parseur natif.
+    */
+    const parsed = new Date(texte);
+
+    if (isNaN(parsed.getTime())) {
+      return null;
+    }
+
+    return new Date(Date.UTC(
+      parsed.getUTCFullYear(),
+      parsed.getUTCMonth(),
+      parsed.getUTCDate()
+    ));
+  }
+
+
+  /*
+    Crée une date UTC et vérifie qu'elle existe réellement.
+    Par exemple 31/02 sera refusé.
+  */
+
+  function makeUTCDate(year, month, day) {
+
+    const date = new Date(Date.UTC(
+      year,
+      month - 1,
+      day
+    ));
+
+    if (
+      date.getUTCFullYear() !== year ||
+      date.getUTCMonth() !== month - 1 ||
+      date.getUTCDate() !== day
+    ) {
+      return null;
+    }
+
+    return date;
+  }
+
+
+  /*
+    ==================================================
+    SEMAINE ISO
+    lundi -> dimanche
+    ==================================================
+  */
+
+  function getISOWeekInfo(date) {
+
+    /*
+      On travaille entièrement en UTC.
+    */
+    const d = new Date(Date.UTC(
+      date.getUTCFullYear(),
+      date.getUTCMonth(),
+      date.getUTCDate()
+    ));
+
+    let day = d.getUTCDay();
+
+    /*
+      Dimanche 0 -> 7
+    */
+    if (day === 0) {
+      day = 7;
+    }
+
+    /*
+      Jeudi de la semaine ISO :
+      c'est lui qui détermine l'année ISO.
+    */
+    d.setUTCDate(
+      d.getUTCDate() + 4 - day
+    );
+
+    const isoYear = d.getUTCFullYear();
+
+    const yearStart = new Date(Date.UTC(
+      isoYear,
+      0,
+      1
+    ));
+
+    const week = Math.ceil(
+      (
+        (
+          d.getTime() - yearStart.getTime()
+        ) / 86400000
+        + 1
+      ) / 7
+    );
+
+    const monday = getMondayOfISOWeek(
+      isoYear,
+      week
+    );
+
+    const sunday = new Date(monday);
+    sunday.setUTCDate(
+      sunday.getUTCDate() + 6
+    );
+
+    return {
+      year: isoYear,
+      week: week,
+      key:
+        isoYear +
+        "-" +
+        String(week).padStart(2, "0"),
+      monday: monday,
+      sunday: sunday
+    };
+  }
+
+
+  /*
+    ==================================================
+    LUNDI D'UNE SEMAINE ISO
+    ==================================================
+  */
+
+  function getMondayOfISOWeek(year, week) {
+
+    const january4 = new Date(Date.UTC(
+      year,
+      0,
+      4
+    ));
+
+    const day = january4.getUTCDay() || 7;
+
+    const mondayWeek1 = new Date(january4);
+
+    mondayWeek1.setUTCDate(
+      january4.getUTCDate() - day + 1
+    );
+
+    const monday = new Date(mondayWeek1);
+
+    monday.setUTCDate(
+      mondayWeek1.getUTCDate() +
+      (week - 1) * 7
+    );
+
+    return monday;
+  }
+
+
+  /*
+    ==================================================
+    FORMAT JJ/MM
+    ==================================================
+  */
+
+  function formatDayMonth(date) {
+
+    const day = String(
+      date.getUTCDate()
+    ).padStart(2, "0");
+
+    const month = String(
+      date.getUTCMonth() + 1
+    ).padStart(2, "0");
+
+    return day + "/" + month;
+  }
+
+
+  /*
+    ==================================================
+    FORMAT JJ/MM/AA
+    ==================================================
+  */
+
+  function formatFullDate(date) {
+
+    if (!date) {
+      return "";
+    }
+
+    const day = String(
+      date.getUTCDate()
+    ).padStart(2, "0");
+
+    const month = String(
+      date.getUTCMonth() + 1
+    ).padStart(2, "0");
+
+    const year = String(
+      date.getUTCFullYear()
+    ).slice(-2);
+
+    return day + "/" + month + "/" + year;
+  }
+
+
+  /*
+    ==================================================
+    LISTE DES SEMAINES
+    ==================================================
+  */
+
+  function getAvailableWeeks() {
+
+    const weeks = new Map();
+
+    allRecords.forEach(function(record) {
+
+      /*
+        Une semaine n'est créée QUE si Date_de_saisie
+        a pu être lue et convertie correctement.
+      */
+      if (
+        !record._weekKey ||
+        !record._date
+      ) {
+        return;
+      }
+
+      if (!weeks.has(record._weekKey)) {
+
+        weeks.set(
+          record._weekKey,
+          getISOWeekInfo(record._date)
+        );
+      }
+    });
+
+    /*
+      Semaine la plus récente en premier.
+    */
+    return Array
+      .from(weeks.values())
+      .sort(function(a, b) {
+
+        if (a.year !== b.year) {
+          return b.year - a.year;
+        }
+
+        return b.week - a.week;
+      });
+  }
+
+
+  /*
+    ==================================================
+    AFFICHAGE SÉLECTEUR SEMAINE
+    ==================================================
+  */
+
+  function renderWeekFilter() {
+
+    const select =
+      document.getElementById("week-filter");
+
+    const weeks = getAvailableWeeks();
+
+    const validKeys =
+      weeks.map(item => item.key);
+
+    if (
+      selectedWeek !== "all" &&
+      !validKeys.includes(selectedWeek)
+    ) {
+      selectedWeek = "all";
+    }
+
+    let html = `
+      <option value="all">
+        Toutes les semaines
+      </option>
+    `;
+
+    weeks.forEach(function(info) {
+
+      const selected =
+        selectedWeek === info.key
+          ? "selected"
+          : "";
+
+      const label =
+        "S" +
+        info.week +
+        " — " +
+        formatDayMonth(info.monday) +
+        " au " +
+        formatDayMonth(info.sunday);
+
+      html += `
+        <option
+          value="${escapeHtml(info.key)}"
+          ${selected}
+        >
+          ${escapeHtml(label)}
+        </option>
+      `;
+    });
+
+    select.innerHTML = html;
+  }
+
+
+  /*
+    ==================================================
+    CHANGEMENT DE SEMAINE
+    ==================================================
+  */
+
+  function setWeek(value) {
+
+    selectedWeek = value;
+    currentPage = 1;
+
+    renderTable();
+  }
+
+
+
+  /*
+    ==================================================
+    FILTRE DATE EXACTE
+    ==================================================
+  */
+
+  function formatDateKey(date) {
+
+    if (!date) {
+      return "";
+    }
+
+    const year = date.getUTCFullYear();
+    const month = String(
+      date.getUTCMonth() + 1
+    ).padStart(2, "0");
+    const day = String(
+      date.getUTCDate()
+    ).padStart(2, "0");
+
+    return `${year}-${month}-${day}`;
+  }
+
+
+  function getAvailableDates() {
+
+    const dates = new Map();
+
+    allRecords.forEach(function(record) {
+
+      if (!record._date || !record._dateKey) {
+        return;
+      }
+
+      if (!dates.has(record._dateKey)) {
+        dates.set(record._dateKey, record._date);
+      }
+    });
+
+    return Array
+      .from(dates.entries())
+      .sort(function(a, b) {
+        return b[0].localeCompare(a[0]);
+      });
+  }
+
+
+  function renderDateFilter() {
+
+    const select =
+      document.getElementById("date-filter");
+
+    if (!select) {
+      return;
+    }
+
+    const dates = getAvailableDates();
+
+    const validKeys =
+      dates.map(item => item[0]);
+
+    if (
+      selectedDate !== "all" &&
+      !validKeys.includes(selectedDate)
+    ) {
+      selectedDate = "all";
+    }
+
+    let html = `
+      <option value="all">
+        Toutes les dates
+      </option>
+    `;
+
+    dates.forEach(function(item) {
+
+      const key = item[0];
+      const date = item[1];
+
+      const selected =
+        selectedDate === key
+          ? "selected"
+          : "";
+
+      const label =
+        String(date.getUTCDate()).padStart(2, "0") +
+        "/" +
+        String(date.getUTCMonth() + 1).padStart(2, "0") +
+        "/" +
+        date.getUTCFullYear();
+
+      html += `
+        <option
+          value="${escapeHtml(key)}"
+          ${selected}
+        >
+          ${escapeHtml(label)}
+        </option>
+      `;
+    });
+
+    select.innerHTML = html;
+  }
+
+
+  function setDateFilter(value) {
+
+    selectedDate = value;
+    currentPage = 1;
+
+    renderTable();
+  }
+
+
+  /*
+    ==================================================
+    RECHERCHE TEXTUELLE
+    ==================================================
+  */
+
+  function normalizeSearch(value) {
+
+    return String(
+      value === null || value === undefined
+        ? ""
+        : value
+    )
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .trim();
+  }
+
+
+  function setSearch(value) {
+
+    searchText = normalizeSearch(value);
+    currentPage = 1;
+
+    renderTable();
+  }
+
+
+  /*
+    ==================================================
+    DÉPARTEMENTS DISPONIBLES
+    ==================================================
+  */
+
+  function getDepartments() {
+
+    const departments = allRecords
+      .map(record => record._departement)
+      .filter(Boolean);
+
+    const unique = [...new Set(departments)];
+
+    unique.sort(function(a, b) {
+      return Number(a) - Number(b);
+    });
+
+    return unique;
+  }
+
+
+  /*
+    ==================================================
+    BOUTONS DÉPARTEMENT
+    ==================================================
+  */
+
+  function renderDepartmentFilters() {
+
+    const target =
+      document.getElementById("department-filters");
+
+    const departments =
+      getDepartments();
+
+    let html = `
+      <button
+        type="button"
+        class="department-btn ${
+          selectedDepartment === "all"
+            ? "active"
+            : ""
+        }"
+        onclick="setDepartment('all')"
+      >
+        Tous
+      </button>
+    `;
+
+    departments.forEach(function(departement) {
+
+      html += `
+        <button
+          type="button"
+          class="department-btn ${
+            selectedDepartment === departement
+              ? "active"
+              : ""
+          }"
+          onclick="setDepartment('${escapeJsString(departement)}')"
+        >
+          ${escapeHtml(departement)}
+        </button>
+      `;
+    });
+
+    target.innerHTML = html;
+  }
+
+
+  /*
+    ==================================================
+    CHANGEMENT DÉPARTEMENT
+    ==================================================
+  */
+
+  function setDepartment(departement) {
+
+    selectedDepartment = departement;
+    currentPage = 1;
+
+    renderDegreeFilters();
+    renderDepartmentFilters();
+    renderLevelFilters();
+    renderTable();
+  }
+
+
+  /*
+    ==================================================
+    FILTRE DEGRÉ
+    ==================================================
+  */
+
+  function renderDegreeFilters() {
+
+    const target =
+      document.getElementById("degree-filters");
+
+    if (!target) {
+      return;
+    }
+
+    const degrees = [
+      { value: "all", label: "Tous" },
+      { value: "1er", label: "1er" },
+      { value: "2nd", label: "2nd" }
+    ];
+
+    target.innerHTML = degrees.map(function(item) {
+
+      const active =
+        selectedDegree === item.value
+          ? "active"
+          : "";
+
+      return `
+        <button
+          type="button"
+          class="department-btn ${active}"
+          onclick="setDegree('${item.value}')"
+        >
+          ${item.label}
+        </button>
+      `;
+    }).join("");
+  }
+
+
+  function setDegree(degree) {
+
+    selectedDegree = degree;
+    currentPage = 1;
+
+    renderDegreeFilters();
+    renderTable();
+  }
+
+
+  /*
+    ==================================================
+    FILTRE NIVEAU
+    ==================================================
+  */
+
+  function renderLevelFilters() {
+
+    const target =
+      document.getElementById("level-filters");
+
+    if (!target) {
+      return;
+    }
+
+    const levels = [
+      { value: "all", label: "Tous" },
+      { value: "2", label: "2" },
+      { value: "3", label: "3" }
+    ];
+
+    target.innerHTML = levels.map(function(item) {
+
+      const active =
+        selectedLevel === item.value
+          ? "active"
+          : "";
+
+      return `
+        <button
+          type="button"
+          class="department-btn ${active}"
+          onclick="setLevel('${item.value}')"
+        >
+          ${item.label}
+        </button>
+      `;
+    }).join("");
+  }
+
+
+  function setLevel(level) {
+
+    selectedLevel = level;
+    currentPage = 1;
+
+    renderLevelFilters();
+    renderTable();
+  }
+
+
+  /*
+    ==================================================
+    FILTRES COMBINÉS
+    ==================================================
+  */
+
+  function getFilteredRecords() {
+
+    return allRecords.filter(function(record) {
+
+      const departmentOk =
+        selectedDepartment === "all" ||
+        record._departement === selectedDepartment;
+
+      const weekOk =
+        selectedWeek === "all" ||
+        record._weekKey === selectedWeek;
+
+      const dateOk =
+        selectedDate === "all" ||
+        record._dateKey === selectedDate;
+
+      const levelOk =
+        selectedLevel === "all" ||
+        record._niveau === selectedLevel;
+
+      const degreeOk =
+        selectedDegree === "all" ||
+        record._degre === selectedDegree;
+
+      const searchableText = normalizeSearch([
+        record[FIELD.NUMERO_FE],
+        record[FIELD.ID_NOM],
+        record[FIELD.VILLE],
+        record[FIELD.RESUME],
+        record._departement,
+        record._niveau,
+        Array.isArray(record._typeFait)
+          ? record._typeFait.join(" ")
+          : ""
+      ].join(" "));
+
+      const searchOk =
+        !searchText ||
+        searchableText.includes(searchText);
+
+      return (
+        departmentOk &&
+        weekOk &&
+        dateOk &&
+        levelOk &&
+        degreeOk &&
+        searchOk
+      );
+    });
+  }
+
+
+  /*
+    ==================================================
+    TABLEAU
+    ==================================================
+  */
+
+  function renderTable() {
+
+    const tableContainer =
+      document.getElementById("table1");
+
+    const filteredRecords =
+      getFilteredRecords();
+
+    if (filteredRecords.length === 0) {
+
+      tableContainer.innerHTML = `
+        <div class="empty-table">
+          Aucun fait à afficher avec ces filtres.
+        </div>
+      `;
+
+      renderPagination(filteredRecords);
+      return;
+    }
+
+    const startIndex =
+      (currentPage - 1) * PAGE_SIZE;
+
+    const endIndex =
+      startIndex + PAGE_SIZE;
+
+    const visibleRecords =
+      filteredRecords.slice(
+        startIndex,
+        endIndex
+      );
+
+    let html = "<table>";
+
+    /*
+      EN-TÊTE
+    */
+    html += "<thead><tr>";
+
+    COLUMNS.forEach(function(column) {
+      html +=
+        "<th>" +
+        escapeHtml(column.label) +
+        "</th>";
+    });
+
+    html += "</tr></thead>";
+
+    /*
+      LIGNES
+    */
+    html += "<tbody>";
+
+    visibleRecords.forEach(function(record) {
+
+      html += "<tr>";
+
+      COLUMNS.forEach(function(column) {
+
+        /*
+          Colonnes calculées avec rendu stylisé.
+        */
+        if (column.id === "_niveau") {
+
+          html +=
+            '<td class="level-cell">' +
+            renderLevelBadge(record._niveau) +
+            "</td>";
+
+          return;
+        }
+
+        if (column.id === "_typeFait") {
+
+          html +=
+            '<td class="type-cell">' +
+            renderFactBadges(record._typeFait) +
+            "</td>";
+
+          return;
+        }
+
+        if (column.id === FIELD.RESUME) {
+
+          const resume = formatValue(
+            record[FIELD.RESUME],
+            FIELD.RESUME
+          );
+
+          html +=
+            '<td class="summary-cell" title="' +
+            escapeHtml(resume) +
+            '">' +
+            escapeHtml(resume) +
+            "</td>";
+
+          return;
+        }
+
+        if (column.id === "_dateDuFait") {
+
+          html +=
+            '<td class="fact-date-cell">' +
+            escapeHtml(record._dateDuFait || "") +
+            "</td>";
+
+          return;
+        }
+
+
+        let value;
+
+        if (column.id === FIELD.DATE_SAISIE) {
+
+          /*
+            On affiche la même date normalisée que celle
+            utilisée par les filtres semaine et date.
+          */
+          value = formatFullDate(record._date);
+        }
+
+        else if (column.id === FIELD.VILLE) {
+
+          const ville = formatValue(
+            record[FIELD.VILLE],
+            FIELD.VILLE
+          );
+
+          value =
+            ville && record._departement
+              ? `${ville} (${record._departement})`
+              : ville;
+        }
+
+        else {
+          value = formatValue(
+            record[column.id],
+            column.id
+          );
+        }
+
+        html +=
+          "<td>" +
+          escapeHtml(value) +
+          "</td>";
+      });
+
+      html += "</tr>";
+    });
+
+    html += "</tbody>";
+    html += "</table>";
+
+    tableContainer.innerHTML = html;
+
+    renderPagination(filteredRecords);
+  }
+
+
+  /*
+    ==================================================
+    PAGINATION
+    ==================================================
+  */
+
+  function renderPagination(records) {
+
+    const pagination =
+      document.getElementById("pagination");
+
+    const totalRecords =
+      records.length;
+
+    if (totalRecords === 0) {
+
+      pagination.innerHTML = `
+        <div class="pagination-info">
+          0 fait
+        </div>
+      `;
+
+      return;
+    }
+
+    const totalPages = Math.max(
+      1,
+      Math.ceil(totalRecords / PAGE_SIZE)
+    );
+
+    if (currentPage > totalPages) {
+      currentPage = totalPages;
+    }
+
+    const firstRow =
+      ((currentPage - 1) * PAGE_SIZE) + 1;
+
+    const lastRow = Math.min(
+      currentPage * PAGE_SIZE,
+      totalRecords
+    );
+
+    let buttons = "";
+    let ellipsisBefore = false;
+    let ellipsisAfter = false;
+
+    for (
+      let page = 1;
+      page <= totalPages;
+      page++
+    ) {
+
+      const closeToCurrent =
+        Math.abs(page - currentPage) <= 2;
+
+      const edgePage =
+        page === 1 ||
+        page === totalPages;
+
+      if (closeToCurrent || edgePage) {
+
+        buttons += `
+          <button
+            type="button"
+            class="page-btn ${
+              page === currentPage
+                ? "active"
+                : ""
+            }"
+            onclick="goToPage(${page})"
+          >
+            ${page}
+          </button>
+        `;
+
+        continue;
+      }
+
+      if (
+        page < currentPage &&
+        !ellipsisBefore
+      ) {
+
+        buttons += `
+          <span class="pagination-info">…</span>
+        `;
+
+        ellipsisBefore = true;
+      }
+
+      if (
+        page > currentPage &&
+        !ellipsisAfter
+      ) {
+
+        buttons += `
+          <span class="pagination-info">…</span>
+        `;
+
+        ellipsisAfter = true;
+      }
+    }
+
+    pagination.innerHTML = `
+      <div class="pagination-controls">
+
+        <button
+          type="button"
+          class="page-btn"
+          onclick="goToPage(${currentPage - 1})"
+          ${
+            currentPage === 1
+              ? "disabled"
+              : ""
+          }
+        >
+          ← Précédent
+        </button>
+
+        ${buttons}
+
+        <button
+          type="button"
+          class="page-btn"
+          onclick="goToPage(${currentPage + 1})"
+          ${
+            currentPage === totalPages
+              ? "disabled"
+              : ""
+          }
+        >
+          Suivant →
+        </button>
+
+      </div>
+
+      <div class="pagination-info">
+        ${firstRow}–${lastRow}
+        sur
+        ${totalRecords}
+        faits
+      </div>
+    `;
+  }
+
+
+  /*
+    ==================================================
+    CHANGEMENT PAGE
+    ==================================================
+  */
+
+  function goToPage(page) {
+
+    const filteredRecords =
+      getFilteredRecords();
+
+    const totalPages = Math.max(
+      1,
+      Math.ceil(
+        filteredRecords.length / PAGE_SIZE
+      )
+    );
+
+    if (
+      page < 1 ||
+      page > totalPages
+    ) {
+      return;
+    }
+
+    currentPage = page;
+
+    renderTable();
+
+    const table =
+      document.getElementById("table1");
+
+    if (table) {
+      table.scrollTop = 0;
+      table.scrollLeft = 0;
+    }
+  }
+
+
+  /*
+    ==================================================
+    FORMAT DES VALEURS
+    ==================================================
+  */
+
+  function formatValue(
+    value,
+    columnId = ""
+  ) {
+
+    if (
+      value === null ||
+      value === undefined ||
+      value === ""
+    ) {
+      return "";
+    }
+
+    /*
+      Numéro FE
+    */
+    if (columnId === FIELD.NUMERO_FE) {
+
+      const numero =
+        getNumeroFE(value);
+
+      return numero
+        ? String(numero)
+        : String(value);
+    }
+
+    /*
+      Listes Grist
+    */
+    if (Array.isArray(value)) {
+
+      if (value[0] === "L") {
+        return value
+          .slice(1)
+          .join(", ");
+      }
+
+      return value.join(", ");
+    }
+
+    /*
+      Objet
+    */
+    if (typeof value === "object") {
+
+      try {
+        return JSON.stringify(value);
+      }
+
+      catch {
+        return String(value);
+      }
+    }
+
+    return String(value);
+  }
+
+
+  /*
+    ==================================================
+    PROTECTION HTML
+    ==================================================
+  */
+
+  function escapeHtml(value) {
+
+    return String(
+      value === null || value === undefined
+        ? ""
+        : value
+    )
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+  }
+
+
+  /*
+    Protection minimale si une valeur est injectée
+    dans un onclick entre apostrophes.
+  */
+
+  function escapeJsString(value) {
+
+    return String(value)
+      .replaceAll("\\", "\\\\")
+      .replaceAll("'", "\\'");
+  }
+
 </script>
 
 </body>
