@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="fr">
 
@@ -9,7 +10,7 @@
     content="width=device-width, initial-scale=1"
   >
 
-  <title>Tableau de bord</title>
+  <title>Portail Grist</title>
 
   <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
 
@@ -515,6 +516,19 @@
       color: var(--muted);
     }
 
+    .white-note-stats-line {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      gap: 8px 28px;
+      margin: 3px 0 8px;
+    }
+
+    .white-note-stats-line .white-note-counts,
+    .white-note-stats-line .white-note-total {
+      margin: 0;
+    }
+
     .level-3-text {
       color: #b54708;
       font-weight: 700;
@@ -744,9 +758,7 @@
         <h2 id="white-note-title" class="white-note-title">
           Note Blanche
         </h2>
-        <p class="muted">
-          Récapitulatif départemental des faits enregistrés la veille.
-        </p>
+        <p id="white-note-period" class="white-note-period"></p>
       </div>
 
       <div class="white-note-controls">
@@ -769,8 +781,6 @@
         </div>
       </div>
     </div>
-
-    <p id="white-note-period" class="white-note-period"></p>
 
     <div id="white-note-content">
       <div class="white-note-empty">
@@ -1783,7 +1793,7 @@
         "Atteintes aux biens",
 
       "AttSecu":
-        "Atteintes à la sécurité, au climat de l'établissement",
+        "Atteinte à la sécurité",
 
       "AttPers":
         "Atteintes aux personnes",
@@ -3117,22 +3127,24 @@
             Récapitulatif des faits d'établissement du ${escapeHtml(label)} du ${escapeHtml(selectedWhiteNoteDepartment)}
           </p>
 
-          <p class="white-note-counts">
-            Faits du jour (N2) : ${counts.dayN2}
-            -
-            <span class="level-3-text">Faits du jour (N3) : ${counts.dayN3}</span>
-          </p>
+          <div class="white-note-stats-line">
+            <p class="white-note-counts">
+              Faits du jour (N2) : ${counts.dayN2}
+              -
+              <span class="level-3-text">Faits du jour (N3) : ${counts.dayN3}</span>
+            </p>
 
-          <p class="white-note-counts actualisation">
-            Faits d'actualisation (N2) : ${counts.updateN2}
-            -
-            <span class="level-3-text">Faits d'actualisation (N3) : ${counts.updateN3}</span>
-          </p>
+            <p class="white-note-counts actualisation">
+              Faits d'actualisation (N2) : ${counts.updateN2}
+              -
+              <span class="level-3-text">Faits d'actualisation (N3) : ${counts.updateN3}</span>
+            </p>
 
-          <p class="white-note-total">
-            Total faits N2 : ${counts.totalN2}
-            &nbsp;&nbsp; Total faits N3 : ${counts.totalN3}
-          </p>
+            <p class="white-note-total">
+              Total faits N2 : ${counts.totalN2}
+              &nbsp;&nbsp; Total faits N3 : ${counts.totalN3}
+            </p>
+          </div>
         </div>
     `;
 
@@ -3155,10 +3167,10 @@
         <table class="white-note-table">
           <thead>
             <tr>
-              <th>NIVEAU</th>
+              <th>Niveau</th>
               <th>Résumé</th>
-              <th>Type fait</th>
-              <th>Nom + ville</th>
+              <th>Type de fait</th>
+              <th>Etablissement</th>
             </tr>
           </thead>
           <tbody>
