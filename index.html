@@ -457,7 +457,7 @@
 
   <section class="section">
 
-    <h2>Premier tableau</h2>
+    <h2>Tableau des FEs</h2>
 
     <p>
       Tableau des faits avec les informations principales.
@@ -750,7 +750,21 @@
       Vérification des IDs techniques réellement reçus.
       Cette vérification ne dépend pas de l'ordre des colonnes.
     */
-    const receivedColumns = new Set(Object.keys(records[0]));
+    /*
+      On construit la liste des colonnes à partir de TOUTES les lignes reçues,
+      et pas uniquement de records[0].
+
+      C'est important pour Resume : si la première ligne n'a pas encore de
+      résumé, Grist peut ne pas inclure la propriété Resume sur cette ligne,
+      alors qu'elle existe bien sur d'autres FE.
+    */
+    const receivedColumns = new Set();
+
+    records.forEach(function(record) {
+      Object.keys(record || {}).forEach(function(columnId) {
+        receivedColumns.add(columnId);
+      });
+    });
 
     const requiredColumns = [
       FIELD.NUMERO_FE,
