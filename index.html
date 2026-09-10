@@ -445,54 +445,47 @@
 
 
 <script>
-
   /*
     ==================================================
-    COLONNES
+    CONFIGURATION DES COLONNES GRIST
     ==================================================
+
+    IMPORTANT :
+    - On utilise UNIQUEMENT les identifiants techniques Grist.
+    - On ne dépend JAMAIS de la position des colonnes dans Excel/Grist.
+    - Déplacer une colonne ne casse donc pas le widget.
   */
 
-  const COLUMNS = [
+  const FIELD = Object.freeze({
+    NUMERO_FE: "Numero_FE",
+    DATE_SAISIE: "Date_de_saisie",
+    ID_NOM: "ID_et_Nom",
+    VILLE: "Ville",
+    REDACTEUR: "Redacteur"
+  });
 
-    ["Numero_FE", "Numéro FE"],
-
-    ["Date_de_saisie", "Date de saisie"],
-
-    ["ID_et_Nom", "ID et Nom"],
-
-    ["Ville", "Ville"],
-
-    ["_departement", "Département"],
-
-    ["Redacteur", "Rédacteur"]
-
-  ];
-
-
-  /*
-    ==================================================
-    CONFIG
-    ==================================================
-  */
+  const COLUMNS = Object.freeze([
+    { id: FIELD.NUMERO_FE, label: "Numéro FE" },
+    { id: FIELD.DATE_SAISIE, label: "Date de saisie" },
+    { id: FIELD.ID_NOM, label: "ID et Nom" },
+    { id: FIELD.VILLE, label: "Ville" },
+    { id: "_departement", label: "Département" },
+    { id: FIELD.REDACTEUR, label: "Rédacteur" }
+  ]);
 
   const PAGE_SIZE = 10;
 
   let allRecords = [];
-
   let currentPage = 1;
-
   let selectedDepartment = "all";
-
   let selectedWeek = "all";
 
-
-  const diagnostic =
-    document.getElementById("diagnostic");
+  const diagnostic = document.getElementById("diagnostic");
 
 
   /*
     ==================================================
-    GRIST
+    INITIALISATION GRIST
     ==================================================
   */
 
@@ -501,159 +494,137 @@
   });
 
 
+  /*
+    ==================================================
+    RÉCEPTION DES LIGNES
+    ==================================================
+  */
+
   grist.onRecords(function(records) {
 
     if (!Array.isArray(records)) {
-
-      diagnostic.textContent =
-        "Erreur : les données reçues ne sont pas valides.";
-
-      diagnostic.className =
-        "diagnostic error";
-
+      showDiagnostic(
+        "Erreur : les données reçues par le widget ne sont pas valides.",
+        "error"
+      );
       return;
     }
-
 
     if (records.length === 0) {
-
       allRecords = [];
+      currentPage = 1;
 
-      diagnostic.textContent =
-        "Connexion réussie, mais aucun fait n'a été reçu.";
-
-      diagnostic.className =
-        "diagnostic error";
+      showDiagnostic(
+        "Connexion réussie, mais aucune ligne n'a été reçue.",
+        "error"
+      );
 
       renderWeekFilter();
-
       renderDepartmentFilters();
-
       renderTable();
-
       return;
     }
 
+    /*
+      Vérification des IDs techniques réellement reçus.
+      Cette vérification ne dépend pas de l'ordre des colonnes.
+    */
+    const receivedColumns = new Set(Object.keys(records[0]));
+
+    const requiredColumns = [
+      FIELD.NUMERO_FE,
+      FIELD.DATE_SAISIE,
+      FIELD.ID_NOM,
+      FIELD.VILLE,
+      FIELD.REDACTEUR
+    ];
+
+    const missingColumns = requiredColumns.filter(
+      id => !receivedColumns.has(id)
+    );
 
     /*
-      Enrichissement des données
-    */
+      Construction des lignes internes du widget.
 
+      La date utilisée pour le filtre semaine vient EXCLUSIVEMENT de :
+          record[FIELD.DATE_SAISIE]
+
+      Donc jamais d'un numéro de colonne, d'un Object.values(),
+      ou de la position de la colonne dans Excel.
+    */
     allRecords = records.map(function(record) {
 
-      const date =
-        parseGristDate(
-          record.Date_de_saisie
-        );
-
-      const weekInfo =
-        date
-          ? getISOWeekInfo(date)
-          : null;
+      const rawDate = record[FIELD.DATE_SAISIE];
+      const date = parseGristDate(rawDate);
+      const weekInfo = date ? getISOWeekInfo(date) : null;
 
       return {
-
         ...record,
 
-        _departement:
-          getDepartement(record),
+        _departement: getDepartement(record),
 
-        _date:
-          date,
+        /*
+          Valeur brute conservée pour diagnostic éventuel.
+        */
+        _rawDateDeSaisie: rawDate,
 
-        _weekKey:
-          weekInfo
-            ? weekInfo.key
-            : "",
+        /*
+          Date normalisée à partir de Date_de_saisie uniquement.
+        */
+        _date: date,
 
-        _weekNumber:
-          weekInfo
-            ? weekInfo.week
-            : null,
-
-        _weekYear:
-          weekInfo
-            ? weekInfo.year
-            : null
-
+        _weekKey: weekInfo ? weekInfo.key : "",
+        _weekNumber: weekInfo ? weekInfo.week : null,
+        _weekYear: weekInfo ? weekInfo.year : null
       };
-
     });
-
 
     /*
-      Tri FE décroissant
+      Tri par numéro FE décroissant.
     */
-
     allRecords.sort(function(a, b) {
-
       return (
-        getNumeroFE(b.Numero_FE)
-        -
-        getNumeroFE(a.Numero_FE)
+        getNumeroFE(b[FIELD.NUMERO_FE]) -
+        getNumeroFE(a[FIELD.NUMERO_FE])
       );
-
     });
-
 
     currentPage = 1;
 
-
-    /*
-      Vérification colonnes
-    */
-
-    const receivedColumns =
-      Object.keys(records[0]);
-
-
-    const gristColumns =
-      COLUMNS
-        .map(column => column[0])
-        .filter(column => column !== "_departement");
-
-
-    const missingColumns =
-      gristColumns.filter(function(id) {
-
-        return !receivedColumns.includes(id);
-
-      });
-
-
     if (missingColumns.length > 0) {
-
-      diagnostic.textContent =
+      showDiagnostic(
         "Connexion réussie : " +
         records.length +
-        " lignes reçues. Colonnes introuvables : " +
-        missingColumns.join(", ");
-
-      diagnostic.className =
-        "diagnostic error";
-
-    }
-
-    else {
-
-      diagnostic.textContent =
+        " lignes reçues. IDs de colonnes introuvables : " +
+        missingColumns.join(", "),
+        "error"
+      );
+    } else {
+      showDiagnostic(
         "Connexion réussie : " +
         records.length +
-        " faits reçus.";
-
-      diagnostic.className =
-        "diagnostic ok";
-
+        " faits reçus.",
+        "ok"
+      );
     }
-
 
     renderWeekFilter();
-
     renderDepartmentFilters();
-
     renderTable();
-
   });
+
+
+  /*
+    ==================================================
+    DIAGNOSTIC
+    ==================================================
+  */
+
+  function showDiagnostic(message, type) {
+    diagnostic.textContent = message;
+    diagnostic.className =
+      "diagnostic" + (type ? " " + type : "");
+  }
 
 
   /*
@@ -672,25 +643,14 @@
       return 0;
     }
 
-    const texte =
-      String(value);
+    const texte = String(value);
+    const nombres = texte.match(/\d+/g);
 
-    const nombres =
-      texte.match(/\d+/g);
-
-    if (
-      !nombres ||
-      nombres.length === 0
-    ) {
+    if (!nombres || nombres.length === 0) {
       return 0;
     }
 
-    return Number(
-      nombres[
-        nombres.length - 1
-      ]
-    );
-
+    return Number(nombres[nombres.length - 1]);
   }
 
 
@@ -702,36 +662,60 @@
 
   function getDepartement(record) {
 
+    if (!record) {
+      return "";
+    }
+
+    /*
+      Là encore, on lit l'ID Grist "ID_et_Nom",
+      jamais la position de la colonne.
+    */
+    const value = record[FIELD.ID_NOM];
+
     if (
-      !record ||
-      !record.ID_et_Nom
+      value === null ||
+      value === undefined ||
+      value === ""
     ) {
       return "";
     }
 
-    const texte =
-      String(
-        record.ID_et_Nom
-      ).trim();
+    const texte = String(value).trim();
 
-    const match =
-      texte.match(/^(\d{3})/);
+    /*
+      Exemples :
+      0341949J -> département 34
+      0300036B -> département 30
+      0660905A -> département 66
+      011....  -> département 11
+      048....  -> département 48
+    */
+    const match = texte.match(/^(\d{3})/);
 
     if (!match) {
       return "";
     }
 
-    return String(
-      Number(match[1])
-    );
-
+    return String(Number(match[1]));
   }
 
 
   /*
     ==================================================
-    PARSE DATE GRIST
+    DATE GRIST
     ==================================================
+
+    Cette fonction accepte :
+    - un objet Date JavaScript ;
+    - un timestamp Grist en secondes ;
+    - un timestamp JavaScript en millisecondes ;
+    - YYYY-MM-DD ;
+    - YYYY-MM-DDTHH:mm:ss...
+    - DD/MM/YYYY ;
+    - DD/MM/YY.
+
+    Toutes les dates sont ensuite ramenées à une date "civile"
+    en UTC afin d'éviter les décalages de fuseau horaire.
   */
 
   function parseGristDate(value) {
@@ -744,84 +728,153 @@
       return null;
     }
 
+    /*
+      Cas 1 : Date JavaScript.
+    */
     if (value instanceof Date) {
 
-      return new Date(
-        value.getTime()
-      );
-
-    }
-
-
-    let texte;
-
-    if (
-      typeof value === "object"
-    ) {
-
-      try {
-        texte =
-          JSON.stringify(value);
+      if (isNaN(value.getTime())) {
+        return null;
       }
 
-      catch {
-        texte =
-          String(value);
-      }
-
+      return new Date(Date.UTC(
+        value.getUTCFullYear(),
+        value.getUTCMonth(),
+        value.getUTCDate()
+      ));
     }
 
-    else {
+    /*
+      Cas 2 : valeur numérique Grist.
 
-      texte =
-        String(value);
-
-    }
-
-
-    texte =
-      texte
-        .trim()
-        .replace(
-          /^["']+|["']+$/g,
-          ""
-        );
-
-
-    const isoMatch =
-      texte.match(
-        /^(\d{4})-(\d{2})-(\d{2})/
-      );
-
-
-    if (isoMatch) {
-
-      return new Date(
-        Number(isoMatch[1]),
-        Number(isoMatch[2]) - 1,
-        Number(isoMatch[3])
-      );
-
-    }
-
-
-    const parsed =
-      new Date(texte);
-
-
+      Grist transmet couramment les Date/DateTime comme timestamp
+      Unix en secondes. Si la valeur est déjà en millisecondes,
+      on la conserve telle quelle.
+    */
     if (
-      isNaN(
-        parsed.getTime()
-      )
+      typeof value === "number" &&
+      Number.isFinite(value)
     ) {
 
+      const milliseconds =
+        Math.abs(value) < 100000000000
+          ? value * 1000
+          : value;
+
+      const parsed = new Date(milliseconds);
+
+      if (isNaN(parsed.getTime())) {
+        return null;
+      }
+
+      return new Date(Date.UTC(
+        parsed.getUTCFullYear(),
+        parsed.getUTCMonth(),
+        parsed.getUTCDate()
+      ));
+    }
+
+    /*
+      Cas 3 : chaîne de caractères.
+    */
+    let texte = String(value)
+      .trim()
+      .replace(/^["']+|["']+$/g, "");
+
+    if (!texte) {
       return null;
-
     }
 
+    /*
+      YYYY-MM-DD ou YYYY-MM-DDTHH...
+    */
+    let match = texte.match(
+      /^(\d{4})-(\d{1,2})-(\d{1,2})(?:[T\s].*)?$/
+    );
 
-    return parsed;
+    if (match) {
+      return makeUTCDate(
+        Number(match[1]),
+        Number(match[2]),
+        Number(match[3])
+      );
+    }
 
+    /*
+      DD/MM/YYYY ou DD-MM-YYYY
+    */
+    match = texte.match(
+      /^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})$/
+    );
+
+    if (match) {
+      return makeUTCDate(
+        Number(match[3]),
+        Number(match[2]),
+        Number(match[1])
+      );
+    }
+
+    /*
+      DD/MM/YY ou DD-MM-YY
+      00-69 -> 2000-2069
+      70-99 -> 1970-1999
+    */
+    match = texte.match(
+      /^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{2})$/
+    );
+
+    if (match) {
+
+      const yy = Number(match[3]);
+      const year = yy <= 69 ? 2000 + yy : 1900 + yy;
+
+      return makeUTCDate(
+        year,
+        Number(match[2]),
+        Number(match[1])
+      );
+    }
+
+    /*
+      Dernier recours : parseur natif.
+    */
+    const parsed = new Date(texte);
+
+    if (isNaN(parsed.getTime())) {
+      return null;
+    }
+
+    return new Date(Date.UTC(
+      parsed.getUTCFullYear(),
+      parsed.getUTCMonth(),
+      parsed.getUTCDate()
+    ));
+  }
+
+
+  /*
+    Crée une date UTC et vérifie qu'elle existe réellement.
+    Par exemple 31/02 sera refusé.
+  */
+
+  function makeUTCDate(year, month, day) {
+
+    const date = new Date(Date.UTC(
+      year,
+      month - 1,
+      day
+    ));
+
+    if (
+      date.getUTCFullYear() !== year ||
+      date.getUTCMonth() !== month - 1 ||
+      date.getUTCDate() !== day
+    ) {
+      return null;
+    }
+
+    return date;
   }
 
 
@@ -834,94 +887,69 @@
 
   function getISOWeekInfo(date) {
 
-    const d =
-      new Date(
-        Date.UTC(
-          date.getFullYear(),
-          date.getMonth(),
-          date.getDate()
-        )
-      );
+    /*
+      On travaille entièrement en UTC.
+    */
+    const d = new Date(Date.UTC(
+      date.getUTCFullYear(),
+      date.getUTCMonth(),
+      date.getUTCDate()
+    ));
 
+    let day = d.getUTCDay();
 
-    let day =
-      d.getUTCDay();
-
-
+    /*
+      Dimanche 0 -> 7
+    */
     if (day === 0) {
       day = 7;
     }
 
-
     /*
-      Jeudi de la semaine ISO
+      Jeudi de la semaine ISO :
+      c'est lui qui détermine l'année ISO.
     */
-
     d.setUTCDate(
-      d.getUTCDate()
-      + 4
-      - day
+      d.getUTCDate() + 4 - day
     );
 
+    const isoYear = d.getUTCFullYear();
 
-    const isoYear =
-      d.getUTCFullYear();
+    const yearStart = new Date(Date.UTC(
+      isoYear,
+      0,
+      1
+    ));
 
-
-    const yearStart =
-      new Date(
-        Date.UTC(
-          isoYear,
-          0,
-          1
-        )
-      );
-
-
-    const week =
-      Math.ceil(
+    const week = Math.ceil(
+      (
         (
-          (
-            d - yearStart
-          ) / 86400000
-          + 1
-        ) / 7
-      );
-
-
-    const monday =
-      getMondayOfISOWeek(
-        isoYear,
-        week
-      );
-
-
-    const sunday =
-      new Date(monday);
-
-
-    sunday.setDate(
-      monday.getDate() + 6
+          d.getTime() - yearStart.getTime()
+        ) / 86400000
+        + 1
+      ) / 7
     );
 
+    const monday = getMondayOfISOWeek(
+      isoYear,
+      week
+    );
+
+    const sunday = new Date(monday);
+    sunday.setUTCDate(
+      sunday.getUTCDate() + 6
+    );
 
     return {
-
       year: isoYear,
-
       week: week,
-
       key:
         isoYear +
         "-" +
         String(week).padStart(2, "0"),
-
       monday: monday,
-
       sunday: sunday
-
     };
-
   }
 
 
@@ -933,49 +961,28 @@
 
   function getMondayOfISOWeek(year, week) {
 
-    const january4 =
-      new Date(
-        year,
-        0,
-        4
-      );
+    const january4 = new Date(Date.UTC(
+      year,
+      0,
+      4
+    ));
 
+    const day = january4.getUTCDay() || 7;
 
-    const day =
-      january4.getDay() || 7;
+    const mondayWeek1 = new Date(january4);
 
-
-    const mondayWeek1 =
-      new Date(january4);
-
-
-    mondayWeek1.setDate(
-      january4.getDate()
-      - day
-      + 1
+    mondayWeek1.setUTCDate(
+      january4.getUTCDate() - day + 1
     );
 
+    const monday = new Date(mondayWeek1);
 
-    const monday =
-      new Date(mondayWeek1);
-
-
-    monday.setDate(
-      mondayWeek1.getDate()
-      + (week - 1) * 7
+    monday.setUTCDate(
+      mondayWeek1.getUTCDate() +
+      (week - 1) * 7
     );
-
-
-    monday.setHours(
-      0,
-      0,
-      0,
-      0
-    );
-
 
     return monday;
-
   }
 
 
@@ -987,30 +994,43 @@
 
   function formatDayMonth(date) {
 
-    const day =
-      String(
-        date.getDate()
-      ).padStart(
-        2,
-        "0"
-      );
+    const day = String(
+      date.getUTCDate()
+    ).padStart(2, "0");
+
+    const month = String(
+      date.getUTCMonth() + 1
+    ).padStart(2, "0");
+
+    return day + "/" + month;
+  }
 
 
-    const month =
-      String(
-        date.getMonth() + 1
-      ).padStart(
-        2,
-        "0"
-      );
+  /*
+    ==================================================
+    FORMAT JJ/MM/AA
+    ==================================================
+  */
 
+  function formatFullDate(date) {
 
-    return (
-      day +
-      "/" +
-      month
-    );
+    if (!date) {
+      return "";
+    }
 
+    const day = String(
+      date.getUTCDate()
+    ).padStart(2, "0");
+
+    const month = String(
+      date.getUTCMonth() + 1
+    ).padStart(2, "0");
+
+    const year = String(
+      date.getUTCFullYear()
+    ).slice(-2);
+
+    return day + "/" + month + "/" + year;
   }
 
 
@@ -1022,12 +1042,14 @@
 
   function getAvailableWeeks() {
 
-    const weeks =
-      new Map();
-
+    const weeks = new Map();
 
     allRecords.forEach(function(record) {
 
+      /*
+        Une semaine n'est créée QUE si Date_de_saisie
+        a pu être lue et convertie correctement.
+      */
       if (
         !record._weekKey ||
         !record._date
@@ -1035,56 +1057,28 @@
         return;
       }
 
-
-      if (
-        !weeks.has(
-          record._weekKey
-        )
-      ) {
-
-        const info =
-          getISOWeekInfo(
-            record._date
-          );
-
+      if (!weeks.has(record._weekKey)) {
 
         weeks.set(
           record._weekKey,
-          info
+          getISOWeekInfo(record._date)
         );
-
       }
-
     });
 
-
     /*
-      Semaine la plus récente
-      en premier
+      Semaine la plus récente en premier.
     */
-
     return Array
-      .from(
-        weeks.values()
-      )
+      .from(weeks.values())
       .sort(function(a, b) {
 
-        if (
-          a.year !== b.year
-        ) {
-
-          return (
-            b.year - a.year
-          );
-
+        if (a.year !== b.year) {
+          return b.year - a.year;
         }
 
-        return (
-          b.week - a.week
-        );
-
+        return b.week - a.week;
       });
-
   }
 
 
@@ -1097,47 +1091,25 @@
   function renderWeekFilter() {
 
     const select =
-      document.getElementById(
-        "week-filter"
-      );
+      document.getElementById("week-filter");
 
-
-    const weeks =
-      getAvailableWeeks();
-
-
-    /*
-      Si la semaine sélectionnée
-      n'existe plus, retour à "all"
-    */
+    const weeks = getAvailableWeeks();
 
     const validKeys =
-      weeks.map(
-        item => item.key
-      );
-
+      weeks.map(item => item.key);
 
     if (
       selectedWeek !== "all" &&
-      !validKeys.includes(
-        selectedWeek
-      )
+      !validKeys.includes(selectedWeek)
     ) {
-
-      selectedWeek =
-        "all";
-
+      selectedWeek = "all";
     }
 
-
     let html = `
-
       <option value="all">
         Toutes les semaines
       </option>
-
     `;
-
 
     weeks.forEach(function(info) {
 
@@ -1146,37 +1118,25 @@
           ? "selected"
           : "";
 
-
       const label =
         "S" +
         info.week +
         " — " +
-        formatDayMonth(
-          info.monday
-        ) +
+        formatDayMonth(info.monday) +
         " au " +
-        formatDayMonth(
-          info.sunday
-        );
-
+        formatDayMonth(info.sunday);
 
       html += `
-
         <option
-          value="${info.key}"
+          value="${escapeHtml(info.key)}"
           ${selected}
         >
           ${escapeHtml(label)}
         </option>
-
       `;
-
     });
 
-
-    select.innerHTML =
-      html;
-
+    select.innerHTML = html;
   }
 
 
@@ -1188,14 +1148,10 @@
 
   function setWeek(value) {
 
-    selectedWeek =
-      value;
-
-    currentPage =
-      1;
+    selectedWeek = value;
+    currentPage = 1;
 
     renderTable();
-
   }
 
 
@@ -1207,36 +1163,17 @@
 
   function getDepartments() {
 
-    const departments =
-      allRecords
-        .map(function(record) {
+    const departments = allRecords
+      .map(record => record._departement)
+      .filter(Boolean);
 
-          return record._departement;
-
-        })
-        .filter(Boolean);
-
-
-    const unique =
-      [
-        ...new Set(
-          departments
-        )
-      ];
-
+    const unique = [...new Set(departments)];
 
     unique.sort(function(a, b) {
-
-      return (
-        Number(a) -
-        Number(b)
-      );
-
+      return Number(a) - Number(b);
     });
 
-
     return unique;
-
   }
 
 
@@ -1249,17 +1186,12 @@
   function renderDepartmentFilters() {
 
     const target =
-      document.getElementById(
-        "department-filters"
-      );
-
+      document.getElementById("department-filters");
 
     const departments =
       getDepartments();
 
-
     let html = `
-
       <button
         type="button"
         class="department-btn ${
@@ -1271,14 +1203,11 @@
       >
         Tous
       </button>
-
     `;
-
 
     departments.forEach(function(departement) {
 
       html += `
-
         <button
           type="button"
           class="department-btn ${
@@ -1286,19 +1215,14 @@
               ? "active"
               : ""
           }"
-          onclick="setDepartment('${departement}')"
+          onclick="setDepartment('${escapeJsString(departement)}')"
         >
           ${escapeHtml(departement)}
         </button>
-
       `;
-
     });
 
-
-    target.innerHTML =
-      html;
-
+    target.innerHTML = html;
   }
 
 
@@ -1310,16 +1234,11 @@
 
   function setDepartment(departement) {
 
-    selectedDepartment =
-      departement;
-
-    currentPage =
-      1;
+    selectedDepartment = departement;
+    currentPage = 1;
 
     renderDepartmentFilters();
-
     renderTable();
-
   }
 
 
@@ -1333,34 +1252,16 @@
 
     return allRecords.filter(function(record) {
 
-
-      /*
-        Filtre département
-      */
-
       const departmentOk =
-        selectedDepartment === "all"
-        ||
+        selectedDepartment === "all" ||
         record._departement === selectedDepartment;
 
-
-      /*
-        Filtre semaine
-      */
-
       const weekOk =
-        selectedWeek === "all"
-        ||
+        selectedWeek === "all" ||
         record._weekKey === selectedWeek;
 
-
-      return (
-        departmentOk &&
-        weekOk
-      );
-
+      return departmentOk && weekOk;
     });
-
   }
 
 
@@ -1373,50 +1274,28 @@
   function renderTable() {
 
     const tableContainer =
-      document.getElementById(
-        "table1"
-      );
-
+      document.getElementById("table1");
 
     const filteredRecords =
       getFilteredRecords();
 
-
-    if (
-      filteredRecords.length === 0
-    ) {
+    if (filteredRecords.length === 0) {
 
       tableContainer.innerHTML = `
-
         <div class="empty-table">
-          Aucun fait à afficher
-          avec ces filtres.
+          Aucun fait à afficher avec ces filtres.
         </div>
-
       `;
 
-
-      renderPagination(
-        filteredRecords
-      );
-
-
+      renderPagination(filteredRecords);
       return;
-
     }
 
-
     const startIndex =
-      (currentPage - 1)
-      *
-      PAGE_SIZE;
-
+      (currentPage - 1) * PAGE_SIZE;
 
     const endIndex =
-      startIndex
-      +
-      PAGE_SIZE;
-
+      startIndex + PAGE_SIZE;
 
     const visibleRecords =
       filteredRecords.slice(
@@ -1424,92 +1303,71 @@
         endIndex
       );
 
-
-    let html =
-      "<table>";
-
+    let html = "<table>";
 
     /*
       EN-TÊTE
     */
-
-    html +=
-      "<thead><tr>";
-
+    html += "<thead><tr>";
 
     COLUMNS.forEach(function(column) {
-
       html +=
         "<th>" +
-        escapeHtml(
-          column[1]
-        ) +
+        escapeHtml(column.label) +
         "</th>";
-
     });
 
-
-    html +=
-      "</tr></thead>";
-
+    html += "</tr></thead>";
 
     /*
       LIGNES
     */
-
-    html +=
-      "<tbody>";
-
+    html += "<tbody>";
 
     visibleRecords.forEach(function(record) {
 
-      html +=
-        "<tr>";
-
+      html += "<tr>";
 
       COLUMNS.forEach(function(column) {
 
-        const columnId =
-          column[0];
+        let value;
 
+        if (column.id === "_departement") {
+          value = record._departement;
+        }
 
-        const value =
-          formatValue(
-            record[columnId],
-            columnId
+        else if (column.id === FIELD.DATE_SAISIE) {
+
+          /*
+            IMPORTANT :
+            On affiche la MÊME date normalisée que celle
+            utilisée pour calculer la semaine.
+          */
+          value = formatFullDate(record._date);
+        }
+
+        else {
+          value = formatValue(
+            record[column.id],
+            column.id
           );
-
+        }
 
         html +=
           "<td>" +
           escapeHtml(value) +
           "</td>";
-
       });
 
-
-      html +=
-        "</tr>";
-
+      html += "</tr>";
     });
 
+    html += "</tbody>";
+    html += "</table>";
 
-    html +=
-      "</tbody>";
+    tableContainer.innerHTML = html;
 
-
-    html +=
-      "</table>";
-
-
-    tableContainer.innerHTML =
-      html;
-
-
-    renderPagination(
-      filteredRecords
-    );
-
+    renderPagination(filteredRecords);
   }
 
 
@@ -1522,71 +1380,42 @@
   function renderPagination(records) {
 
     const pagination =
-      document.getElementById(
-        "pagination"
-      );
-
+      document.getElementById("pagination");
 
     const totalRecords =
       records.length;
 
-
-    if (
-      totalRecords === 0
-    ) {
+    if (totalRecords === 0) {
 
       pagination.innerHTML = `
-
         <div class="pagination-info">
           0 fait
         </div>
-
       `;
 
       return;
-
     }
 
+    const totalPages = Math.max(
+      1,
+      Math.ceil(totalRecords / PAGE_SIZE)
+    );
 
-    const totalPages =
-      Math.max(
-        1,
-        Math.ceil(
-          totalRecords /
-          PAGE_SIZE
-        )
-      );
-
-
-    if (
-      currentPage >
-      totalPages
-    ) {
-
-      currentPage =
-        totalPages;
-
+    if (currentPage > totalPages) {
+      currentPage = totalPages;
     }
-
 
     const firstRow =
-      (
-        (currentPage - 1)
-        *
-        PAGE_SIZE
-      ) + 1;
+      ((currentPage - 1) * PAGE_SIZE) + 1;
 
-
-    const lastRow =
-      Math.min(
-        currentPage *
-        PAGE_SIZE,
-        totalRecords
-      );
-
+    const lastRow = Math.min(
+      currentPage * PAGE_SIZE,
+      totalRecords
+    );
 
     let buttons = "";
-
+    let ellipsisBefore = false;
+    let ellipsisAfter = false;
 
     for (
       let page = 1;
@@ -1595,24 +1424,15 @@
     ) {
 
       const closeToCurrent =
-        Math.abs(
-          page - currentPage
-        ) <= 2;
-
+        Math.abs(page - currentPage) <= 2;
 
       const edgePage =
-        page === 1
-        ||
+        page === 1 ||
         page === totalPages;
 
-
-      if (
-        closeToCurrent ||
-        edgePage
-      ) {
+      if (closeToCurrent || edgePage) {
 
         buttons += `
-
           <button
             type="button"
             class="page-btn ${
@@ -1624,42 +1444,37 @@
           >
             ${page}
           </button>
-
         `;
 
+        continue;
       }
 
-      else if (
-
-        (
-          page === 2
-          &&
-          currentPage > 4
-        )
-
-        ||
-
-        (
-          page === totalPages - 1
-          &&
-          currentPage < totalPages - 3
-        )
-
+      if (
+        page < currentPage &&
+        !ellipsisBefore
       ) {
 
         buttons += `
-          <span class="pagination-info">
-            …
-          </span>
+          <span class="pagination-info">…</span>
         `;
 
+        ellipsisBefore = true;
       }
 
+      if (
+        page > currentPage &&
+        !ellipsisAfter
+      ) {
+
+        buttons += `
+          <span class="pagination-info">…</span>
+        `;
+
+        ellipsisAfter = true;
+      }
     }
 
-
     pagination.innerHTML = `
-
       <div class="pagination-controls">
 
         <button
@@ -1693,16 +1508,12 @@
       </div>
 
       <div class="pagination-info">
-
         ${firstRow}–${lastRow}
         sur
         ${totalRecords}
         faits
-
       </div>
-
     `;
-
   }
 
 
@@ -1717,16 +1528,12 @@
     const filteredRecords =
       getFilteredRecords();
 
-
-    const totalPages =
-      Math.max(
-        1,
-        Math.ceil(
-          filteredRecords.length /
-          PAGE_SIZE
-        )
-      );
-
+    const totalPages = Math.max(
+      1,
+      Math.ceil(
+        filteredRecords.length / PAGE_SIZE
+      )
+    );
 
     if (
       page < 1 ||
@@ -1735,28 +1542,17 @@
       return;
     }
 
-
-    currentPage =
-      page;
-
+    currentPage = page;
 
     renderTable();
 
-
     const table =
-      document.getElementById(
-        "table1"
-      );
-
+      document.getElementById("table1");
 
     if (table) {
-
       table.scrollTop = 0;
-
       table.scrollLeft = 0;
-
     }
-
   }
 
 
@@ -1779,14 +1575,10 @@
       return "";
     }
 
-
     /*
       Numéro FE
     */
-
-    if (
-      columnId === "Numero_FE"
-    ) {
+    if (columnId === FIELD.NUMERO_FE) {
 
       const numero =
         getNumeroFE(value);
@@ -1794,124 +1586,37 @@
       return numero
         ? String(numero)
         : String(value);
-
     }
-
-
-    /*
-      Département calculé
-    */
-
-    if (
-      columnId === "_departement"
-    ) {
-
-      return String(value);
-
-    }
-
-
-    /*
-      Date
-    */
-
-    if (
-      columnId === "Date_de_saisie"
-    ) {
-
-      const date =
-        parseGristDate(value);
-
-
-      if (date) {
-
-        const day =
-          String(
-            date.getDate()
-          ).padStart(
-            2,
-            "0"
-          );
-
-
-        const month =
-          String(
-            date.getMonth() + 1
-          ).padStart(
-            2,
-            "0"
-          );
-
-
-        const year =
-          String(
-            date.getFullYear()
-          ).slice(-2);
-
-
-        return (
-          day +
-          "/" +
-          month +
-          "/" +
-          year
-        );
-
-      }
-
-    }
-
 
     /*
       Listes Grist
     */
+    if (Array.isArray(value)) {
 
-    if (
-      Array.isArray(value)
-    ) {
-
-      if (
-        value[0] === "L"
-      ) {
-
+      if (value[0] === "L") {
         return value
           .slice(1)
           .join(", ");
-
       }
 
       return value.join(", ");
-
     }
-
 
     /*
       Objet
     */
-
-    if (
-      typeof value === "object"
-    ) {
+    if (typeof value === "object") {
 
       try {
-
-        return JSON.stringify(
-          value
-        );
-
+        return JSON.stringify(value);
       }
 
       catch {
-
         return String(value);
-
       }
-
     }
 
-
     return String(value);
-
   }
 
 
@@ -1923,33 +1628,29 @@
 
   function escapeHtml(value) {
 
+    return String(
+      value === null || value === undefined
+        ? ""
+        : value
+    )
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+  }
+
+
+  /*
+    Protection minimale si une valeur est injectée
+    dans un onclick entre apostrophes.
+  */
+
+  function escapeJsString(value) {
+
     return String(value)
-
-      .replaceAll(
-        "&",
-        "&amp;"
-      )
-
-      .replaceAll(
-        "<",
-        "&lt;"
-      )
-
-      .replaceAll(
-        ">",
-        "&gt;"
-      )
-
-      .replaceAll(
-        '"',
-        "&quot;"
-      )
-
-      .replaceAll(
-        "'",
-        "&#039;"
-      );
-
+      .replaceAll("\\", "\\\\")
+      .replaceAll("'", "\\'");
   }
 
 </script>
