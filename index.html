@@ -408,6 +408,12 @@
       font-size: 13px;
     }
 
+    .fact-date-cell {
+      min-width: 105px;
+      white-space: nowrap;
+      font-size: 13px;
+    }
+
   </style>
 
 </head>
@@ -516,16 +522,6 @@
       <div class="filter-row">
 
         <span class="filter-label">
-          Degré
-        </span>
-
-        <div
-          id="degree-filters"
-          class="department-filters"
-        >
-        </div>
-
-        <span class="filter-label inline-filter-label">
           Département
         </span>
 
@@ -535,12 +531,22 @@
         >
         </div>
 
-        <span class="filter-label level-filter-label">
+        <span class="filter-label inline-filter-label">
           Niveau
         </span>
 
         <div
           id="level-filters"
+          class="department-filters"
+        >
+        </div>
+
+        <span class="filter-label inline-filter-label">
+          Degré
+        </span>
+
+        <div
+          id="degree-filters"
           class="department-filters"
         >
         </div>
@@ -643,13 +649,21 @@
     { id: FIELD.DATE_SAISIE, label: "Date de saisie" },
     { id: FIELD.ID_NOM, label: "ID et Nom" },
     { id: FIELD.VILLE, label: "Ville" },
-    { id: "_typeFait", label: "Type de fait" }
+    { id: "_typeFait", label: "Type de fait" },
+    { id: "_dateDuFait", label: "Date du fait" }
   ]);
 
   const PAGE_SIZE = 10;
 
   let allRecords = [];
   let currentPage = 1;
+
+  /*
+    Identifiant de génération :
+    si Grist déclenche onRecords plusieurs fois rapidement,
+    seul le traitement le plus récent a le droit de terminer.
+  */
+  let recordsGeneration = 0;
   let selectedDepartment = "all";
   let selectedWeek = "all";
   let selectedDate = "all";
@@ -691,6 +705,8 @@
   */
 
   grist.onRecords(function(records) {
+
+    const myGeneration = ++recordsGeneration;
 
     if (!Array.isArray(records)) {
       showDiagnostic(
@@ -760,14 +776,27 @@
       bloque tout le widget. Le message d'analyse reste visible et
       affiche la progression.
     */
-    allRecords = [];
     currentPage = 1;
+
+    /*
+      Buffer local : évite que deux analyses concurrentes
+      ajoutent leurs résultats dans le même allRecords.
+    */
+    const processedRecords = [];
 
     const BATCH_SIZE = 20;
     let index = 0;
     let analysisErrors = 0;
 
     function processBatch() {
+
+      /*
+        Si Grist a envoyé une nouvelle version des données entre-temps,
+        ce traitement est devenu obsolète : on l'abandonne.
+      */
+      if (myGeneration !== recordsGeneration) {
+        return;
+      }
 
       const batchEnd =
         Math.min(index + BATCH_SIZE, records.length);
@@ -790,7 +819,7 @@
           const analysis =
             analyzeRecordFast(record);
 
-          allRecords.push({
+          processedRecords.push({
             ...record,
 
             _departement:
@@ -821,7 +850,10 @@
               analysis.degree,
 
             _typeFait:
-              analysis.types
+              analysis.types,
+
+            _dateDuFait:
+              analysis.dateDuFait
           });
 
         }
@@ -833,7 +865,7 @@
             Une ligne problématique ne bloque plus tout le tableau.
             On conserve tout de même les champs essentiels.
           */
-          allRecords.push({
+          processedRecords.push({
             ...record,
 
             _departement:
@@ -864,7 +896,10 @@
               "",
 
             _typeFait:
-              []
+              [],
+
+            _dateDuFait:
+              ""
           });
 
           console.error(
@@ -890,12 +925,21 @@
         return;
       }
 
-      allRecords.sort(function(a, b) {
+      /*
+        Dernière vérification avant publication des résultats.
+      */
+      if (myGeneration !== recordsGeneration) {
+        return;
+      }
+
+      processedRecords.sort(function(a, b) {
         return (
           getNumeroFE(b[FIELD.NUMERO_FE]) -
           getNumeroFE(a[FIELD.NUMERO_FE])
         );
       });
+
+      allRecords = processedRecords;
 
       if (missingColumns.length > 0) {
 
@@ -1124,6 +1168,64 @@
   }
 
 
+  function extractFactDate(value) {
+
+    const text =
+      String(value || "").trim();
+
+    const match =
+      text.match(
+        /(\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{2,4}|\d{4}[\/\-.]\d{1,2}[\/\-.]\d{1,2})/
+      );
+
+    if (!match) {
+      return "";
+    }
+
+    const raw = match[1];
+
+    let parts =
+      raw.split(/[\/\-.]/);
+
+    if (
+      parts.length !== 3
+    ) {
+      return "";
+    }
+
+    /*
+      AAAA-MM-JJ
+    */
+    if (parts[0].length === 4) {
+      return (
+        String(Number(parts[2])).padStart(2, "0") +
+        "/" +
+        String(Number(parts[1])).padStart(2, "0") +
+        "/" +
+        parts[0]
+      );
+    }
+
+    /*
+      JJ/MM/AAAA ou JJ/MM/AA
+    */
+    let year =
+      Number(parts[2]);
+
+    if (year < 100) {
+      year += year >= 70 ? 1900 : 2000;
+    }
+
+    return (
+      String(Number(parts[0])).padStart(2, "0") +
+      "/" +
+      String(Number(parts[1])).padStart(2, "0") +
+      "/" +
+      year
+    );
+  }
+
+
   function analyzeRecordFast(record) {
 
     const values = [];
@@ -1140,6 +1242,9 @@
 
     let hasSecondDegree = false;
     let hasFirstDegree = false;
+
+    let dateDuFait = "";
+    let dateDuFaitExpectedNext = false;
 
     Object.keys(record || {}).forEach(function(key) {
 
@@ -1186,6 +1291,67 @@
 
       const normalizedKey = normalizeText(key);
       const normalizedValue = normalizeText(textValue);
+
+      /*
+        Date du fait :
+        intégrée à CETTE MÊME boucle d'analyse.
+
+        Cas gérés :
+        - une colonne dont l'identifiant contient "Date du fait" ;
+        - une cellule contenant "Date du fait : 10/09/2026" ;
+        - une cellule "Date du fait", suivie de la date dans la valeur suivante.
+      */
+      if (!dateDuFait) {
+
+        if (
+          normalizedKey.includes("date du fait") ||
+          normalizedKey.includes("date_du_fait") ||
+          normalizedKey.includes("datedufait")
+        ) {
+          dateDuFait =
+            extractFactDate(textValue);
+        }
+
+        if (!dateDuFait) {
+
+          const phrasePosition =
+            normalizedValue.indexOf("date du fait");
+
+          if (phrasePosition !== -1) {
+
+            const originalLower =
+              textValue.toLowerCase();
+
+            const originalPhrasePosition =
+              originalLower.indexOf("date du fait");
+
+            const afterPhrase =
+              originalPhrasePosition !== -1
+                ? textValue.slice(
+                    originalPhrasePosition +
+                    "date du fait".length
+                  )
+                : textValue;
+
+            dateDuFait =
+              extractFactDate(afterPhrase);
+
+            if (!dateDuFait) {
+              dateDuFaitExpectedNext = true;
+            }
+          }
+          else if (dateDuFaitExpectedNext) {
+
+            dateDuFait =
+              extractFactDate(textValue);
+
+            /*
+              On ne garde l'attente que sur la valeur immédiatement suivante.
+            */
+            dateDuFaitExpectedNext = false;
+          }
+        }
+      }
 
       /*
         Niveau :
@@ -1263,12 +1429,10 @@
       );
 
     hasSecurityClimate =
-      text.includes(
-        "atteintes a la securite, au climat de l'etablissement"
-      ) ||
-      text.includes(
-        "atteintes a la securite au climat de l'etablissement"
-      );
+      text.includes("atteintes a la securite") ||
+      text.includes("atteinte a la securite") ||
+      text.includes("climat de l'etablissement") ||
+      text.includes("climat scolaire");
 
     hasPersonsGeneric =
       text.includes(
@@ -1385,7 +1549,8 @@
     return {
       level,
       degree,
-      types
+      types,
+      dateDuFait
     };
   }
 
@@ -2413,6 +2578,16 @@
           html +=
             '<td class="type-cell">' +
             renderFactBadges(record._typeFait) +
+            "</td>";
+
+          return;
+        }
+
+        if (column.id === "_dateDuFait") {
+
+          html +=
+            '<td class="fact-date-cell">' +
+            escapeHtml(record._dateDuFait || "") +
             "</td>";
 
           return;
