@@ -1114,6 +1114,16 @@
     aucune donnée n'est écrite dans Grist.
   */
 
+  function normalizeText(value) {
+
+    return String(value || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .trim();
+  }
+
+
   function analyzeRecordFast(record) {
 
     const values = [];
