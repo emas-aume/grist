@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="fr">
 
@@ -10,7 +9,7 @@
     content="width=device-width, initial-scale=1"
   >
 
-  <title>Portail Grist</title>
+  <title>Tableau de bord</title>
 
   <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
 
@@ -2868,8 +2867,8 @@
     qui affiche donc les faits saisis le 02/09/2026.
 
     Le numéro de note avance uniquement pour les jours
-    dont la veille contient au moins un "fait du jour"
-    (date de saisie = date du fait).
+    dont la veille contient au moins un fait saisi dans
+    le département, qu'il soit du jour ou d'actualisation.
   */
 
   const WHITE_NOTE_FIRST_DATE_KEY = "2026-09-03";
@@ -2936,13 +2935,33 @@
   }
 
 
-  function getWhiteNoteDates() {
+  function getWhiteNoteCalendarDates(department) {
+
+    /*
+      Le sélecteur ne propose QUE les jours pour lesquels une
+      Note Blanche existe réellement dans le département choisi.
+
+      Une note du jour J existe dès lors qu'au moins un fait a été
+      saisi à J-1 dans ce département, qu'il s'agisse d'un fait du
+      jour ou d'une actualisation.
+
+      Exemple : faits saisis le 02/09/2026 -> Note du 03/09/2026.
+      Aucun fait saisi un jour donné -> aucune date correspondante
+      n'apparaît dans le sélecteur.
+    */
+    if (!department) {
+      return [];
+    }
 
     const dates = new Map();
 
     allRecords.forEach(function(record) {
 
-      if (!isWhiteNoteDayFact(record) || !record._date) {
+      if (
+        !record ||
+        record._departement !== department ||
+        !record._date
+      ) {
         return;
       }
 
@@ -2966,12 +2985,28 @@
   }
 
 
-  function getWhiteNoteNumber(noteKey) {
+  function getWhiteNoteDayFactDates(department) {
 
-    const dates = getWhiteNoteDates();
+    /*
+      La numérotation suit exactement les dates réellement présentes
+      dans le sélecteur : 1, 2, 3... sans trou.
+    */
+    return getWhiteNoteCalendarDates(department);
+  }
+
+
+  function getWhiteNoteNumber(noteKey, department) {
+
+    const dates = getWhiteNoteDayFactDates(department);
     const index = dates.findIndex(item => item[0] === noteKey);
 
     return index === -1 ? "" : index + 1;
+  }
+
+
+  function hasWhiteNoteForDate(noteKey, department) {
+
+    return getWhiteNoteNumber(noteKey, department) !== "";
   }
 
 
@@ -3207,7 +3242,6 @@
     }
 
     const departments = getDepartments();
-    const noteDates = getWhiteNoteDates();
 
     if (
       !selectedWhiteNoteDepartment ||
@@ -3219,13 +3253,15 @@
           : (departments.includes("34") ? "34" : (departments[0] || ""));
     }
 
+    const calendarDates = getWhiteNoteCalendarDates(selectedWhiteNoteDepartment);
+
     if (
       !selectedWhiteNoteDate ||
-      !noteDates.some(item => item[0] === selectedWhiteNoteDate)
+      !calendarDates.some(item => item[0] === selectedWhiteNoteDate)
     ) {
       selectedWhiteNoteDate =
-        noteDates.length > 0
-          ? noteDates[noteDates.length - 1][0]
+        calendarDates.length > 0
+          ? calendarDates[calendarDates.length - 1][0]
           : "";
     }
 
@@ -3244,25 +3280,32 @@
         }).join("")
       : '<option value="">Aucun département</option>';
 
-    dateSelect.innerHTML = noteDates.length
-      ? noteDates.slice().reverse().map(function(item) {
+    dateSelect.innerHTML = calendarDates.length
+      ? calendarDates.slice().reverse().map(function(item) {
           const noteKey = item[0];
           const noteDate = item[1];
           const factsDate = addDaysUTC(noteDate, -1);
-          const number = getWhiteNoteNumber(noteKey);
+          const number = getWhiteNoteNumber(
+            noteKey,
+            selectedWhiteNoteDepartment
+          );
           const selected =
             noteKey === selectedWhiteNoteDate
               ? "selected"
               : "";
 
+          const prefix = number
+            ? `Note n°${number} — `
+            : "";
+
           return `
             <option value="${escapeHtml(noteKey)}" ${selected}>
-              Note n°${number} — ${escapeHtml(formatLongDate(noteDate))}
+              ${prefix}${escapeHtml(formatLongDate(noteDate))}
               (faits du ${escapeHtml(formatLongDate(factsDate))})
             </option>
           `;
         }).join("")
-      : '<option value="">Aucune note disponible</option>';
+      : '<option value="">Aucune date disponible</option>';
 
     if (!selectedWhiteNoteDate || !selectedWhiteNoteDepartment) {
 
@@ -3270,7 +3313,7 @@
       period.textContent = "";
       content.innerHTML = `
         <div class="white-note-empty">
-          Aucune note blanche disponible à partir du 03/09/2026.
+          Aucune Note Blanche disponible pour ce département.
         </div>
       `;
       return;
@@ -3278,7 +3321,27 @@
 
     const noteDate = parseGristDate(selectedWhiteNoteDate);
     const factsDate = addDaysUTC(noteDate, -1);
-    const noteNumber = getWhiteNoteNumber(selectedWhiteNoteDate);
+    const noteNumber = getWhiteNoteNumber(
+      selectedWhiteNoteDate,
+      selectedWhiteNoteDepartment
+    );
+
+    /*
+      Sécurité : ce cas ne devrait pas se produire puisque le sélecteur
+      ne contient que les dates pour lesquelles une note existe.
+    */
+    if (!noteNumber) {
+
+      title.textContent = "Note Blanche";
+      period.textContent = "";
+      content.innerHTML = `
+        <div class="white-note-empty">
+          Aucune Note Blanche disponible pour ce département.
+        </div>
+      `;
+      return;
+    }
+
     const records = getWhiteNoteRecords();
 
     title.textContent =
@@ -3297,6 +3360,7 @@
       renderWhiteNoteDegree("1er", "1er degré", records) +
       renderWhiteNoteDegree("2nd", "2nd degré", records);
   }
+
 
 
   /*
