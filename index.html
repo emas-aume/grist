@@ -706,7 +706,7 @@
   */
 
   grist.ready({
-    requiredAccess: "read table"
+    requiredAccess: "full"
   });
 
 
@@ -716,9 +716,43 @@
     ==================================================
   */
 
-  grist.onRecords(function(records) {
+  grist.onRecords(async function(records) {
 
     const myGeneration = ++recordsGeneration;
+
+    /*
+      Resume_du_fait est récupéré DIRECTEMENT dans la table Grist FElignes.
+      On ne dépend donc pas des colonnes visibles/transmises par onRecords().
+    */
+    try {
+      const resumeById = await fetchResumeDuFaitByRowId();
+
+      records = (records || []).map(function(record) {
+        const rowId = Number(record.id);
+
+        return {
+          ...record,
+          [FIELD.RESUME]:
+            resumeById.has(rowId)
+              ? resumeById.get(rowId)
+              : ""
+        };
+      });
+    }
+    catch (error) {
+      console.error(
+        "Impossible de récupérer Resume_du_fait depuis FElignes :",
+        error
+      );
+
+      showDiagnostic(
+        "Erreur : impossible de récupérer la colonne Resume_du_fait dans la table FElignes. " +
+        (error && error.message ? error.message : ""),
+        "error"
+      );
+
+      return;
+    }
 
     if (!Array.isArray(records)) {
       showDiagnostic(
@@ -747,16 +781,11 @@
     }
 
     /*
-      Vérification des IDs techniques réellement reçus.
-      Cette vérification ne dépend pas de l'ordre des colonnes.
-    */
-    /*
-      On construit la liste des colonnes à partir de TOUTES les lignes reçues,
-      et pas uniquement de records[0].
+      Vérification des IDs techniques reçus par le widget principal.
 
-      C'est important pour Resume : si la première ligne n'a pas encore de
-      résumé, Grist peut ne pas inclure la propriété Resume sur cette ligne,
-      alors qu'elle existe bien sur d'autres FE.
+      Resume_du_fait n'est volontairement PAS vérifié ici :
+      il vient d'être récupéré directement depuis la table FElignes
+      avec grist.docApi.fetchTable().
     */
     const receivedColumns = new Set();
 
@@ -770,8 +799,7 @@
       FIELD.NUMERO_FE,
       FIELD.DATE_SAISIE,
       FIELD.ID_NOM,
-      FIELD.VILLE,
-      FIELD.RESUME
+      FIELD.VILLE
     ];
 
     const missingColumns = requiredColumns.filter(
@@ -1011,6 +1039,121 @@
 
     setTimeout(processBatch, 0);
   });
+
+
+  /*
+    ==================================================
+    RÉCUPÉRATION DIRECTE DE $Resume_du_fait
+    DANS LA TABLE GRIST FElignes
+    ==================================================
+
+    Cette fonction ne dépend pas des colonnes visibles du widget.
+    Elle lit directement la table de données Grist.
+  */
+
+  async function fetchResumeDuFaitByRowId() {
+
+    const tableData =
+      await grist.docApi.fetchTable("FElignes");
+
+    const result = new Map();
+
+    /*
+      Selon la version/API Grist, fetchTable peut fournir
+      soit une liste de records, soit des colonnes sous forme de tableaux.
+      On accepte les deux formats.
+    */
+
+    if (Array.isArray(tableData)) {
+
+      tableData.forEach(function(row) {
+
+        if (!row) {
+          return;
+        }
+
+        const rowId =
+          Number(
+            row.id !== undefined
+              ? row.id
+              : row.ID
+          );
+
+        if (!Number.isFinite(rowId)) {
+          return;
+        }
+
+        result.set(
+          rowId,
+          row[FIELD.RESUME] === null ||
+          row[FIELD.RESUME] === undefined
+            ? ""
+            : row[FIELD.RESUME]
+        );
+
+      });
+
+      return result;
+    }
+
+
+    if (
+      tableData &&
+      typeof tableData === "object"
+    ) {
+
+      const ids =
+        Array.isArray(tableData.id)
+          ? tableData.id
+          : [];
+
+      const resumes =
+        Array.isArray(tableData[FIELD.RESUME])
+          ? tableData[FIELD.RESUME]
+          : [];
+
+
+      ids.forEach(function(rowId, index) {
+
+        const numericId =
+          Number(rowId);
+
+        if (!Number.isFinite(numericId)) {
+          return;
+        }
+
+        const value =
+          resumes[index];
+
+        result.set(
+          numericId,
+          value === null ||
+          value === undefined
+            ? ""
+            : value
+        );
+
+      });
+
+
+      /*
+        Si aucune colonne id n'a été trouvée, on signale clairement
+        le format inattendu au lieu de laisser un tableau vide.
+      */
+      if (ids.length === 0) {
+        throw new Error(
+          "La table FElignes a été lue, mais aucun identifiant de ligne n'a été reçu."
+        );
+      }
+
+      return result;
+    }
+
+
+    throw new Error(
+      "Format de données inattendu lors de la lecture de FElignes."
+    );
+  }
 
 
   /*
