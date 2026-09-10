@@ -414,6 +414,16 @@
       font-size: 13px;
     }
 
+    .summary-cell {
+      min-width: 360px;
+      width: 420px;
+      max-width: 520px;
+      white-space: normal;
+      line-height: 1.45;
+      font-size: 13px;
+      vertical-align: top;
+    }
+
   </style>
 
 </head>
@@ -640,7 +650,8 @@
     NUMERO_FE: "Numero_FE",
     DATE_SAISIE: "Date_de_saisie",
     ID_NOM: "ID_et_Nom",
-    VILLE: "Ville"
+    VILLE: "Ville",
+    RESUME: "Resume"
   });
 
   const COLUMNS = Object.freeze([
@@ -650,6 +661,7 @@
     { id: FIELD.ID_NOM, label: "ID et Nom" },
     { id: FIELD.VILLE, label: "Ville" },
     { id: "_typeFait", label: "Type de fait" },
+    { id: FIELD.RESUME, label: "Résumé" },
     { id: "_dateDuFait", label: "Date du fait" }
   ]);
 
@@ -744,7 +756,8 @@
       FIELD.NUMERO_FE,
       FIELD.DATE_SAISIE,
       FIELD.ID_NOM,
-      FIELD.VILLE
+      FIELD.VILLE,
+      FIELD.RESUME
     ];
 
     const missingColumns = requiredColumns.filter(
@@ -2472,6 +2485,7 @@
         record[FIELD.NUMERO_FE],
         record[FIELD.ID_NOM],
         record[FIELD.VILLE],
+        record[FIELD.RESUME],
         record._departement,
         record._niveau,
         Array.isArray(record._typeFait)
@@ -2578,6 +2592,23 @@
           html +=
             '<td class="type-cell">' +
             renderFactBadges(record._typeFait) +
+            "</td>";
+
+          return;
+        }
+
+        if (column.id === FIELD.RESUME) {
+
+          const resume = formatValue(
+            record[FIELD.RESUME],
+            FIELD.RESUME
+          );
+
+          html +=
+            '<td class="summary-cell" title="' +
+            escapeHtml(resume) +
+            '">' +
+            escapeHtml(resume) +
             "</td>";
 
           return;
