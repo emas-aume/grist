@@ -1,4 +1,5 @@
 
+
 <!DOCTYPE html>
 <html lang="fr">
 
@@ -666,6 +667,11 @@
       text-align: left;
       font-weight: 600;
       min-width: 180px;
+    }
+
+    /* 1 px plus petit uniquement pour les libellés Type de fait du BRQ */
+    .brq-table tbody td:first-child {
+      font-size: 15px;
     }
 
     .brq-unaccounted {
@@ -2005,11 +2011,11 @@
   */
 
   const BRQ_TYPES = Object.freeze([
-    { key: "ValRep", label: "ValRep" },
-    { key: "Harcel", label: "Harcel" },
-    { key: "VP", label: "VP" },
-    { key: "VV", label: "VV" },
-    { key: "VS", label: "VS" }
+    { key: "ValRep", label: "Valeurs de la République" },
+    { key: "Harcel", label: "Harcèlement" },
+    { key: "VP", label: "Violences physiques" },
+    { key: "VV", label: "Violences verbales" },
+    { key: "VS", label: "Violences sexuelles" }
   ]);
 
   function isPrivateRecord(record) {
@@ -2053,13 +2059,74 @@
 
   function getBrqTypeFlags(record) {
     const types = Array.isArray(record._typeFait) ? record._typeFait : [];
-    const joined = types.join(" | ");
+    const joinedTypes = types.join(" | ");
+
+    /*
+      Détection spécifique au BRQ uniquement.
+      On relit aussi le contenu brut de la ligne pour reconnaître les libellés
+      malgré les retours à la ligne ou espaces inhabituels.
+    */
+    const rawParts = [];
+
+    Object.keys(record || {}).forEach(function(key) {
+      if (String(key).startsWith("_")) return;
+
+      const value = record[key];
+      if (value === null || value === undefined || value === "") return;
+
+      if (Array.isArray(value)) {
+        value.forEach(function(item) {
+          if (item !== null && item !== undefined && typeof item !== "object") {
+            rawParts.push(String(item));
+          }
+        });
+        return;
+      }
+
+      if (typeof value !== "object") {
+        rawParts.push(String(value));
+      }
+    });
+
+    const rawText = normalizeText(rawParts.join(" "))
+      .replace(/\s+/g, " ")
+      .trim();
+
+    const compactText = rawText.replace(/[^a-z0-9]/g, "");
+
+    const hasValRep =
+      types.includes("AttValRep") ||
+      compactText.includes("atteintesauxvaleursdelarepublique") ||
+      compactText.includes("atteinteauxvaleursdelarepublique") ||
+      compactText.includes("valeursdelarepublique") ||
+      compactText.includes("valrep");
+
+    const hasHarcel =
+      types.includes("Harcel") ||
+      compactText.includes("harcelement") ||
+      compactText.includes("cyberharcelement");
+
+    const hasVP =
+      joinedTypes.includes("VP") ||
+      compactText.includes("violencesphysiques") ||
+      compactText.includes("violencephysique");
+
+    const hasVV =
+      joinedTypes.includes("VV") ||
+      compactText.includes("violencesverbales") ||
+      compactText.includes("violenceverbale");
+
+    const hasVS =
+      joinedTypes.includes("VS") ||
+      compactText.includes("violencessexuelles") ||
+      compactText.includes("violencesexuelle");
+
     return {
-      ValRep: types.includes("AttValRep"),
-      Harcel: types.includes("Harcel"),
-      VP: joined.includes("VP"),
-      VV: joined.includes("VV"),
-      VS: joined.includes("VS")
+      ValRep: hasValRep,
+      Harcel: hasHarcel,
+      VP: hasVP,
+      VV: hasVV,
+      VS: hasVS
     };
   }
 
@@ -2070,16 +2137,39 @@
 
   function getBrqDailyDates() {
     const dates = new Map();
+    const BRQ_START_DATE = "2026-09-03";
+
     allRecords.forEach(function(record) {
-      if (record._date && record._dateKey) dates.set(record._dateKey, record._date);
+      if (
+        record._date &&
+        record._dateKey &&
+        record._dateKey >= BRQ_START_DATE
+      ) {
+        dates.set(record._dateKey, record._date);
+      }
     });
-    return Array.from(dates.entries()).sort(function(a,b){ return b[0].localeCompare(a[0]); });
+
+    return Array.from(dates.entries()).sort(function(a,b){
+      return b[0].localeCompare(a[0]);
+    });
   }
 
   function getBrqWeeks() {
     const weeks = new Map();
+    const BRQ_START_DATE = "2026-09-03";
+
     allRecords.forEach(function(record) {
-      if (!record._weekKey || !record._weekNumber || !record._weekYear || !record._date) return;
+      if (
+        !record._weekKey ||
+        !record._weekNumber ||
+        !record._weekYear ||
+        !record._date ||
+        !record._dateKey ||
+        record._dateKey < BRQ_START_DATE
+      ) {
+        return;
+      }
+
       if (!weeks.has(record._weekKey)) {
         const monday = getMondayUTC(record._date);
         weeks.set(record._weekKey, {
@@ -2091,6 +2181,7 @@
         });
       }
     });
+
     return Array.from(weeks.values()).sort(function(a,b){
       if (a.year !== b.year) return b.year - a.year;
       return b.week - a.week;
@@ -2244,7 +2335,16 @@
       title.textContent = "BRQ n°" + getBrqDailyNumber(dateKey) + " - " + (date ? formatLongDate(date) : dateKey);
     }
 
-    const departments = getDepartments();
+    /*
+      Ordre d'affichage propre au BRQ uniquement.
+    */
+    const brqDepartmentOrder = ["34", "30", "66", "11", "48"];
+    const availableDepartments = new Set(getDepartments());
+
+    const departments = brqDepartmentOrder.filter(function(department) {
+      return availableDepartments.has(department);
+    });
+
     if (!departments.length) {
       content.innerHTML = '<div class="brq-empty">Aucun département disponible.</div>';
       return;
