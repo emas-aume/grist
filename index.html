@@ -587,6 +587,128 @@
       }
     }
 
+
+    /* =========================
+       BRQ
+       ========================= */
+
+    .brq-header {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 18px;
+      flex-wrap: wrap;
+      margin-bottom: 18px;
+    }
+
+    .brq-title { margin-bottom: 4px; }
+
+    .brq-controls {
+      display: flex;
+      align-items: flex-end;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .brq-control {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .brq-control label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--muted);
+    }
+
+    .brq-select {
+      min-width: 250px;
+      padding: 9px 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #ffffff;
+      color: var(--text);
+      font-size: 14px;
+    }
+
+    .brq-department {
+      margin-top: 24px;
+      padding-top: 22px;
+      border-top: 1px solid var(--line);
+    }
+
+    .brq-department:first-child {
+      margin-top: 0;
+      padding-top: 0;
+      border-top: none;
+    }
+
+    .brq-department-title {
+      margin: 0 0 10px;
+      font-size: 16px;
+      font-weight: 700;
+    }
+
+    .brq-table-wrap {
+      overflow: auto;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+    }
+
+    .brq-table { min-width: 560px; }
+
+    .brq-table th,
+    .brq-table td { text-align: center; }
+
+    .brq-table th:first-child,
+    .brq-table td:first-child {
+      text-align: left;
+      font-weight: 600;
+      min-width: 180px;
+    }
+
+    .brq-unaccounted {
+      margin-top: 12px;
+      padding: 12px 14px;
+      border: 1px solid var(--line);
+      border-radius: 9px;
+      background: #fafafa;
+    }
+
+    .brq-unaccounted-title {
+      margin: 0 0 7px;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .brq-unaccounted-line {
+      margin: 4px 0;
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .brq-empty-department,
+    .brq-empty {
+      padding: 14px 16px;
+      border: 1px solid var(--line);
+      border-radius: 9px;
+      color: var(--muted);
+      background: #fafafa;
+      font-size: 14px;
+    }
+
+    @media (max-width: 700px) {
+      .brq-controls,
+      .brq-control { width: 100%; }
+
+      .brq-select {
+        width: 100%;
+        min-width: 0;
+      }
+    }
+
+
   </style>
 
 </head>
@@ -620,10 +742,10 @@
 
   <section class="section">
 
-    <h2>Faits d'établissement</h2>
+    <h2>Premier tableau</h2>
 
     <p>
-      Base de données simplifiée
+      Tableau des faits avec les informations principales.
     </p>
 
     <div
@@ -791,16 +913,26 @@
   </section>
 
 
-  <!-- DOCUMENTS -->
+  <!-- BRQ -->
 
-  <section class="section">
+  <section class="section" id="brq-section">
 
-    <h2>Documents à télécharger</h2>
+    <div class="brq-header">
+      <div>
+        <h2 id="brq-title" class="brq-title">BRQ</h2>
+      </div>
 
-    <p>
-      Cette section pourra ensuite servir à proposer
-      différents documents ou ressources.
-    </p>
+      <div class="brq-controls">
+        <div class="brq-control">
+          <label for="brq-period">Période</label>
+          <select id="brq-period" class="brq-select" onchange="setBrqPeriod(this.value)"></select>
+        </div>
+      </div>
+    </div>
+
+    <div id="brq-content">
+      <div class="brq-empty">Les BRQ seront disponibles dès réception des données Grist.</div>
+    </div>
 
   </section>
 
@@ -859,6 +991,7 @@
 
   let selectedWhiteNoteDepartment = "";
   let selectedWhiteNoteDate = "";
+  let selectedBrqPeriod = "";
 
   const diagnostic = document.getElementById("diagnostic");
 
@@ -921,6 +1054,7 @@
       renderLevelFilters();
       renderTable();
       renderWhiteNote();
+      renderBRQ();
       return;
     }
 
@@ -1194,6 +1328,7 @@
       renderLevelFilters();
       renderTable();
       renderWhiteNote();
+      renderBRQ();
     }
 
     setTimeout(processBatch, 0);
@@ -1859,6 +1994,265 @@
         }).join("")}
       </div>
     `;
+  }
+
+
+
+  /*
+    ==================================================
+    BRQ
+    ==================================================
+  */
+
+  const BRQ_TYPES = Object.freeze([
+    { key: "ValRep", label: "ValRep" },
+    { key: "Harcel", label: "Harcel" },
+    { key: "VP", label: "VP" },
+    { key: "VV", label: "VV" },
+    { key: "VS", label: "VS" }
+  ]);
+
+  function isPrivateRecord(record) {
+    if (!record) return false;
+
+    let found = false;
+    Object.keys(record).some(function(key) {
+      if (String(key).startsWith("_")) return false;
+      const value = record[key];
+      if (value === null || value === undefined || typeof value === "object") return false;
+
+      const keyText = normalizeText(key);
+      const valueText = normalizeText(String(value));
+      const keySuggestsSector =
+        keyText.includes("secteur") ||
+        keyText.includes("statut") ||
+        keyText.includes("public prive") ||
+        keyText.includes("public_prive") ||
+        keyText.includes("prive");
+
+      if (
+        (keySuggestsSector && /\bprive\b/.test(valueText)) ||
+        valueText === "prive" ||
+        valueText.includes("enseignement prive") ||
+        valueText.includes("etablissement prive")
+      ) {
+        found = true;
+        return true;
+      }
+      return false;
+    });
+    return found;
+  }
+
+  function getBrqCategory(record) {
+    if (isPrivateRecord(record)) return "private";
+    if (record._degre === "1er") return "first";
+    if (record._degre === "2nd") return "second";
+    return "";
+  }
+
+  function getBrqTypeFlags(record) {
+    const types = Array.isArray(record._typeFait) ? record._typeFait : [];
+    const joined = types.join(" | ");
+    return {
+      ValRep: types.includes("AttValRep"),
+      Harcel: types.includes("Harcel"),
+      VP: joined.includes("VP"),
+      VV: joined.includes("VV"),
+      VS: joined.includes("VS")
+    };
+  }
+
+  function isBrqCountedRecord(record) {
+    const flags = getBrqTypeFlags(record);
+    return flags.ValRep || flags.Harcel || flags.VP || flags.VV || flags.VS;
+  }
+
+  function getBrqDailyDates() {
+    const dates = new Map();
+    allRecords.forEach(function(record) {
+      if (record._date && record._dateKey) dates.set(record._dateKey, record._date);
+    });
+    return Array.from(dates.entries()).sort(function(a,b){ return b[0].localeCompare(a[0]); });
+  }
+
+  function getBrqWeeks() {
+    const weeks = new Map();
+    allRecords.forEach(function(record) {
+      if (!record._weekKey || !record._weekNumber || !record._weekYear || !record._date) return;
+      if (!weeks.has(record._weekKey)) {
+        const monday = getMondayUTC(record._date);
+        weeks.set(record._weekKey, {
+          key: record._weekKey,
+          week: record._weekNumber,
+          year: record._weekYear,
+          monday: monday,
+          sunday: addDaysUTC(monday, 6)
+        });
+      }
+    });
+    return Array.from(weeks.values()).sort(function(a,b){
+      if (a.year !== b.year) return b.year - a.year;
+      return b.week - a.week;
+    });
+  }
+
+  function getMondayUTC(date) {
+    const day = date.getUTCDay();
+    return addDaysUTC(date, day === 0 ? -6 : 1 - day);
+  }
+
+  function getBrqDailyNumber(dateKey) {
+    const datesAscending = getBrqDailyDates().map(function(item){ return item[0]; }).sort();
+    const index = datesAscending.indexOf(dateKey);
+    return index === -1 ? "" : index + 1;
+  }
+
+  function renderBrqPeriodOptions() {
+    const select = document.getElementById("brq-period");
+    if (!select) return;
+
+    const dailyDates = getBrqDailyDates();
+    const weeks = getBrqWeeks();
+    const validValues = [];
+    let html = "";
+
+    dailyDates.forEach(function(item) {
+      const dateKey = item[0];
+      const date = item[1];
+      const value = "D:" + dateKey;
+      validValues.push(value);
+      html += `<option value="${escapeHtml(value)}">BRQ n°${getBrqDailyNumber(dateKey)} - ${escapeHtml(formatLongDate(date))}</option>`;
+    });
+
+    weeks.forEach(function(info) {
+      const value = "W:" + info.key;
+      validValues.push(value);
+      html += `<option value="${escapeHtml(value)}">BRQ S${info.week} - ${escapeHtml(formatDayMonth(info.monday))} au ${escapeHtml(formatDayMonth(info.sunday))}</option>`;
+    });
+
+    if (!validValues.length) {
+      selectedBrqPeriod = "";
+      select.innerHTML = '<option value="">Aucun BRQ disponible</option>';
+      return;
+    }
+
+    if (!selectedBrqPeriod || !validValues.includes(selectedBrqPeriod)) selectedBrqPeriod = validValues[0];
+    select.innerHTML = html;
+    select.value = selectedBrqPeriod;
+  }
+
+  function setBrqPeriod(value) {
+    selectedBrqPeriod = value;
+    renderBRQ();
+  }
+
+  function getSelectedBrqRecords() {
+    if (!selectedBrqPeriod) return [];
+    if (selectedBrqPeriod.startsWith("D:")) {
+      const dateKey = selectedBrqPeriod.slice(2);
+      return allRecords.filter(function(record){ return record._dateKey === dateKey; });
+    }
+    if (selectedBrqPeriod.startsWith("W:")) {
+      const weekKey = selectedBrqPeriod.slice(2);
+      return allRecords.filter(function(record){ return record._weekKey === weekKey; });
+    }
+    return [];
+  }
+
+  function getBrqCounts(records) {
+    const counts = {};
+    BRQ_TYPES.forEach(function(type) {
+      counts[type.key] = { first:0, second:0, private:0 };
+    });
+
+    records.forEach(function(record) {
+      const category = getBrqCategory(record);
+      if (!category) return;
+      const flags = getBrqTypeFlags(record);
+      BRQ_TYPES.forEach(function(type) {
+        if (flags[type.key]) counts[type.key][category]++;
+      });
+    });
+    return counts;
+  }
+
+  function formatBrqTypeForLine(record) {
+    if (!Array.isArray(record._typeFait) || !record._typeFait.length) return "Type non renseigné";
+    return record._typeFait.map(function(type){ return getFullFactLabel(type); }).join(" + ");
+  }
+
+  function renderBrqDepartment(department, records, weeklyMode) {
+    const departmentRecords = records.filter(function(record){ return record._departement === department; });
+    let html = `<div class="brq-department"><p class="brq-department-title">DSDEN.${escapeHtml(department)}</p>`;
+
+    if (!departmentRecords.length) {
+      html += `<div class="brq-empty-department">Aucun fait d'établissement recensé dans le département ${escapeHtml(department)} pour cette période.</div></div>`;
+      return html;
+    }
+
+    const counts = getBrqCounts(departmentRecords);
+    html += `<div class="brq-table-wrap"><table class="brq-table"><thead><tr><th>Type de fait</th><th>1er degré</th><th>2nd degré</th><th>Privé</th></tr></thead><tbody>`;
+
+    BRQ_TYPES.forEach(function(type) {
+      html += `<tr><td>${escapeHtml(type.label)}</td><td>${counts[type.key].first}</td><td>${counts[type.key].second}</td><td>${counts[type.key].private}</td></tr>`;
+    });
+
+    html += `</tbody></table></div>`;
+
+    if (!weeklyMode) {
+      const unaccounted = departmentRecords.filter(function(record){ return !isBrqCountedRecord(record); });
+      if (unaccounted.length) {
+        html += `<div class="brq-unaccounted"><p class="brq-unaccounted-title">FE non comptabilisés dans le tableau :</p>`;
+        unaccounted.forEach(function(record) {
+          const idNom = record[FIELD.ID_NOM] || "Établissement non renseigné";
+          const niveau = record._niveau || "?";
+          const type = formatBrqTypeForLine(record);
+          const resume = record[FIELD.RESUME] || "Résumé non renseigné";
+          html += `<p class="brq-unaccounted-line">${escapeHtml(String(idNom))} (Niveau ${escapeHtml(String(niveau))}) - ${escapeHtml(type)} - ${escapeHtml(String(resume))}</p>`;
+        });
+        html += `</div>`;
+      }
+    }
+
+    html += `</div>`;
+    return html;
+  }
+
+  function renderBRQ() {
+    const title = document.getElementById("brq-title");
+    const content = document.getElementById("brq-content");
+    if (!title || !content) return;
+
+    renderBrqPeriodOptions();
+    if (!selectedBrqPeriod) {
+      title.textContent = "BRQ";
+      content.innerHTML = '<div class="brq-empty">Aucun BRQ disponible.</div>';
+      return;
+    }
+
+    const weeklyMode = selectedBrqPeriod.startsWith("W:");
+    const records = getSelectedBrqRecords();
+
+    if (weeklyMode) {
+      const weekKey = selectedBrqPeriod.slice(2);
+      const info = getBrqWeeks().find(function(item){ return item.key === weekKey; });
+      title.textContent = info ? "BRQ S" + info.week + " - " + formatDayMonth(info.monday) + " au " + formatDayMonth(info.sunday) : "BRQ hebdomadaire";
+    } else {
+      const dateKey = selectedBrqPeriod.slice(2);
+      const date = parseGristDate(dateKey);
+      title.textContent = "BRQ n°" + getBrqDailyNumber(dateKey) + " - " + (date ? formatLongDate(date) : dateKey);
+    }
+
+    const departments = getDepartments();
+    if (!departments.length) {
+      content.innerHTML = '<div class="brq-empty">Aucun département disponible.</div>';
+      return;
+    }
+
+    content.innerHTML = departments.map(function(department){
+      return renderBrqDepartment(department, records, weeklyMode);
+    }).join("");
   }
 
 
