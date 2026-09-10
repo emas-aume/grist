@@ -296,6 +296,64 @@
       font-size: 14px;
     }
 
+    /* =========================
+       NIVEAU / TYPE DE FAIT
+       ========================= */
+
+    .level-badge,
+    .fact-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 999px;
+      font-weight: 700;
+      line-height: 1;
+    }
+
+    .level-badge {
+      min-width: 30px;
+      height: 30px;
+      padding: 0 10px;
+      background: #eef2f6;
+      border: 1px solid #d0d5dd;
+      color: #344054;
+      font-size: 14px;
+    }
+
+    .level-badge.level-3 {
+      background: #fff4e5;
+      border-color: #fdb022;
+      color: #b54708;
+    }
+
+    .fact-badges {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      max-width: 520px;
+      white-space: normal;
+    }
+
+    .fact-badge {
+      padding: 7px 10px;
+      background: #f2f4f7;
+      border: 1px solid #d0d5dd;
+      color: #344054;
+      font-size: 12px;
+      font-weight: 600;
+      white-space: normal;
+    }
+
+    td.type-cell {
+      white-space: normal;
+      min-width: 260px;
+    }
+
+    td.level-cell {
+      text-align: center;
+      min-width: 76px;
+    }
+
   </style>
 
 </head>
@@ -512,7 +570,9 @@
     { id: FIELD.NUMERO_FE, label: "Numéro FE" },
     { id: FIELD.DATE_SAISIE, label: "Date de saisie" },
     { id: FIELD.ID_NOM, label: "ID et Nom" },
-    { id: FIELD.VILLE, label: "Ville" }
+    { id: FIELD.VILLE, label: "Ville" },
+    { id: "_niveau", label: "Niveau" },
+    { id: "_typeFait", label: "Type de fait" }
   ]);
 
   const PAGE_SIZE = 10;
@@ -621,7 +681,14 @@
         _weekNumber: weekInfo ? weekInfo.week : null,
         _weekYear: weekInfo ? weekInfo.year : null,
 
-        _dateKey: date ? formatDateKey(date) : ""
+        _dateKey: date ? formatDateKey(date) : "",
+
+        /*
+          Valeurs dérivées à partir de toute la ligne.
+          Aucune écriture n'est faite dans Grist.
+        */
+        _niveau: detectLevel(record),
+        _typeFait: detectFactTypes(record)
       };
     });
 
@@ -744,6 +811,393 @@
     }
 
     return String(Number(match[1]));
+  }
+
+
+
+  /*
+    ==================================================
+    ANALYSE DE LA LIGNE : NIVEAU / TYPE DE FAIT
+    ==================================================
+
+    Le widget ne modifie aucune donnée Grist.
+    Il lit les valeurs de la ligne et calcule seulement
+    ce qui doit être affiché dans le tableau.
+  */
+
+  function flattenRecordValues(value, output = []) {
+
+    if (
+      value === null ||
+      value === undefined ||
+      value === ""
+    ) {
+      return output;
+    }
+
+    if (Array.isArray(value)) {
+
+      /*
+        Les listes Grist peuvent commencer par "L".
+        Ce marqueur technique n'est pas utile à l'analyse.
+      */
+      const start =
+        value[0] === "L"
+          ? 1
+          : 0;
+
+      for (let i = start; i < value.length; i++) {
+        flattenRecordValues(value[i], output);
+      }
+
+      return output;
+    }
+
+    if (typeof value === "object") {
+
+      /*
+        Ne pas transformer les Date en objet JSON illisible.
+      */
+      if (value instanceof Date) {
+        output.push(value.toISOString());
+        return output;
+      }
+
+      Object.values(value).forEach(function(item) {
+        flattenRecordValues(item, output);
+      });
+
+      return output;
+    }
+
+    output.push(String(value));
+
+    return output;
+  }
+
+
+  function normalizeDetectionText(value) {
+
+    return String(value)
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[’‘]/g, "'")
+      .toLowerCase()
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+
+  function getWholeRecordText(record) {
+
+    return normalizeDetectionText(
+      flattenRecordValues(record).join(" | ")
+    );
+  }
+
+
+  /*
+    --------------------------------------------------
+    DÉTECTION DU NIVEAU
+    --------------------------------------------------
+
+    Priorité :
+    1. colonnes dont l'identifiant contient "niveau" ;
+    2. cellules contenant explicitement "niveau 2" / "niveau 3".
+
+    On évite volontairement de chercher un simple "2" ou "3"
+    dans toute la ligne : cela confondrait le niveau avec une date,
+    un numéro FE, un département, une classe, etc.
+  */
+
+  function detectLevel(record) {
+
+    let found2 = false;
+    let found3 = false;
+
+    Object.entries(record).forEach(function(entry) {
+
+      const columnId =
+        normalizeDetectionText(entry[0]);
+
+      const values =
+        flattenRecordValues(entry[1]);
+
+      const valueText =
+        normalizeDetectionText(
+          values.join(" | ")
+        );
+
+      /*
+        Si la colonne elle-même parle de niveau,
+        une valeur 2 ou 3 est considérée comme le niveau.
+      */
+      if (
+        columnId.includes("niveau") ||
+        columnId.includes("level")
+      ) {
+
+        if (
+          /(^|[^\d])3([^\d]|$)/.test(valueText) ||
+          /\bniveau\s*3\b/.test(valueText)
+        ) {
+          found3 = true;
+        }
+
+        if (
+          /(^|[^\d])2([^\d]|$)/.test(valueText) ||
+          /\bniveau\s*2\b/.test(valueText)
+        ) {
+          found2 = true;
+        }
+      }
+
+      /*
+        Même si le niveau se trouve dans une autre colonne,
+        on accepte une mention explicite "Niveau 2" / "Niveau 3".
+      */
+      if (/\bniveau\s*3\b/.test(valueText)) {
+        found3 = true;
+      }
+
+      if (/\bniveau\s*2\b/.test(valueText)) {
+        found2 = true;
+      }
+    });
+
+    /*
+      Si les deux sont trouvés par incohérence de la source,
+      le niveau 3, plus élevé, est retenu.
+    */
+    if (found3) {
+      return "3";
+    }
+
+    if (found2) {
+      return "2";
+    }
+
+    return "";
+  }
+
+
+  /*
+    --------------------------------------------------
+    DÉTECTION DU TYPE DE FAIT
+    --------------------------------------------------
+
+    Plusieurs familles peuvent être retournées pour un même FE :
+    par exemple "Atteintes aux valeurs de la République"
+    + "Harcèlement".
+
+    Pour les violences, on regroupe les sous-types dans UNE seule
+    formulation "Atteintes aux personnes : ...".
+  */
+
+  function detectFactTypes(record) {
+
+    const text =
+      getWholeRecordText(record);
+
+    const types = [];
+
+    const hasValRep =
+      text.includes(
+        normalizeDetectionText(
+          "Atteintes aux valeurs de la République"
+        )
+      );
+
+    const hasHarassment =
+      text.includes(
+        normalizeDetectionText(
+          "Harcèlement ou suspicion de harcèlement"
+        )
+      ) ||
+      text.includes(
+        normalizeDetectionText(
+          "Cyber-harcèlement"
+        )
+      );
+
+    const hasProperty =
+      text.includes(
+        normalizeDetectionText(
+          "Atteintes aux biens"
+        )
+      );
+
+    const hasPhysical =
+      text.includes(
+        normalizeDetectionText(
+          "Violences physiques"
+        )
+      );
+
+    const hasVerbal =
+      text.includes(
+        normalizeDetectionText(
+          "Violences verbales"
+        )
+      );
+
+    const hasSexual =
+      text.includes(
+        normalizeDetectionText(
+          "Violences sexuelles"
+        )
+      );
+
+    const hasPersonsGeneric =
+      text.includes(
+        normalizeDetectionText(
+          "Atteintes aux personnes"
+        )
+      );
+
+    const hasSecurityClimate =
+      text.includes(
+        normalizeDetectionText(
+          "Atteintes à la sécurité, au climat de l'établissement"
+        )
+      );
+
+
+    if (hasValRep) {
+      types.push(
+        "Atteintes aux valeurs de la République"
+      );
+    }
+
+    if (hasHarassment) {
+      types.push("Harcèlement");
+    }
+
+    if (hasProperty) {
+      types.push("Atteintes aux biens");
+    }
+
+
+    /*
+      Une seule catégorie "Atteintes aux personnes"
+      est produite, selon la combinaison trouvée.
+    */
+
+    if (
+      hasPhysical &&
+      hasSexual &&
+      hasVerbal
+    ) {
+      types.push(
+        "Atteintes aux personnes : Violences physiques, sexuelles et verbales"
+      );
+    }
+
+    else if (
+      hasPhysical &&
+      hasSexual
+    ) {
+      types.push(
+        "Atteintes aux personnes : Violences physiques et sexuelles"
+      );
+    }
+
+    else if (
+      hasPhysical &&
+      hasVerbal
+    ) {
+      types.push(
+        "Atteintes aux personnes : Violences physiques et verbales"
+      );
+    }
+
+    else if (
+      hasSexual &&
+      hasVerbal
+    ) {
+      types.push(
+        "Atteintes aux personnes : Violences sexuelles et verbales"
+      );
+    }
+
+    else if (hasPhysical) {
+      types.push(
+        "Atteintes aux personnes : Violences physiques"
+      );
+    }
+
+    else if (hasVerbal) {
+      types.push(
+        "Atteintes aux personnes : Violences verbales"
+      );
+    }
+
+    else if (hasSexual) {
+      types.push(
+        "Atteintes aux personnes : Violences sexuelles"
+      );
+    }
+
+    else if (hasPersonsGeneric) {
+      types.push(
+        "Atteintes aux personnes"
+      );
+    }
+
+
+    if (hasSecurityClimate) {
+      types.push(
+        "Atteintes à la sécurité, au climat de l'établissement"
+      );
+    }
+
+
+    /*
+      Évite un doublon éventuel dû à la source.
+    */
+    return [...new Set(types)];
+  }
+
+
+  function renderLevelBadge(level) {
+
+    if (!level) {
+      return "";
+    }
+
+    const className =
+      level === "3"
+        ? "level-badge level-3"
+        : "level-badge";
+
+    return `
+      <span class="${className}">
+        ${escapeHtml(level)}
+      </span>
+    `;
+  }
+
+
+  function renderFactBadges(types) {
+
+    if (
+      !Array.isArray(types) ||
+      types.length === 0
+    ) {
+      return "";
+    }
+
+    return `
+      <div class="fact-badges">
+        ${types.map(function(type) {
+          return `
+            <span class="fact-badge">
+              ${escapeHtml(type)}
+            </span>
+          `;
+        }).join("")}
+      </div>
+    `;
   }
 
 
@@ -1459,7 +1913,11 @@
         record[FIELD.NUMERO_FE],
         record[FIELD.ID_NOM],
         record[FIELD.VILLE],
-        record._departement
+        record._departement,
+        record._niveau,
+        Array.isArray(record._typeFait)
+          ? record._typeFait.join(" ")
+          : ""
       ].join(" "));
 
       const searchOk =
@@ -1540,6 +1998,30 @@
       html += "<tr>";
 
       COLUMNS.forEach(function(column) {
+
+        /*
+          Colonnes calculées avec rendu stylisé.
+        */
+        if (column.id === "_niveau") {
+
+          html +=
+            '<td class="level-cell">' +
+            renderLevelBadge(record._niveau) +
+            "</td>";
+
+          return;
+        }
+
+        if (column.id === "_typeFait") {
+
+          html +=
+            '<td class="type-cell">' +
+            renderFactBadges(record._typeFait) +
+            "</td>";
+
+          return;
+        }
+
 
         let value;
 
