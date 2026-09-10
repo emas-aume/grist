@@ -394,6 +394,7 @@
       }
     }
 
+    .inline-filter-label,
     .level-filter-label {
       min-width: auto;
       margin-left: 14px;
@@ -507,6 +508,16 @@
       <div class="filter-row">
 
         <span class="filter-label">
+          Degré
+        </span>
+
+        <div
+          id="degree-filters"
+          class="department-filters"
+        >
+        </div>
+
+        <span class="filter-label inline-filter-label">
           Département
         </span>
 
@@ -635,6 +646,7 @@
   let selectedWeek = "all";
   let selectedDate = "all";
   let selectedLevel = "all";
+  let selectedDegree = "all";
   let searchText = "";
 
   const diagnostic = document.getElementById("diagnostic");
@@ -691,6 +703,7 @@
 
       renderWeekFilter();
       renderDateFilter();
+      renderDegreeFilters();
       renderDepartmentFilters();
       renderLevelFilters();
       renderTable();
@@ -796,6 +809,7 @@
 
     renderWeekFilter();
     renderDateFilter();
+    renderDegreeFilters();
     renderDepartmentFilters();
     renderLevelFilters();
     renderTable();
@@ -973,6 +987,75 @@
     Cela reste une analyse d'affichage :
     aucune donnée n'est écrite dans Grist.
   */
+
+  function detectDegree(record) {
+
+    const parts = [];
+
+    Object.keys(record || {}).forEach(function(key) {
+      const value = record[key];
+
+      if (
+        value === null ||
+        value === undefined
+      ) {
+        return;
+      }
+
+      if (value instanceof Date) {
+        return;
+      }
+
+      if (Array.isArray(value)) {
+        value.forEach(function(item) {
+          if (
+            item !== null &&
+            item !== undefined
+          ) {
+            parts.push(String(item));
+          }
+        });
+        return;
+      }
+
+      if (typeof value === "object") {
+        try {
+          parts.push(JSON.stringify(value));
+        } catch (e) {
+          // Ignore non-serializable objects.
+        }
+        return;
+      }
+
+      parts.push(String(value));
+    });
+
+    const text =
+      normalizeText(parts.join(" "));
+
+    const hasSecondDegree =
+      /\bcollege\b/.test(text) ||
+      /\blycee\b/.test(text);
+
+    const hasFirstDegree =
+      /\bcirconscription\b/.test(text) ||
+      /\becole maternelle\b/.test(text) ||
+      /\becole elementaire\b/.test(text) ||
+      /\becole primaire\b/.test(text);
+
+    // If both somehow appear, keep the most explicit establishment type.
+    // Priority here: lycée/collège => 2nd degree.
+    if (hasSecondDegree) {
+      return "2nd";
+    }
+
+    if (hasFirstDegree) {
+      return "1er";
+    }
+
+    return "";
+  }
+
 
   function analyzeRecord(record) {
 
@@ -1943,8 +2026,60 @@
     selectedDepartment = departement;
     currentPage = 1;
 
+    renderDegreeFilters();
     renderDepartmentFilters();
     renderLevelFilters();
+    renderTable();
+  }
+
+
+  /*
+    ==================================================
+    FILTRE DEGRÉ
+    ==================================================
+  */
+
+  function renderDegreeFilters() {
+
+    const target =
+      document.getElementById("degree-filters");
+
+    if (!target) {
+      return;
+    }
+
+    const degrees = [
+      { value: "all", label: "Tous" },
+      { value: "1er", label: "1er" },
+      { value: "2nd", label: "2nd" }
+    ];
+
+    target.innerHTML = degrees.map(function(item) {
+
+      const active =
+        selectedDegree === item.value
+          ? "active"
+          : "";
+
+      return `
+        <button
+          type="button"
+          class="department-btn ${active}"
+          onclick="setDegree('${item.value}')"
+        >
+          ${item.label}
+        </button>
+      `;
+    }).join("");
+  }
+
+
+  function setDegree(degree) {
+
+    selectedDegree = degree;
+    currentPage = 1;
+
+    renderDegreeFilters();
     renderTable();
   }
 
@@ -2026,6 +2161,10 @@
         selectedLevel === "all" ||
         record._niveau === selectedLevel;
 
+      const degreeOk =
+        selectedDegree === "all" ||
+        record._degre === selectedDegree;
+
       const searchableText = normalizeSearch([
         record[FIELD.NUMERO_FE],
         record[FIELD.ID_NOM],
@@ -2046,6 +2185,7 @@
         weekOk &&
         dateOk &&
         levelOk &&
+        degreeOk &&
         searchOk
       );
     });
