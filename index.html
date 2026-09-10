@@ -997,11 +997,25 @@
     aucune donnée n'est écrite dans Grist.
   */
 
-  function detectDegree(record) {
+  function analyzeRecordFast(record) {
 
-    const parts = [];
+    const values = [];
+    const levelCandidates = [];
+
+    let hasValRep = false;
+    let hasHarassment = false;
+    let hasGoods = false;
+    let hasSecurityClimate = false;
+    let hasPersonsGeneric = false;
+    let hasPhysical = false;
+    let hasSexual = false;
+    let hasVerbal = false;
+
+    let hasSecondDegree = false;
+    let hasFirstDegree = false;
 
     Object.keys(record || {}).forEach(function(key) {
+
       const value = record[key];
 
       if (
@@ -1011,159 +1025,138 @@
         return;
       }
 
+      let textValue = "";
+
       if (value instanceof Date) {
-        return;
+        textValue = "";
       }
-
-      if (Array.isArray(value)) {
-        value.forEach(function(item) {
-          if (
-            item !== null &&
-            item !== undefined
-          ) {
-            parts.push(String(item));
-          }
-        });
-        return;
+      else if (Array.isArray(value)) {
+        textValue = value.join(" ");
       }
-
-      if (typeof value === "object") {
+      else if (typeof value === "object") {
         try {
-          parts.push(JSON.stringify(value));
+          textValue = JSON.stringify(value);
         } catch (e) {
-          // Ignore non-serializable objects.
+          textValue = "";
         }
+      }
+      else {
+        textValue = String(value);
+      }
+
+      if (!textValue) {
         return;
       }
 
-      parts.push(String(value));
-    });
+      values.push(textValue);
 
-    const text =
-      normalizeText(parts.join(" "));
-
-    const hasSecondDegree =
-      /\bcollege\b/.test(text) ||
-      /\blycee\b/.test(text);
-
-    const hasFirstDegree =
-      /\bcirconscription\b/.test(text) ||
-      /\becole maternelle\b/.test(text) ||
-      /\becole elementaire\b/.test(text) ||
-      /\becole primaire\b/.test(text);
-
-    // If both somehow appear, keep the most explicit establishment type.
-    // Priority here: lycée/collège => 2nd degree.
-    if (hasSecondDegree) {
-      return "2nd";
-    }
-
-    if (hasFirstDegree) {
-      return "1er";
-    }
-
-    return "";
-  }
-
-
-  function analyzeRecord(record) {
-
-    let found2 = false;
-    let found3 = false;
-
-    const textParts = [];
-
-    Object.entries(record).forEach(function(entry) {
-
-      const columnId =
-        normalizeDetectionText(entry[0]);
-
-      const values =
-        valueToDetectionStrings(entry[1]);
-
-      if (values.length === 0) {
-        return;
-      }
-
-      const valueText =
-        normalizeDetectionText(
-          values.join(" | ")
-        );
-
-      textParts.push(valueText);
+      const normalizedKey = normalizeText(key);
+      const normalizedValue = normalizeText(textValue);
 
       /*
-        NIVEAU
-
-        - Si l'identifiant de colonne contient "niveau" / "level",
-          une valeur 2 ou 3 est acceptée.
-        - Ailleurs, il faut une mention explicite "niveau 2/3".
-        Cela évite de prendre un département, une classe ou une date
-        pour le niveau.
+        Niveau :
+        on ne cherche 2/3 comme valeurs isolées que dans
+        les colonnes dont le nom évoque le niveau.
       */
       if (
-        columnId.includes("niveau") ||
-        columnId.includes("level")
+        normalizedKey.includes("niveau") ||
+        normalizedKey.includes("level")
       ) {
+        const levelMatch =
+          normalizedValue.match(/(?:^|\D)([23])(?:\D|$)/);
 
-        if (/(^|[^\d])3([^\d]|$)/.test(valueText)) {
-          found3 = true;
-        }
-
-        if (/(^|[^\d])2([^\d]|$)/.test(valueText)) {
-          found2 = true;
+        if (levelMatch) {
+          levelCandidates.push(levelMatch[1]);
         }
       }
 
-      if (/\bniveau\s*3\b/.test(valueText)) {
-        found3 = true;
+      /*
+        Détection explicite "niveau 2" / "niveau 3"
+        dans n'importe quelle cellule.
+      */
+      if (/\bniveau\s*3\b/.test(normalizedValue)) {
+        levelCandidates.push("3");
+      }
+      else if (/\bniveau\s*2\b/.test(normalizedValue)) {
+        levelCandidates.push("2");
       }
 
-      if (/\bniveau\s*2\b/.test(valueText)) {
-        found2 = true;
+      /*
+        Degré
+      */
+      if (
+        /\bcollege\b/.test(normalizedValue) ||
+        /\blycee\b/.test(normalizedValue)
+      ) {
+        hasSecondDegree = true;
+      }
+
+      if (
+        /\bcirconscription\b/.test(normalizedValue) ||
+        /\becole maternelle\b/.test(normalizedValue) ||
+        /\becole elementaire\b/.test(normalizedValue) ||
+        /\becole primaire\b/.test(normalizedValue)
+      ) {
+        hasFirstDegree = true;
       }
     });
 
-
+    /*
+      Une seule normalisation globale pour les catégories.
+    */
     const text =
-      textParts.join(" | ");
+      normalizeText(values.join(" "));
 
-    const has = function(label) {
-      return text.includes(
-        normalizeDetectionText(label)
+    hasValRep =
+      text.includes(
+        "atteintes aux valeurs de la republique"
       );
-    };
 
+    hasHarassment =
+      text.includes(
+        "harcelement ou suspicion de harcelement"
+      ) ||
+      text.includes(
+        "cyber-harcelement"
+      ) ||
+      text.includes(
+        "cyber harcelement"
+      );
+
+    hasGoods =
+      text.includes(
+        "atteintes aux biens"
+      );
+
+    hasSecurityClimate =
+      text.includes(
+        "atteintes a la securite, au climat de l'etablissement"
+      ) ||
+      text.includes(
+        "atteintes a la securite au climat de l'etablissement"
+      );
+
+    hasPersonsGeneric =
+      text.includes(
+        "atteintes aux personnes"
+      );
+
+    hasPhysical =
+      text.includes(
+        "violences physiques"
+      );
+
+    hasSexual =
+      text.includes(
+        "violences sexuelles"
+      );
+
+    hasVerbal =
+      text.includes(
+        "violences verbales"
+      );
 
     const types = [];
-
-    const hasValRep =
-      has("Atteintes aux valeurs de la République");
-
-    const hasHarassment =
-      has("Harcèlement ou suspicion de harcèlement") ||
-      has("Cyber-harcèlement");
-
-    const hasProperty =
-      has("Atteintes aux biens");
-
-    const hasPhysical =
-      has("Violences physiques");
-
-    const hasVerbal =
-      has("Violences verbales");
-
-    const hasSexual =
-      has("Violences sexuelles");
-
-    const hasPersonsGeneric =
-      has("Atteintes aux personnes");
-
-    const hasSecurityClimate =
-      has(
-        "Atteintes à la sécurité, au climat de l'établissement"
-      );
-
 
     if (hasValRep) {
       types.push("AttValRep");
@@ -1173,15 +1166,10 @@
       types.push("Harcel");
     }
 
-    if (hasProperty) {
+    if (hasGoods) {
       types.push("AttBiens");
     }
 
-
-    /*
-      ATTEINTES AUX PERSONNES :
-      une seule formulation selon la combinaison détectée.
-    */
     if (
       hasPhysical &&
       hasSexual &&
@@ -1191,7 +1179,6 @@
         "AttPers: VP + VS + VV"
       );
     }
-
     else if (
       hasPhysical &&
       hasSexual
@@ -1200,7 +1187,6 @@
         "AttPers: VP + VS"
       );
     }
-
     else if (
       hasPhysical &&
       hasVerbal
@@ -1209,7 +1195,6 @@
         "AttPers: VP + VV"
       );
     }
-
     else if (
       hasSexual &&
       hasVerbal
@@ -1218,65 +1203,56 @@
         "AttPers: VS + VV"
       );
     }
-
     else if (hasPhysical) {
       types.push(
         "AttPers: VP"
       );
     }
-
-    else if (hasVerbal) {
-      types.push(
-        "AttPers: VV"
-      );
-    }
-
     else if (hasSexual) {
       types.push(
         "AttPers: VS"
       );
     }
-
-    else if (hasPersonsGeneric) {
-      types.push("AttPers");
+    else if (hasVerbal) {
+      types.push(
+        "AttPers: VV"
+      );
     }
-
+    else if (hasPersonsGeneric) {
+      types.push(
+        "AttPers"
+      );
+    }
 
     if (hasSecurityClimate) {
-      types.push("AttSecu");
+      types.push(
+        "AttSecu"
+      );
     }
 
+    let level = "";
+
+    if (levelCandidates.includes("3")) {
+      level = "3";
+    }
+    else if (levelCandidates.includes("2")) {
+      level = "2";
+    }
+
+    let degree = "";
+
+    if (hasSecondDegree) {
+      degree = "2nd";
+    }
+    else if (hasFirstDegree) {
+      degree = "1er";
+    }
 
     return {
-      level:
-        found3
-          ? "3"
-          : found2
-            ? "2"
-            : "",
-
-      types:
-        [...new Set(types)]
+      level,
+      degree,
+      types
     };
-  }
-
-
-  function renderLevelBadge(level) {
-
-    if (!level) {
-      return "";
-    }
-
-    const className =
-      level === "3"
-        ? "level-badge level-3"
-        : "level-badge";
-
-    return `
-      <span class="${className}">
-        ${escapeHtml(level)}
-      </span>
-    `;
   }
 
 
