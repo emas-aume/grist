@@ -136,7 +136,9 @@
       color: var(--muted);
     }
 
-    .week-select {
+    .week-select,
+    .date-select,
+    .search-input {
       min-width: 230px;
       padding: 9px 12px;
       border: 1px solid var(--line);
@@ -147,9 +149,16 @@
       cursor: pointer;
     }
 
-    .week-select:focus {
+    .week-select:focus,
+    .date-select:focus,
+    .search-input:focus {
       outline: 2px solid rgba(47, 111, 237, 0.15);
       border-color: var(--primary);
+    }
+
+    .search-input {
+      flex: 1;
+      min-width: 280px;
     }
 
     .department-filters {
@@ -362,6 +371,42 @@
       <div class="filter-row">
 
         <span class="filter-label">
+          Date
+        </span>
+
+        <select
+          id="date-filter"
+          class="date-select"
+          onchange="setDateFilter(this.value)"
+        >
+          <option value="all">
+            Toutes les dates
+          </option>
+        </select>
+
+      </div>
+
+
+      <div class="filter-row">
+
+        <span class="filter-label">
+          Recherche
+        </span>
+
+        <input
+          id="text-search"
+          class="search-input"
+          type="search"
+          placeholder="Nom de l’établissement, ville, n° FE..."
+          oninput="setSearch(this.value)"
+        >
+
+      </div>
+
+
+      <div class="filter-row">
+
+        <span class="filter-label">
           Département
         </span>
 
@@ -460,17 +505,14 @@
     NUMERO_FE: "Numero_FE",
     DATE_SAISIE: "Date_de_saisie",
     ID_NOM: "ID_et_Nom",
-    VILLE: "Ville",
-    REDACTEUR: "Redacteur"
+    VILLE: "Ville"
   });
 
   const COLUMNS = Object.freeze([
     { id: FIELD.NUMERO_FE, label: "Numéro FE" },
     { id: FIELD.DATE_SAISIE, label: "Date de saisie" },
     { id: FIELD.ID_NOM, label: "ID et Nom" },
-    { id: FIELD.VILLE, label: "Ville" },
-    { id: "_departement", label: "Département" },
-    { id: FIELD.REDACTEUR, label: "Rédacteur" }
+    { id: FIELD.VILLE, label: "Ville" }
   ]);
 
   const PAGE_SIZE = 10;
@@ -479,6 +521,8 @@
   let currentPage = 1;
   let selectedDepartment = "all";
   let selectedWeek = "all";
+  let selectedDate = "all";
+  let searchText = "";
 
   const diagnostic = document.getElementById("diagnostic");
 
@@ -520,6 +564,7 @@
       );
 
       renderWeekFilter();
+      renderDateFilter();
       renderDepartmentFilters();
       renderTable();
       return;
@@ -535,8 +580,7 @@
       FIELD.NUMERO_FE,
       FIELD.DATE_SAISIE,
       FIELD.ID_NOM,
-      FIELD.VILLE,
-      FIELD.REDACTEUR
+      FIELD.VILLE
     ];
 
     const missingColumns = requiredColumns.filter(
@@ -575,7 +619,9 @@
 
         _weekKey: weekInfo ? weekInfo.key : "",
         _weekNumber: weekInfo ? weekInfo.week : null,
-        _weekYear: weekInfo ? weekInfo.year : null
+        _weekYear: weekInfo ? weekInfo.year : null,
+
+        _dateKey: date ? formatDateKey(date) : ""
       };
     });
 
@@ -609,6 +655,7 @@
     }
 
     renderWeekFilter();
+    renderDateFilter();
     renderDepartmentFilters();
     renderTable();
   });
@@ -1155,6 +1202,150 @@
   }
 
 
+
+  /*
+    ==================================================
+    FILTRE DATE EXACTE
+    ==================================================
+  */
+
+  function formatDateKey(date) {
+
+    if (!date) {
+      return "";
+    }
+
+    const year = date.getUTCFullYear();
+    const month = String(
+      date.getUTCMonth() + 1
+    ).padStart(2, "0");
+    const day = String(
+      date.getUTCDate()
+    ).padStart(2, "0");
+
+    return `${year}-${month}-${day}`;
+  }
+
+
+  function getAvailableDates() {
+
+    const dates = new Map();
+
+    allRecords.forEach(function(record) {
+
+      if (!record._date || !record._dateKey) {
+        return;
+      }
+
+      if (!dates.has(record._dateKey)) {
+        dates.set(record._dateKey, record._date);
+      }
+    });
+
+    return Array
+      .from(dates.entries())
+      .sort(function(a, b) {
+        return b[0].localeCompare(a[0]);
+      });
+  }
+
+
+  function renderDateFilter() {
+
+    const select =
+      document.getElementById("date-filter");
+
+    if (!select) {
+      return;
+    }
+
+    const dates = getAvailableDates();
+
+    const validKeys =
+      dates.map(item => item[0]);
+
+    if (
+      selectedDate !== "all" &&
+      !validKeys.includes(selectedDate)
+    ) {
+      selectedDate = "all";
+    }
+
+    let html = `
+      <option value="all">
+        Toutes les dates
+      </option>
+    `;
+
+    dates.forEach(function(item) {
+
+      const key = item[0];
+      const date = item[1];
+
+      const selected =
+        selectedDate === key
+          ? "selected"
+          : "";
+
+      const label =
+        String(date.getUTCDate()).padStart(2, "0") +
+        "/" +
+        String(date.getUTCMonth() + 1).padStart(2, "0") +
+        "/" +
+        date.getUTCFullYear();
+
+      html += `
+        <option
+          value="${escapeHtml(key)}"
+          ${selected}
+        >
+          ${escapeHtml(label)}
+        </option>
+      `;
+    });
+
+    select.innerHTML = html;
+  }
+
+
+  function setDateFilter(value) {
+
+    selectedDate = value;
+    currentPage = 1;
+
+    renderTable();
+  }
+
+
+  /*
+    ==================================================
+    RECHERCHE TEXTUELLE
+    ==================================================
+  */
+
+  function normalizeSearch(value) {
+
+    return String(
+      value === null || value === undefined
+        ? ""
+        : value
+    )
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .trim();
+  }
+
+
+  function setSearch(value) {
+
+    searchText = normalizeSearch(value);
+    currentPage = 1;
+
+    renderTable();
+  }
+
+
   /*
     ==================================================
     DÉPARTEMENTS DISPONIBLES
@@ -1260,7 +1451,27 @@
         selectedWeek === "all" ||
         record._weekKey === selectedWeek;
 
-      return departmentOk && weekOk;
+      const dateOk =
+        selectedDate === "all" ||
+        record._dateKey === selectedDate;
+
+      const searchableText = normalizeSearch([
+        record[FIELD.NUMERO_FE],
+        record[FIELD.ID_NOM],
+        record[FIELD.VILLE],
+        record._departement
+      ].join(" "));
+
+      const searchOk =
+        !searchText ||
+        searchableText.includes(searchText);
+
+      return (
+        departmentOk &&
+        weekOk &&
+        dateOk &&
+        searchOk
+      );
     });
   }
 
@@ -1332,18 +1543,26 @@
 
         let value;
 
-        if (column.id === "_departement") {
-          value = record._departement;
-        }
-
-        else if (column.id === FIELD.DATE_SAISIE) {
+        if (column.id === FIELD.DATE_SAISIE) {
 
           /*
-            IMPORTANT :
-            On affiche la MÊME date normalisée que celle
-            utilisée pour calculer la semaine.
+            On affiche la même date normalisée que celle
+            utilisée par les filtres semaine et date.
           */
           value = formatFullDate(record._date);
+        }
+
+        else if (column.id === FIELD.VILLE) {
+
+          const ville = formatValue(
+            record[FIELD.VILLE],
+            FIELD.VILLE
+          );
+
+          value =
+            ville && record._departement
+              ? `${ville} (${record._departement})`
+              : ville;
         }
 
         else {
