@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="fr">
 
@@ -424,6 +425,155 @@
       vertical-align: top;
     }
 
+
+    /* =========================
+       NOTE BLANCHE
+       ========================= */
+
+    .white-note-header {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 18px;
+      flex-wrap: wrap;
+      margin-bottom: 18px;
+    }
+
+    .white-note-title {
+      margin-bottom: 4px;
+    }
+
+    .white-note-controls {
+      display: flex;
+      align-items: flex-end;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .white-note-control {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .white-note-control label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--muted);
+    }
+
+    .white-note-select {
+      min-width: 190px;
+      padding: 9px 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #ffffff;
+      color: var(--text);
+      font-size: 14px;
+    }
+
+    .white-note-period {
+      margin: 0 0 18px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .white-note-degree {
+      margin-top: 24px;
+      padding-top: 22px;
+      border-top: 1px solid var(--line);
+    }
+
+    .white-note-degree:first-of-type {
+      margin-top: 0;
+      padding-top: 0;
+      border-top: none;
+    }
+
+    .white-note-recap {
+      margin-bottom: 12px;
+    }
+
+    .white-note-recap-title {
+      margin: 0 0 8px;
+      font-size: 16px;
+      font-weight: 700;
+    }
+
+    .white-note-counts {
+      margin: 3px 0;
+      line-height: 1.5;
+      font-size: 14px;
+    }
+
+    .white-note-counts.actualisation {
+      font-style: italic;
+    }
+
+    .white-note-total {
+      margin-top: 5px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .level-3-text {
+      color: #b54708;
+      font-weight: 700;
+    }
+
+    .white-note-table-wrap {
+      overflow: auto;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+    }
+
+    .white-note-table {
+      min-width: 760px;
+    }
+
+    .white-note-table th:nth-child(1),
+    .white-note-table td:nth-child(1) {
+      width: 84px;
+      text-align: center;
+    }
+
+    .white-note-table th:nth-child(2),
+    .white-note-table td:nth-child(2) {
+      min-width: 360px;
+      white-space: normal;
+      line-height: 1.45;
+    }
+
+    .white-note-table th:nth-child(3),
+    .white-note-table td:nth-child(3) {
+      min-width: 260px;
+      white-space: normal;
+    }
+
+    .white-note-table th:nth-child(4),
+    .white-note-table td:nth-child(4) {
+      min-width: 260px;
+      white-space: normal;
+    }
+
+    .white-note-empty {
+      padding: 24px 18px;
+      text-align: center;
+      color: var(--muted);
+    }
+
+    @media (max-width: 700px) {
+      .white-note-controls,
+      .white-note-control {
+        width: 100%;
+      }
+
+      .white-note-select {
+        width: 100%;
+        min-width: 0;
+      }
+    }
+
   </style>
 
 </head>
@@ -586,33 +736,48 @@
   </section>
 
 
-  <!-- INFORMATIONS -->
+  <!-- NOTE BLANCHE -->
 
-  <section class="section">
+  <section class="section" id="white-note-section">
 
-    <h2>Informations complémentaires</h2>
+    <div class="white-note-header">
+      <div>
+        <h2 id="white-note-title" class="white-note-title">
+          Note Blanche
+        </h2>
+        <p class="muted">
+          Récapitulatif départemental des faits enregistrés la veille.
+        </p>
+      </div>
 
-    <div class="note">
-      Ce bloc peut servir à mettre en évidence une procédure,
-      une consigne importante, une explication ou un rappel.
+      <div class="white-note-controls">
+        <div class="white-note-control">
+          <label for="white-note-department">Département</label>
+          <select
+            id="white-note-department"
+            class="white-note-select"
+            onchange="setWhiteNoteDepartment(this.value)"
+          ></select>
+        </div>
+
+        <div class="white-note-control">
+          <label for="white-note-date">Jour de la note</label>
+          <select
+            id="white-note-date"
+            class="white-note-select"
+            onchange="setWhiteNoteDate(this.value)"
+          ></select>
+        </div>
+      </div>
     </div>
 
-    <p>
-      Le contenu de cette page reste totalement libre.
-    </p>
+    <p id="white-note-period" class="white-note-period"></p>
 
-  </section>
-
-
-  <!-- DEUXIÈME TABLEAU -->
-
-  <section class="section">
-
-    <h2>Deuxième tableau</h2>
-
-    <p>
-      Un second tableau pourra être ajouté ici ultérieurement.
-    </p>
+    <div id="white-note-content">
+      <div class="white-note-empty">
+        Les notes blanches seront disponibles dès réception des données Grist.
+      </div>
+    </div>
 
   </section>
 
@@ -660,8 +825,8 @@
     { id: FIELD.DATE_SAISIE, label: "Date de saisie" },
     { id: FIELD.ID_NOM, label: "ID et Nom" },
     { id: FIELD.VILLE, label: "Ville" },
-    { id: "_typeFait", label: "Type de fait" },
     { id: FIELD.RESUME, label: "Résumé" },
+    { id: "_typeFait", label: "Type de fait" },
     { id: "_dateDuFait", label: "Date du fait" }
   ]);
 
@@ -682,6 +847,9 @@
   let selectedLevel = "all";
   let selectedDegree = "all";
   let searchText = "";
+
+  let selectedWhiteNoteDepartment = "";
+  let selectedWhiteNoteDate = "";
 
   const diagnostic = document.getElementById("diagnostic");
 
@@ -743,6 +911,7 @@
       renderDepartmentFilters();
       renderLevelFilters();
       renderTable();
+      renderWhiteNote();
       return;
     }
 
@@ -1007,6 +1176,7 @@
       renderDepartmentFilters();
       renderLevelFilters();
       renderTable();
+      renderWhiteNote();
     }
 
     setTimeout(processBatch, 0);
@@ -2685,6 +2855,447 @@
     tableContainer.innerHTML = html;
 
     renderPagination(filteredRecords);
+  }
+
+
+  /*
+    ==================================================
+    NOTE BLANCHE
+    ==================================================
+
+    Une note du jour J affiche les faits saisis à J-1.
+    La première note possible est celle du 03/09/2026,
+    qui affiche donc les faits saisis le 02/09/2026.
+
+    Le numéro de note avance uniquement pour les jours
+    dont la veille contient au moins un "fait du jour"
+    (date de saisie = date du fait).
+  */
+
+  const WHITE_NOTE_FIRST_DATE_KEY = "2026-09-03";
+
+
+  function addDaysUTC(date, days) {
+
+    const result = new Date(Date.UTC(
+      date.getUTCFullYear(),
+      date.getUTCMonth(),
+      date.getUTCDate()
+    ));
+
+    result.setUTCDate(result.getUTCDate() + days);
+    return result;
+  }
+
+
+  function getFactDate(record) {
+
+    if (!record || !record._dateDuFait) {
+      return null;
+    }
+
+    return parseGristDate(record._dateDuFait);
+  }
+
+
+  function isSameUTCDate(a, b) {
+
+    if (!a || !b) {
+      return false;
+    }
+
+    return formatDateKey(a) === formatDateKey(b);
+  }
+
+
+  function isWhiteNoteDayFact(record) {
+
+    const factDate = getFactDate(record);
+
+    return Boolean(
+      record &&
+      record._date &&
+      factDate &&
+      isSameUTCDate(record._date, factDate)
+    );
+  }
+
+
+  function isWhiteNoteUpdate(record) {
+
+    const factDate = getFactDate(record);
+
+    if (!record || !record._date || !factDate) {
+      return false;
+    }
+
+    return (
+      formatDateKey(factDate) !== record._dateKey &&
+      factDate.getTime() < record._date.getTime()
+    );
+  }
+
+
+  function getWhiteNoteDates() {
+
+    const dates = new Map();
+
+    allRecords.forEach(function(record) {
+
+      if (!isWhiteNoteDayFact(record) || !record._date) {
+        return;
+      }
+
+      const noteDate = addDaysUTC(record._date, 1);
+      const noteKey = formatDateKey(noteDate);
+
+      if (noteKey < WHITE_NOTE_FIRST_DATE_KEY) {
+        return;
+      }
+
+      if (!dates.has(noteKey)) {
+        dates.set(noteKey, noteDate);
+      }
+    });
+
+    return Array
+      .from(dates.entries())
+      .sort(function(a, b) {
+        return a[0].localeCompare(b[0]);
+      });
+  }
+
+
+  function getWhiteNoteNumber(noteKey) {
+
+    const dates = getWhiteNoteDates();
+    const index = dates.findIndex(item => item[0] === noteKey);
+
+    return index === -1 ? "" : index + 1;
+  }
+
+
+  function formatLongDate(date) {
+
+    if (!date) {
+      return "";
+    }
+
+    return String(date.getUTCDate()).padStart(2, "0") +
+      "/" +
+      String(date.getUTCMonth() + 1).padStart(2, "0") +
+      "/" +
+      date.getUTCFullYear();
+  }
+
+
+  function setWhiteNoteDepartment(department) {
+
+    selectedWhiteNoteDepartment = department;
+    renderWhiteNote();
+  }
+
+
+  function setWhiteNoteDate(noteDateKey) {
+
+    selectedWhiteNoteDate = noteDateKey;
+    renderWhiteNote();
+  }
+
+
+  function getWhiteNoteRecords() {
+
+    if (!selectedWhiteNoteDate || !selectedWhiteNoteDepartment) {
+      return [];
+    }
+
+    const noteDate = parseGristDate(selectedWhiteNoteDate);
+
+    if (!noteDate) {
+      return [];
+    }
+
+    const factsDate = addDaysUTC(noteDate, -1);
+    const factsDateKey = formatDateKey(factsDate);
+
+    return allRecords.filter(function(record) {
+      return (
+        record._departement === selectedWhiteNoteDepartment &&
+        record._dateKey === factsDateKey
+      );
+    });
+  }
+
+
+  function getWhiteNoteCounts(records) {
+
+    const counts = {
+      dayN2: 0,
+      dayN3: 0,
+      updateN2: 0,
+      updateN3: 0,
+      totalN2: 0,
+      totalN3: 0
+    };
+
+    records.forEach(function(record) {
+
+      if (record._niveau === "2") {
+        counts.totalN2++;
+
+        if (isWhiteNoteDayFact(record)) {
+          counts.dayN2++;
+        }
+        else if (isWhiteNoteUpdate(record)) {
+          counts.updateN2++;
+        }
+      }
+
+      if (record._niveau === "3") {
+        counts.totalN3++;
+
+        if (isWhiteNoteDayFact(record)) {
+          counts.dayN3++;
+        }
+        else if (isWhiteNoteUpdate(record)) {
+          counts.updateN3++;
+        }
+      }
+    });
+
+    return counts;
+  }
+
+
+  function renderWhiteNoteDegree(degree, label, records) {
+
+    const degreeRecords = records.filter(function(record) {
+      return record._degre === degree;
+    });
+
+    const counts = getWhiteNoteCounts(degreeRecords);
+
+    let html = `
+      <div class="white-note-degree">
+        <div class="white-note-recap">
+          <p class="white-note-recap-title">
+            Récapitulatif des faits d'établissement du ${escapeHtml(label)} du ${escapeHtml(selectedWhiteNoteDepartment)}
+          </p>
+
+          <p class="white-note-counts">
+            Faits du jour (N2) : ${counts.dayN2}
+            -
+            <span class="level-3-text">Faits du jour (N3) : ${counts.dayN3}</span>
+          </p>
+
+          <p class="white-note-counts actualisation">
+            Faits d'actualisation (N2) : ${counts.updateN2}
+            -
+            <span class="level-3-text">Faits d'actualisation (N3) : ${counts.updateN3}</span>
+          </p>
+
+          <p class="white-note-total">
+            Total faits N2 : ${counts.totalN2}
+            &nbsp;&nbsp; Total faits N3 : ${counts.totalN3}
+          </p>
+        </div>
+    `;
+
+    if (degreeRecords.length === 0) {
+
+      html += `
+        <div class="white-note-table-wrap">
+          <div class="white-note-empty">
+            Aucun fait du ${escapeHtml(label)} pour cette veille.
+          </div>
+        </div>
+      </div>
+      `;
+
+      return html;
+    }
+
+    html += `
+      <div class="white-note-table-wrap">
+        <table class="white-note-table">
+          <thead>
+            <tr>
+              <th>NIVEAU</th>
+              <th>Résumé</th>
+              <th>Type fait</th>
+              <th>Nom + ville</th>
+            </tr>
+          </thead>
+          <tbody>
+    `;
+
+    degreeRecords.forEach(function(record) {
+
+      const resume = formatValue(
+        record[FIELD.RESUME],
+        FIELD.RESUME
+      );
+
+      const nom = formatValue(
+        record[FIELD.ID_NOM],
+        FIELD.ID_NOM
+      );
+
+      const ville = formatValue(
+        record[FIELD.VILLE],
+        FIELD.VILLE
+      );
+
+      const nomVille = [nom, ville]
+        .filter(Boolean)
+        .join(" — ");
+
+      html += `
+        <tr>
+          <td class="level-cell">
+            ${renderLevelBadge(record._niveau)}
+          </td>
+          <td class="summary-cell" title="${escapeHtml(resume)}">
+            ${escapeHtml(resume)}
+          </td>
+          <td class="type-cell">
+            ${renderFactBadges(record._typeFait)}
+          </td>
+          <td>
+            ${escapeHtml(nomVille)}
+          </td>
+        </tr>
+      `;
+    });
+
+    html += `
+          </tbody>
+        </table>
+      </div>
+    </div>
+    `;
+
+    return html;
+  }
+
+
+  function renderWhiteNote() {
+
+    const departmentSelect =
+      document.getElementById("white-note-department");
+
+    const dateSelect =
+      document.getElementById("white-note-date");
+
+    const title =
+      document.getElementById("white-note-title");
+
+    const period =
+      document.getElementById("white-note-period");
+
+    const content =
+      document.getElementById("white-note-content");
+
+    if (
+      !departmentSelect ||
+      !dateSelect ||
+      !title ||
+      !period ||
+      !content
+    ) {
+      return;
+    }
+
+    const departments = getDepartments();
+    const noteDates = getWhiteNoteDates();
+
+    if (
+      !selectedWhiteNoteDepartment ||
+      !departments.includes(selectedWhiteNoteDepartment)
+    ) {
+      selectedWhiteNoteDepartment =
+        selectedDepartment !== "all" && departments.includes(selectedDepartment)
+          ? selectedDepartment
+          : (departments.includes("34") ? "34" : (departments[0] || ""));
+    }
+
+    if (
+      !selectedWhiteNoteDate ||
+      !noteDates.some(item => item[0] === selectedWhiteNoteDate)
+    ) {
+      selectedWhiteNoteDate =
+        noteDates.length > 0
+          ? noteDates[noteDates.length - 1][0]
+          : "";
+    }
+
+    departmentSelect.innerHTML = departments.length
+      ? departments.map(function(department) {
+          const selected =
+            department === selectedWhiteNoteDepartment
+              ? "selected"
+              : "";
+
+          return `
+            <option value="${escapeHtml(department)}" ${selected}>
+              ${escapeHtml(department)}
+            </option>
+          `;
+        }).join("")
+      : '<option value="">Aucun département</option>';
+
+    dateSelect.innerHTML = noteDates.length
+      ? noteDates.slice().reverse().map(function(item) {
+          const noteKey = item[0];
+          const noteDate = item[1];
+          const factsDate = addDaysUTC(noteDate, -1);
+          const number = getWhiteNoteNumber(noteKey);
+          const selected =
+            noteKey === selectedWhiteNoteDate
+              ? "selected"
+              : "";
+
+          return `
+            <option value="${escapeHtml(noteKey)}" ${selected}>
+              Note n°${number} — ${escapeHtml(formatLongDate(noteDate))}
+              (faits du ${escapeHtml(formatLongDate(factsDate))})
+            </option>
+          `;
+        }).join("")
+      : '<option value="">Aucune note disponible</option>';
+
+    if (!selectedWhiteNoteDate || !selectedWhiteNoteDepartment) {
+
+      title.textContent = "Note Blanche";
+      period.textContent = "";
+      content.innerHTML = `
+        <div class="white-note-empty">
+          Aucune note blanche disponible à partir du 03/09/2026.
+        </div>
+      `;
+      return;
+    }
+
+    const noteDate = parseGristDate(selectedWhiteNoteDate);
+    const factsDate = addDaysUTC(noteDate, -1);
+    const noteNumber = getWhiteNoteNumber(selectedWhiteNoteDate);
+    const records = getWhiteNoteRecords();
+
+    title.textContent =
+      "Note Blanche n°" +
+      noteNumber +
+      " - DSDEN." +
+      selectedWhiteNoteDepartment;
+
+    period.textContent =
+      "Note du " +
+      formatLongDate(noteDate) +
+      " — faits saisis le " +
+      formatLongDate(factsDate);
+
+    content.innerHTML =
+      renderWhiteNoteDegree("1er", "1er degré", records) +
+      renderWhiteNoteDegree("2nd", "2nd degré", records);
   }
 
 
