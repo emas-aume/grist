@@ -354,6 +354,45 @@
       min-width: 76px;
     }
 
+    .period-filters {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      flex: 1;
+      flex-wrap: wrap;
+    }
+
+    .period-filter-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .period-label {
+      font-size: 12px;
+      color: var(--muted);
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    @media (max-width: 700px) {
+      .period-filters {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+      }
+
+      .period-filter-item {
+        width: 100%;
+      }
+
+      .week-select,
+      .date-select {
+        flex: 1;
+        min-width: 0;
+      }
+    }
+
   </style>
 
 </head>
@@ -387,7 +426,7 @@
 
   <section class="section">
 
-    <h2>Premier tableau</h2>
+    <h2>Tableau des faits d'établissement</h2>
 
     <p>
       Tableau des faits avec les informations principales.
@@ -408,39 +447,40 @@
       <div class="filter-row">
 
         <span class="filter-label">
-          Semaine
+          Période
         </span>
 
-        <select
-          id="week-filter"
-          class="week-select"
-          onchange="setWeek(this.value)"
-        >
+        <div class="period-filters">
 
-          <option value="all">
-            Toutes les semaines
-          </option>
+          <div class="period-filter-item">
+            <span class="period-label">Semaine</span>
 
-        </select>
+            <select
+              id="week-filter"
+              class="week-select"
+              onchange="setWeek(this.value)"
+            >
+              <option value="all">
+                Toutes les semaines
+              </option>
+            </select>
+          </div>
 
-      </div>
+          <div class="period-filter-item">
+            <span class="period-label">Date</span>
 
+            <select
+              id="date-filter"
+              class="date-select"
+              onchange="setDateFilter(this.value)"
+            >
+              <option value="all">
+                Toutes les dates
+              </option>
+            </select>
+          </div>
 
-      <div class="filter-row">
-
-        <span class="filter-label">
-          Date
-        </span>
-
-        <select
-          id="date-filter"
-          class="date-select"
-          onchange="setDateFilter(this.value)"
-        >
-          <option value="all">
-            Toutes les dates
-          </option>
-        </select>
+        </div>
 
       </div>
 
@@ -567,11 +607,11 @@
   });
 
   const COLUMNS = Object.freeze([
+    { id: "_niveau", label: "Niveau" },
     { id: FIELD.NUMERO_FE, label: "Numéro FE" },
     { id: FIELD.DATE_SAISIE, label: "Date de saisie" },
     { id: FIELD.ID_NOM, label: "ID et Nom" },
     { id: FIELD.VILLE, label: "Ville" },
-    { id: "_niveau", label: "Niveau" },
     { id: "_typeFait", label: "Type de fait" }
   ]);
 
@@ -585,6 +625,19 @@
   let searchText = "";
 
   const diagnostic = document.getElementById("diagnostic");
+
+  /*
+    Si une erreur JavaScript survient, on l'affiche directement
+    dans le widget au lieu de rester bloqué sur "Connexion...".
+  */
+  window.addEventListener("error", function(event) {
+    if (diagnostic) {
+      diagnostic.textContent =
+        "Erreur JavaScript : " +
+        (event.message || "erreur inconnue");
+      diagnostic.className = "diagnostic error";
+    }
+  });
 
 
   /*
@@ -656,25 +709,35 @@
       Donc jamais d'un numéro de colonne, d'un Object.values(),
       ou de la position de la colonne dans Excel.
     */
+    /*
+      On laisse d'abord le navigateur afficher le statut.
+      C'est utile si le tableau contient beaucoup de colonnes/lignes.
+    */
+    showDiagnostic(
+      "Données reçues : analyse des " +
+      records.length +
+      " faits en cours…",
+      ""
+    );
+
     allRecords = records.map(function(record) {
 
       const rawDate = record[FIELD.DATE_SAISIE];
       const date = parseGristDate(rawDate);
       const weekInfo = date ? getISOWeekInfo(date) : null;
 
+      /*
+        UNE SEULE lecture de la ligne pour Niveau + Type de fait.
+        L'ancienne version parcourait la ligne plusieurs fois.
+      */
+      const analysis = analyzeRecord(record);
+
       return {
         ...record,
 
         _departement: getDepartement(record),
 
-        /*
-          Valeur brute conservée pour diagnostic éventuel.
-        */
         _rawDateDeSaisie: rawDate,
-
-        /*
-          Date normalisée à partir de Date_de_saisie uniquement.
-        */
         _date: date,
 
         _weekKey: weekInfo ? weekInfo.key : "",
@@ -683,12 +746,8 @@
 
         _dateKey: date ? formatDateKey(date) : "",
 
-        /*
-          Valeurs dérivées à partir de toute la ligne.
-          Aucune écriture n'est faite dans Grist.
-        */
-        _niveau: detectLevel(record),
-        _typeFait: detectFactTypes(record)
+        _niveau: analysis.level,
+        _typeFait: analysis.types
       };
     });
 
@@ -825,54 +884,52 @@
     ce qui doit être affiché dans le tableau.
   */
 
-  function flattenRecordValues(value, output = []) {
+  function valueToDetectionStrings(value) {
 
     if (
       value === null ||
       value === undefined ||
       value === ""
     ) {
-      return output;
+      return [];
     }
 
     if (Array.isArray(value)) {
 
-      /*
-        Les listes Grist peuvent commencer par "L".
-        Ce marqueur technique n'est pas utile à l'analyse.
-      */
-      const start =
+      const source =
         value[0] === "L"
-          ? 1
-          : 0;
+          ? value.slice(1)
+          : value;
 
-      for (let i = start; i < value.length; i++) {
-        flattenRecordValues(value[i], output);
-      }
-
-      return output;
+      return source
+        .filter(item =>
+          item !== null &&
+          item !== undefined &&
+          item !== ""
+        )
+        .map(item => String(item));
     }
 
+    /*
+      Les cellules Grist utiles à cette analyse sont normalement
+      primitives ou des listes. Pour éviter toute récursion coûteuse
+      ou objet circulaire, on ne parcourt pas les objets complexes.
+    */
     if (typeof value === "object") {
 
-      /*
-        Ne pas transformer les Date en objet JSON illisible.
-      */
       if (value instanceof Date) {
-        output.push(value.toISOString());
-        return output;
+        return [value.toISOString()];
       }
 
-      Object.values(value).forEach(function(item) {
-        flattenRecordValues(item, output);
-      });
-
-      return output;
+      try {
+        return [JSON.stringify(value)];
+      }
+      catch {
+        return [];
+      }
     }
 
-    output.push(String(value));
-
-    return output;
+    return [String(value)];
   }
 
 
@@ -888,32 +945,26 @@
   }
 
 
-  function getWholeRecordText(record) {
-
-    return normalizeDetectionText(
-      flattenRecordValues(record).join(" | ")
-    );
-  }
-
-
   /*
-    --------------------------------------------------
-    DÉTECTION DU NIVEAU
-    --------------------------------------------------
+    ==================================================
+    ANALYSE UNIQUE D'UN RECORD
+    ==================================================
 
-    Priorité :
-    1. colonnes dont l'identifiant contient "niveau" ;
-    2. cellules contenant explicitement "niveau 2" / "niveau 3".
+    Une ligne est parcourue UNE SEULE FOIS.
+    On en extrait à la fois :
+      - le niveau 2 / 3 ;
+      - les catégories de faits.
 
-    On évite volontairement de chercher un simple "2" ou "3"
-    dans toute la ligne : cela confondrait le niveau avec une date,
-    un numéro FE, un département, une classe, etc.
+    Cela reste une analyse d'affichage :
+    aucune donnée n'est écrite dans Grist.
   */
 
-  function detectLevel(record) {
+  function analyzeRecord(record) {
 
     let found2 = false;
     let found3 = false;
+
+    const textParts = [];
 
     Object.entries(record).forEach(function(entry) {
 
@@ -921,41 +972,42 @@
         normalizeDetectionText(entry[0]);
 
       const values =
-        flattenRecordValues(entry[1]);
+        valueToDetectionStrings(entry[1]);
+
+      if (values.length === 0) {
+        return;
+      }
 
       const valueText =
         normalizeDetectionText(
           values.join(" | ")
         );
 
+      textParts.push(valueText);
+
       /*
-        Si la colonne elle-même parle de niveau,
-        une valeur 2 ou 3 est considérée comme le niveau.
+        NIVEAU
+
+        - Si l'identifiant de colonne contient "niveau" / "level",
+          une valeur 2 ou 3 est acceptée.
+        - Ailleurs, il faut une mention explicite "niveau 2/3".
+        Cela évite de prendre un département, une classe ou une date
+        pour le niveau.
       */
       if (
         columnId.includes("niveau") ||
         columnId.includes("level")
       ) {
 
-        if (
-          /(^|[^\d])3([^\d]|$)/.test(valueText) ||
-          /\bniveau\s*3\b/.test(valueText)
-        ) {
+        if (/(^|[^\d])3([^\d]|$)/.test(valueText)) {
           found3 = true;
         }
 
-        if (
-          /(^|[^\d])2([^\d]|$)/.test(valueText) ||
-          /\bniveau\s*2\b/.test(valueText)
-        ) {
+        if (/(^|[^\d])2([^\d]|$)/.test(valueText)) {
           found2 = true;
         }
       }
 
-      /*
-        Même si le niveau se trouve dans une autre colonne,
-        on accepte une mention explicite "Niveau 2" / "Niveau 3".
-      */
       if (/\bniveau\s*3\b/.test(valueText)) {
         found3 = true;
       }
@@ -965,131 +1017,71 @@
       }
     });
 
-    /*
-      Si les deux sont trouvés par incohérence de la source,
-      le niveau 3, plus élevé, est retenu.
-    */
-    if (found3) {
-      return "3";
-    }
-
-    if (found2) {
-      return "2";
-    }
-
-    return "";
-  }
-
-
-  /*
-    --------------------------------------------------
-    DÉTECTION DU TYPE DE FAIT
-    --------------------------------------------------
-
-    Plusieurs familles peuvent être retournées pour un même FE :
-    par exemple "Atteintes aux valeurs de la République"
-    + "Harcèlement".
-
-    Pour les violences, on regroupe les sous-types dans UNE seule
-    formulation "Atteintes aux personnes : ...".
-  */
-
-  function detectFactTypes(record) {
 
     const text =
-      getWholeRecordText(record);
+      textParts.join(" | ");
+
+    const has = function(label) {
+      return text.includes(
+        normalizeDetectionText(label)
+      );
+    };
+
 
     const types = [];
 
     const hasValRep =
-      text.includes(
-        normalizeDetectionText(
-          "Atteintes aux valeurs de la République"
-        )
-      );
+      has("Atteintes aux valeurs de la République");
 
     const hasHarassment =
-      text.includes(
-        normalizeDetectionText(
-          "Harcèlement ou suspicion de harcèlement"
-        )
-      ) ||
-      text.includes(
-        normalizeDetectionText(
-          "Cyber-harcèlement"
-        )
-      );
+      has("Harcèlement ou suspicion de harcèlement") ||
+      has("Cyber-harcèlement");
 
     const hasProperty =
-      text.includes(
-        normalizeDetectionText(
-          "Atteintes aux biens"
-        )
-      );
+      has("Atteintes aux biens");
 
     const hasPhysical =
-      text.includes(
-        normalizeDetectionText(
-          "Violences physiques"
-        )
-      );
+      has("Violences physiques");
 
     const hasVerbal =
-      text.includes(
-        normalizeDetectionText(
-          "Violences verbales"
-        )
-      );
+      has("Violences verbales");
 
     const hasSexual =
-      text.includes(
-        normalizeDetectionText(
-          "Violences sexuelles"
-        )
-      );
+      has("Violences sexuelles");
 
     const hasPersonsGeneric =
-      text.includes(
-        normalizeDetectionText(
-          "Atteintes aux personnes"
-        )
-      );
+      has("Atteintes aux personnes");
 
     const hasSecurityClimate =
-      text.includes(
-        normalizeDetectionText(
-          "Atteintes à la sécurité, au climat de l'établissement"
-        )
+      has(
+        "Atteintes à la sécurité, au climat de l'établissement"
       );
 
 
     if (hasValRep) {
-      types.push(
-        "Atteintes aux valeurs de la République"
-      );
+      types.push("AttValRep");
     }
 
     if (hasHarassment) {
-      types.push("Harcèlement");
+      types.push("Harcel");
     }
 
     if (hasProperty) {
-      types.push("Atteintes aux biens");
+      types.push("Attbiens");
     }
 
 
     /*
-      Une seule catégorie "Atteintes aux personnes"
-      est produite, selon la combinaison trouvée.
+      ATTEINTES AUX PERSONNES :
+      une seule formulation selon la combinaison détectée.
     */
-
     if (
       hasPhysical &&
       hasSexual &&
       hasVerbal
     ) {
       types.push(
-        "Atteintes aux personnes : Violences physiques, sexuelles et verbales"
+        "Attpers: VP + VS + VV"
       );
     }
 
@@ -1098,7 +1090,7 @@
       hasSexual
     ) {
       types.push(
-        "Atteintes aux personnes : Violences physiques et sexuelles"
+        "Attpers: VP + VS"
       );
     }
 
@@ -1107,7 +1099,7 @@
       hasVerbal
     ) {
       types.push(
-        "Atteintes aux personnes : Violences physiques et verbales"
+        "Attpers: VP + VV"
       );
     }
 
@@ -1116,46 +1108,49 @@
       hasVerbal
     ) {
       types.push(
-        "Atteintes aux personnes : Violences sexuelles et verbales"
+        "Attpers: VS + VV"
       );
     }
 
     else if (hasPhysical) {
       types.push(
-        "Atteintes aux personnes : Violences physiques"
+        "Attpers: VP"
       );
     }
 
     else if (hasVerbal) {
       types.push(
-        "Atteintes aux personnes : Violences verbales"
+        "Attpers: VV"
       );
     }
 
     else if (hasSexual) {
       types.push(
-        "Atteintes aux personnes : Violences sexuelles"
+        "Attpers: VS"
       );
     }
 
     else if (hasPersonsGeneric) {
-      types.push(
-        "Atteintes aux personnes"
-      );
+      types.push("Attpers");
     }
 
 
     if (hasSecurityClimate) {
-      types.push(
-        "Atteintes à la sécurité, au climat de l'établissement"
-      );
+      types.push("Attsecu");
     }
 
 
-    /*
-      Évite un doublon éventuel dû à la source.
-    */
-    return [...new Set(types)];
+    return {
+      level:
+        found3
+          ? "3"
+          : found2
+            ? "2"
+            : "",
+
+      types:
+        [...new Set(types)]
+    };
   }
 
 
@@ -1178,6 +1173,50 @@
   }
 
 
+  function getFullFactLabel(type) {
+
+    const labels = {
+      "AttValRep":
+        "Atteintes aux valeurs de la République",
+
+      "Harcel":
+        "Harcèlement ou suspicion de harcèlement / Cyber-harcèlement",
+
+      "Attbiens":
+        "Atteintes aux biens",
+
+      "Attsecu":
+        "Atteintes à la sécurité, au climat de l'établissement",
+
+      "Attpers":
+        "Atteintes aux personnes",
+
+      "Attpers: VP":
+        "Atteintes aux personnes : Violences physiques",
+
+      "Attpers: VS":
+        "Atteintes aux personnes : Violences sexuelles",
+
+      "Attpers: VV":
+        "Atteintes aux personnes : Violences verbales",
+
+      "Attpers: VP + VS":
+        "Atteintes aux personnes : Violences physiques et sexuelles",
+
+      "Attpers: VP + VV":
+        "Atteintes aux personnes : Violences physiques et verbales",
+
+      "Attpers: VS + VV":
+        "Atteintes aux personnes : Violences sexuelles et verbales",
+
+      "Attpers: VP + VS + VV":
+        "Atteintes aux personnes : Violences physiques, sexuelles et verbales"
+    };
+
+    return labels[type] || type;
+  }
+
+
   function renderFactBadges(types) {
 
     if (
@@ -1190,8 +1229,15 @@
     return `
       <div class="fact-badges">
         ${types.map(function(type) {
+
+          const fullLabel =
+            getFullFactLabel(type);
+
           return `
-            <span class="fact-badge">
+            <span
+              class="fact-badge"
+              title="${escapeHtml(fullLabel)}"
+            >
               ${escapeHtml(type)}
             </span>
           `;
