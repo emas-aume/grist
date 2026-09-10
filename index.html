@@ -620,10 +620,10 @@
 
   <section class="section">
 
-    <h2>Premier tableau</h2>
+    <h2>Faits d'établissement</h2>
 
     <p>
-      Tableau des faits avec les informations principales.
+      Base de données simplifiée
     </p>
 
     <div
@@ -1137,21 +1137,29 @@
         return;
       }
 
-      processedRecords.sort(function(a, b) {
+      /*
+        Une ligne Grist vide ne constitue pas un fait d'établissement.
+        On ne conserve que les lignes ayant un numéro de FE réel.
+      */
+      const validFactRecords = processedRecords.filter(function(record) {
+        return getNumeroFE(record[FIELD.NUMERO_FE]) > 0;
+      });
+
+      validFactRecords.sort(function(a, b) {
         return (
           getNumeroFE(b[FIELD.NUMERO_FE]) -
           getNumeroFE(a[FIELD.NUMERO_FE])
         );
       });
 
-      allRecords = processedRecords;
+      allRecords = validFactRecords;
 
       if (missingColumns.length > 0) {
 
         showDiagnostic(
           "Connexion réussie : " +
-          records.length +
-          " lignes reçues. IDs de colonnes introuvables : " +
+          validFactRecords.length +
+          " faits reçus. IDs de colonnes introuvables : " +
           missingColumns.join(", "),
           "error"
         );
@@ -1161,7 +1169,7 @@
 
         showDiagnostic(
           "Connexion réussie : " +
-          records.length +
+          validFactRecords.length +
           " faits reçus. " +
           analysisErrors +
           " ligne(s) atypique(s) ignorée(s) pendant l'analyse.",
@@ -1173,7 +1181,7 @@
 
         showDiagnostic(
           "Connexion réussie : " +
-          records.length +
+          validFactRecords.length +
           " faits reçus.",
           "ok"
         );
@@ -3362,11 +3370,12 @@
       " - DSDEN." +
       selectedWhiteNoteDepartment;
 
-    period.textContent =
-      "Note du " +
-      formatLongDate(noteDate) +
-      " — faits saisis le " +
-      formatLongDate(factsDate);
+    period.innerHTML =
+      escapeHtml(formatLongDate(factsDate)) +
+      " — <strong>" +
+      records.length +
+      "</strong> faits saisis le " +
+      escapeHtml(formatLongDate(noteDate));
 
     content.innerHTML =
       renderWhiteNoteDegree("1er", "1er degré", records) +
