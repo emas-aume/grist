@@ -1380,6 +1380,25 @@
   }
 
 
+  function renderLevelBadge(level) {
+
+    if (!level) {
+      return "";
+    }
+
+    const levelClass =
+      String(level) === "3"
+        ? "level-badge level-3"
+        : "level-badge";
+
+    return `
+      <span class="${levelClass}">
+        ${escapeHtml(level)}
+      </span>
+    `;
+  }
+
+
   function getFullFactLabel(type) {
 
     const labels = {
