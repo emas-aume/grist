@@ -762,10 +762,12 @@
       const weekInfo = date ? getISOWeekInfo(date) : null;
 
       /*
-        UNE SEULE lecture de la ligne pour Niveau + Type de fait.
-        L'ancienne version parcourait la ligne plusieurs fois.
+        UNE SEULE lecture de la ligne pour :
+        - Niveau
+        - Degré
+        - Type de fait
       */
-      const analysis = analyzeRecord(record);
+      const analysis = analyzeRecordFast(record);
 
       return {
         ...record,
@@ -782,7 +784,7 @@
         _dateKey: date ? formatDateKey(date) : "",
 
         _niveau: analysis.level,
-        _degre: detectDegree(record),
+        _degre: analysis.degree,
         _typeFait: analysis.types
       };
     });
