@@ -400,6 +400,14 @@
       margin-left: 14px;
     }
 
+    /* Valeurs des colonnes Numéro FE, Date, ID/Nom et Ville uniquement */
+    tbody td:nth-child(2),
+    tbody td:nth-child(3),
+    tbody td:nth-child(4),
+    tbody td:nth-child(5) {
+      font-size: 13px;
+    }
+
   </style>
 
 </head>
@@ -774,6 +782,7 @@
         _dateKey: date ? formatDateKey(date) : "",
 
         _niveau: analysis.level,
+        _degre: detectDegree(record),
         _typeFait: analysis.types
       };
     });
