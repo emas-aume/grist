@@ -659,6 +659,20 @@
       font-weight: 700;
     }
 
+    .brq-department-stats {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      gap: 8px 30px;
+      margin: 0 0 12px;
+      font-size: 14px;
+      color: var(--text);
+    }
+
+    .brq-department-stats strong {
+      font-weight: 800 !important;
+    }
+
     .brq-table-wrap {
       overflow: auto;
       border: 1px solid var(--line);
@@ -2262,7 +2276,7 @@
 
   function getBrqDailyDates() {
     const dates = new Map();
-    const BRQ_START_DATE = "2026-09-03";
+    const BRQ_START_DATE = "2026-09-02";
 
     allRecords.forEach(function(record) {
       if (
@@ -2281,7 +2295,7 @@
 
   function getBrqWeeks() {
     const weeks = new Map();
-    const BRQ_START_DATE = "2026-09-03";
+    const BRQ_START_DATE = "2026-09-02";
 
     allRecords.forEach(function(record) {
       if (
@@ -2407,6 +2421,19 @@
       return html;
     }
 
+    const totalFE = departmentRecords.length;
+    const totalDayFacts = departmentRecords.filter(isWhiteNoteDayFact).length;
+    const totalUpdates = departmentRecords.filter(isWhiteNoteUpdate).length;
+    const totalN2 = departmentRecords.filter(function(record) { return record._niveau === "2"; }).length;
+    const totalN3 = departmentRecords.filter(function(record) { return record._niveau === "3"; }).length;
+
+    html += `
+      <div class="brq-department-stats">
+        <span>Total FE : <strong>${totalFE}</strong> dont <strong>${totalDayFacts}</strong> Faits du jour et <strong>${totalUpdates}</strong> Faits d'actualisation</span>
+        <span>Total FE N2 : <strong>${totalN2}</strong> - Total FE N3 : <strong>${totalN3}</strong></span>
+      </div>
+    `;
+
     const counts = getBrqCounts(departmentRecords);
     html += `<div class="brq-table-wrap"><table class="brq-table"><thead><tr><th>Type de fait</th><th>1er degré</th><th>2nd degré</th><th>Privé</th></tr></thead><tbody>`;
 
@@ -2426,7 +2453,10 @@
           const type = formatBrqTypeForLine(record);
           const resume = record[FIELD.RESUME] || "Résumé non renseigné";
           const timingLabel = getFactTimingLabel(record);
-          html += `<p class="brq-unaccounted-line">${escapeHtml(String(idNom))} (Niveau ${escapeHtml(String(niveau))}) - ${escapeHtml(type)} - ${escapeHtml(String(resume))}${timingLabel ? ` <em>(${escapeHtml(timingLabel)})</em>` : ""}</p>`;
+          const niveauHtml = String(niveau) === "3"
+            ? `<span class="level-3-text">(Niveau 3)</span>`
+            : `(Niveau ${escapeHtml(String(niveau))})`;
+          html += `<p class="brq-unaccounted-line">${escapeHtml(String(idNom))} ${niveauHtml} - ${escapeHtml(type)} - ${escapeHtml(String(resume))}${timingLabel ? ` <em>(${escapeHtml(timingLabel)})</em>` : ""}</p>`;
         });
         html += `</div>`;
       }
