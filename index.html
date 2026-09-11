@@ -540,7 +540,7 @@
 
     .level-3-text {
       color: #b54708;
-      font-weight: 700;
+      font-weight: inherit;
     }
 
     .white-note-table-wrap {
@@ -670,7 +670,7 @@
     }
 
     .brq-department-stats strong {
-      font-weight: 800 !important;
+      font-weight: 700;
     }
 
     .brq-table-wrap {
@@ -2412,6 +2412,13 @@
     return record._typeFait.map(function(type){ return getFullFactLabel(type); }).join(" + ");
   }
 
+  function formatNonZeroCount(value) {
+    const numericValue = Number(value) || 0;
+    return numericValue !== 0
+      ? `<strong>${numericValue}</strong>`
+      : "0";
+  }
+
   function renderBrqDepartment(department, records, weeklyMode) {
     const departmentRecords = records.filter(function(record){ return record._departement === department; });
     let html = `<div class="brq-department"><p class="brq-department-title">DSDEN.${escapeHtml(department)}</p>`;
@@ -2438,7 +2445,7 @@
     html += `<div class="brq-table-wrap"><table class="brq-table"><thead><tr><th>Type de fait</th><th>1er degré</th><th>2nd degré</th><th>Privé</th></tr></thead><tbody>`;
 
     BRQ_TYPES.forEach(function(type) {
-      html += `<tr><td>${escapeHtml(type.label)}</td><td>${counts[type.key].first}</td><td>${counts[type.key].second}</td><td>${counts[type.key].private}</td></tr>`;
+      html += `<tr><td>${escapeHtml(type.label)}</td><td>${formatNonZeroCount(counts[type.key].first)}</td><td>${formatNonZeroCount(counts[type.key].second)}</td><td>${formatNonZeroCount(counts[type.key].private)}</td></tr>`;
     });
 
     html += `</tbody></table></div>`;
@@ -3809,20 +3816,20 @@
 
           <div class="white-note-stats-line">
             <p class="white-note-counts">
-              Faits du jour (N2) : ${counts.dayN2}
+              Faits du jour (N2) : ${formatNonZeroCount(counts.dayN2)}
               -
-              <em>Faits d'actualisation (N2) : ${counts.updateN2}</em>
+              <em>Faits d'actualisation (N2) : ${formatNonZeroCount(counts.updateN2)}</em>
             </p>
 
             <p class="white-note-counts level-3-text">
-              Faits du jour (N3) : ${counts.dayN3}
+              Faits du jour (N3) : ${formatNonZeroCount(counts.dayN3)}
               -
-              <em>Faits d'actualisation (N3) : ${counts.updateN3}</em>
+              <em>Faits d'actualisation (N3) : ${formatNonZeroCount(counts.updateN3)}</em>
             </p>
 
             <p class="white-note-total">
-              Total faits N2 : ${counts.totalN2}
-              &nbsp;&nbsp; Total faits N3 : ${counts.totalN3}
+              Total faits N2 : ${formatNonZeroCount(counts.totalN2)}
+              &nbsp;&nbsp; Total faits N3 : ${formatNonZeroCount(counts.totalN3)}
             </p>
           </div>
         </div>
