@@ -15,6 +15,7 @@
 
   <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
   <style>
 
@@ -4275,7 +4276,6 @@
       ? calendarDates.slice().reverse().map(function(item) {
           const noteKey = item[0];
           const noteDate = item[1];
-          const sourceDateLabel = getWhiteNoteSourceDateLabel(noteDate);
           const number = getWhiteNoteNumber(
             noteKey,
             selectedWhiteNoteDepartment
@@ -4292,7 +4292,6 @@
           return `
             <option value="${escapeHtml(noteKey)}" ${selected}>
               ${prefix}${escapeHtml(formatLongDate(noteDate))}
-              (faits ${escapeHtml(sourceDateLabel)})
             </option>
           `;
         }).join("")
