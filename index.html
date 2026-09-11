@@ -2425,7 +2425,8 @@
           const niveau = record._niveau || "?";
           const type = formatBrqTypeForLine(record);
           const resume = record[FIELD.RESUME] || "Résumé non renseigné";
-          html += `<p class="brq-unaccounted-line">${escapeHtml(String(idNom))} (Niveau ${escapeHtml(String(niveau))}) - ${escapeHtml(type)} - ${escapeHtml(String(resume))}</p>`;
+          const timingLabel = getFactTimingLabel(record);
+          html += `<p class="brq-unaccounted-line">${escapeHtml(String(idNom))} (Niveau ${escapeHtml(String(niveau))}) - ${escapeHtml(type)} - ${escapeHtml(String(resume))}${timingLabel ? ` <em>(${escapeHtml(timingLabel)})</em>` : ""}</p>`;
         });
         html += `</div>`;
       }
@@ -3572,6 +3573,18 @@
   }
 
 
+  function getFactTimingLabel(record) {
+    if (isWhiteNoteDayFact(record)) {
+      return "fait du jour";
+    }
+
+    if (isWhiteNoteUpdate(record)) {
+      return "fait d\'actualisation";
+    }
+
+    return "";
+  }
+
   function getWhiteNoteCalendarDates(department) {
 
     /*
@@ -3840,7 +3853,7 @@
             ${renderLevelBadge(record._niveau)}
           </td>
           <td class="summary-cell" title="${escapeHtml(resume)}">
-            ${escapeHtml(resume)}
+            ${escapeHtml(resume)}${getFactTimingLabel(record) ? ` <em>(${escapeHtml(getFactTimingLabel(record))})</em>` : ""}
           </td>
           <td class="type-cell">
             ${renderFactBadges(record._typeFait, record._niveau)}
