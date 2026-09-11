@@ -3644,16 +3644,64 @@
     NOTE BLANCHE
     ==================================================
 
-    Une note du jour J affiche les faits saisis à J-1.
-    La première note possible est celle du 03/09/2026,
-    qui affiche donc les faits saisis le 02/09/2026.
+    Une note du mardi au vendredi affiche les faits saisis
+    la veille. Il n'y a aucune Note Blanche le samedi ni le
+    dimanche : la note du lundi regroupe les faits saisis le
+    vendredi, le samedi et le dimanche précédents.
 
-    Le numéro de note avance uniquement pour les jours
-    dont la veille contient au moins un fait saisi dans
-    le département, qu'il soit du jour ou d'actualisation.
+    La première note possible reste celle du 03/09/2026,
+    qui affiche donc les faits saisis le 02/09/2026.
   */
 
   const WHITE_NOTE_FIRST_DATE_KEY = "2026-09-03";
+  const WHITE_NOTE_SCHOOL_YEAR_END_KEY = "2027-07-02";
+
+  /*
+    Académie de Montpellier = zone C pour l'année scolaire 2026-2027.
+
+    Une Note Blanche n'est pas générée :
+    - le samedi et le dimanche ;
+    - pendant les vacances scolaires de la zone C ;
+    - les jours fériés nationaux ;
+    - le vendredi 7 mai 2027, journée sans classe prévue au calendrier scolaire.
+
+    À la reprise, la première Note Blanche regroupe tous les faits saisis
+    depuis la dernière Note Blanche ouvrée jusqu'à la veille incluse.
+  */
+  const WHITE_NOTE_SCHOOL_BREAKS = Object.freeze([
+    /* Toussaint : reprise le 02/11/2026. */
+    ["2026-10-17", "2026-11-01"],
+
+    /* Noël : reprise le 04/01/2027. */
+    ["2026-12-19", "2027-01-03"],
+
+    /* Hiver - zone C : reprise le 22/02/2027. */
+    ["2027-02-06", "2027-02-21"],
+
+    /* Printemps - zone C : reprise le 19/04/2027. */
+    ["2027-04-03", "2027-04-18"],
+
+    /* Vacances d'été à compter du 03/07/2027. */
+    ["2027-07-03", "9999-12-31"]
+  ]);
+
+  const WHITE_NOTE_PUBLIC_HOLIDAYS = new Set([
+    "2026-11-01", /* Toussaint */
+    "2026-11-11", /* Armistice */
+    "2026-12-25", /* Noël */
+    "2027-01-01", /* Jour de l'An */
+    "2027-03-29", /* Lundi de Pâques */
+    "2027-05-01", /* Fête du Travail */
+    "2027-05-06", /* Ascension */
+    "2027-05-08", /* Victoire 1945 */
+    "2027-05-17", /* Lundi de Pentecôte */
+    "2027-07-14", /* Fête nationale */
+    "2027-08-15"  /* Assomption */
+  ]);
+
+  const WHITE_NOTE_EXTRA_CLOSED_DAYS = new Set([
+    "2027-05-07" /* Classes vaquées dans les zones A, B et C. */
+  ]);
 
 
   function addDaysUTC(date, days) {
@@ -3666,6 +3714,39 @@
 
     result.setUTCDate(result.getUTCDate() + days);
     return result;
+  }
+
+
+  function isDateKeyInRange(dateKey, startKey, endKey) {
+    return dateKey >= startKey && dateKey <= endKey;
+  }
+
+
+  function isWhiteNoteSchoolBreak(date) {
+    if (!date) return false;
+
+    const key = formatDateKey(date);
+
+    return WHITE_NOTE_SCHOOL_BREAKS.some(function(range) {
+      return isDateKeyInRange(key, range[0], range[1]);
+    });
+  }
+
+
+  function isWhiteNoteOperationalDay(date) {
+    if (!date) return false;
+
+    const key = formatDateKey(date);
+    const day = date.getUTCDay();
+
+    if (key < WHITE_NOTE_FIRST_DATE_KEY) return false;
+    if (key > WHITE_NOTE_SCHOOL_YEAR_END_KEY) return false;
+    if (day === 0 || day === 6) return false;
+    if (isWhiteNoteSchoolBreak(date)) return false;
+    if (WHITE_NOTE_PUBLIC_HOLIDAYS.has(key)) return false;
+    if (WHITE_NOTE_EXTRA_CLOSED_DAYS.has(key)) return false;
+
+    return true;
   }
 
 
@@ -3729,19 +3810,114 @@
     return "";
   }
 
+  function getWhiteNoteDateForRecordDate(recordDate) {
+
+    if (!recordDate) {
+      return null;
+    }
+
+    /*
+      Un fait est rattaché à la prochaine journée où une Note Blanche
+      peut réellement être produite. Cela gère d'un seul coup les
+      week-ends, vacances scolaires, jours fériés et journées fermées.
+    */
+    let candidate = addDaysUTC(recordDate, 1);
+
+    while (formatDateKey(candidate) <= WHITE_NOTE_SCHOOL_YEAR_END_KEY) {
+      if (isWhiteNoteOperationalDay(candidate)) {
+        return candidate;
+      }
+
+      candidate = addDaysUTC(candidate, 1);
+    }
+
+    return null;
+  }
+
+
+  function getPreviousWhiteNoteOperationalDay(noteDate) {
+
+    if (!noteDate) {
+      return null;
+    }
+
+    let candidate = addDaysUTC(noteDate, -1);
+
+    /*
+      Pour la toute première Note Blanche, le 03/09/2026 doit reprendre
+      uniquement les faits du 02/09/2026, même si cette date précède le
+      seuil de création des Notes Blanches.
+    */
+    const firstNoteDate = parseGristDate(WHITE_NOTE_FIRST_DATE_KEY);
+    if (firstNoteDate && isSameUTCDate(noteDate, firstNoteDate)) {
+      return candidate;
+    }
+
+    while (candidate.getUTCFullYear() >= 2026) {
+      if (isWhiteNoteOperationalDay(candidate)) {
+        return candidate;
+      }
+
+      candidate = addDaysUTC(candidate, -1);
+    }
+
+    return null;
+  }
+
+
+  function getWhiteNoteSourceDates(noteDate) {
+
+    if (!noteDate || !isWhiteNoteOperationalDay(noteDate)) {
+      return [];
+    }
+
+    const previousNoteDate = getPreviousWhiteNoteOperationalDay(noteDate);
+
+    if (!previousNoteDate) {
+      return [];
+    }
+
+    const dates = [];
+    let current = new Date(previousNoteDate.getTime());
+    const endKey = formatDateKey(addDaysUTC(noteDate, -1));
+
+    while (formatDateKey(current) <= endKey) {
+      dates.push(new Date(current.getTime()));
+      current = addDaysUTC(current, 1);
+    }
+
+    return dates;
+  }
+
+
+  function getWhiteNoteSourceDateLabel(noteDate) {
+
+    const dates = getWhiteNoteSourceDates(noteDate);
+
+    if (dates.length === 0) return "";
+
+    if (dates.length === 1) {
+      return "du " + formatLongDate(dates[0]);
+    }
+
+    return "du " + formatLongDate(dates[0]) +
+      " au " + formatLongDate(dates[dates.length - 1]);
+  }
+
+
   function getWhiteNoteCalendarDates(department) {
 
     /*
       Le sélecteur ne propose QUE les jours pour lesquels une
       Note Blanche existe réellement dans le département choisi.
 
-      Une note du jour J existe dès lors qu'au moins un fait a été
-      saisi à J-1 dans ce département, qu'il s'agisse d'un fait du
-      jour ou d'une actualisation.
+      Chaque fait est rattaché à la prochaine journée de Note Blanche
+      réellement ouverte. Il n'y a donc aucune note le week-end, pendant
+      les vacances scolaires de la zone C, les jours fériés, ni le
+      vendredi 7 mai 2027.
 
-      Exemple : faits saisis le 02/09/2026 -> Note du 03/09/2026.
-      Aucun fait saisi un jour donné -> aucune date correspondante
-      n'apparaît dans le sélecteur.
+      À la reprise, une seule Note Blanche regroupe tous les faits saisis
+      depuis la dernière journée de Note Blanche jusqu'à la veille.
     */
     if (!department) {
       return [];
@@ -3759,7 +3935,12 @@
         return;
       }
 
-      const noteDate = addDaysUTC(record._date, 1);
+      const noteDate = getWhiteNoteDateForRecordDate(record._date);
+
+      if (!noteDate) {
+        return;
+      }
+
       const noteKey = formatDateKey(noteDate);
 
       if (noteKey < WHITE_NOTE_FIRST_DATE_KEY) {
@@ -3844,13 +4025,14 @@
       return [];
     }
 
-    const factsDate = addDaysUTC(noteDate, -1);
-    const factsDateKey = formatDateKey(factsDate);
+    const sourceDateKeys = new Set(
+      getWhiteNoteSourceDates(noteDate).map(formatDateKey)
+    );
 
     return allRecords.filter(function(record) {
       return (
         record._departement === selectedWhiteNoteDepartment &&
-        record._dateKey === factsDateKey
+        sourceDateKeys.has(record._dateKey)
       );
     });
   }
@@ -4093,7 +4275,7 @@
       ? calendarDates.slice().reverse().map(function(item) {
           const noteKey = item[0];
           const noteDate = item[1];
-          const factsDate = addDaysUTC(noteDate, -1);
+          const sourceDateLabel = getWhiteNoteSourceDateLabel(noteDate);
           const number = getWhiteNoteNumber(
             noteKey,
             selectedWhiteNoteDepartment
@@ -4110,7 +4292,7 @@
           return `
             <option value="${escapeHtml(noteKey)}" ${selected}>
               ${prefix}${escapeHtml(formatLongDate(noteDate))}
-              (faits du ${escapeHtml(formatLongDate(factsDate))})
+              (faits ${escapeHtml(sourceDateLabel)})
             </option>
           `;
         }).join("")
@@ -4130,7 +4312,7 @@
     }
 
     const noteDate = parseGristDate(selectedWhiteNoteDate);
-    const factsDate = addDaysUTC(noteDate, -1);
+    const sourceDateLabel = getWhiteNoteSourceDateLabel(noteDate);
     const noteNumber = getWhiteNoteNumber(
       selectedWhiteNoteDate,
       selectedWhiteNoteDepartment
@@ -4165,8 +4347,8 @@
       escapeHtml(formatLongDate(noteDate)) +
       " — <strong>" +
       records.length +
-      "</strong> faits saisis le " +
-      escapeHtml(formatLongDate(factsDate));
+      "</strong> faits saisis " +
+      escapeHtml(sourceDateLabel);
 
     content.innerHTML =
       renderWhiteNoteDegree("1er", "1er degré", records) +
@@ -4178,23 +4360,25 @@
 
   async function downloadSelectedWhiteNotePdf() {
 
-    const title = document.getElementById("white-note-title");
-    const period = document.getElementById("white-note-period");
-    const content = document.getElementById("white-note-content");
     const button = document.getElementById("white-note-download");
 
-    if (
-      !selectedWhiteNoteDepartment ||
-      !selectedWhiteNoteDate ||
-      !title ||
-      !period ||
-      !content
-    ) {
+    if (!selectedWhiteNoteDepartment || !selectedWhiteNoteDate) {
       return;
     }
 
-    if (typeof html2pdf === "undefined") {
-      alert("Le module de génération PDF n'a pas pu être chargé. Vérifiez votre connexion puis réessayez.");
+    /*
+      On génère désormais le PDF directement avec jsPDF au lieu de
+      transformer le HTML avec html2canvas/html2pdf. Dans un widget Grist
+      chargé dans une iframe, html2canvas peut capturer une surface vide,
+      ce qui expliquait les PDF blancs malgré un contenu visible à l'écran.
+    */
+    const JsPdfConstructor =
+      window.jspdf && window.jspdf.jsPDF
+        ? window.jspdf.jsPDF
+        : (window.jsPDF || null);
+
+    if (!JsPdfConstructor) {
+      alert("Le module PDF n'a pas pu être chargé. Vérifiez votre connexion puis réessayez.");
       return;
     }
 
@@ -4205,34 +4389,9 @@
 
     if (!noteNumber) return;
 
-    const exportRoot = document.createElement("div");
-    exportRoot.className = "white-note-pdf-export";
-
-    const exportTitle = title.cloneNode(true);
-    const exportPeriod = period.cloneNode(true);
-    const exportContent = content.cloneNode(true);
-
-    exportRoot.appendChild(exportTitle);
-    exportRoot.appendChild(exportPeriod);
-    exportRoot.appendChild(exportContent);
-
-    /*
-      Le conteneur est ajouté temporairement au DOM pour que html2canvas
-      récupère exactement les styles visibles du widget.
-    */
-    /*
-      html2canvas peut produire une page blanche si la source est placée
-      très loin hors écran. On rend donc temporairement la copie dans la
-      page, au-dessus du widget, puis on la retire dès que le PDF est créé.
-    */
-    exportRoot.style.position = "absolute";
-    exportRoot.style.left = "0";
-    exportRoot.style.top = window.scrollY + "px";
-    exportRoot.style.zIndex = "2147483647";
-    exportRoot.style.background = "#ffffff";
-    exportRoot.style.boxSizing = "border-box";
-    exportRoot.style.pointerEvents = "none";
-    document.body.appendChild(exportRoot);
+    const noteDate = parseGristDate(selectedWhiteNoteDate);
+    const sourceDateLabel = getWhiteNoteSourceDateLabel(noteDate);
+    const records = getWhiteNoteRecords();
 
     const filename =
       "EMAS " +
@@ -4247,38 +4406,244 @@
     }
 
     try {
-      await html2pdf()
-        .set({
-          margin: [8, 8, 8, 8],
-          filename: filename,
-          image: { type: "jpeg", quality: 0.98 },
-          html2canvas: {
-            scale: 2,
-            useCORS: true,
-            backgroundColor: "#ffffff",
-            logging: false,
-            scrollX: 0,
-            scrollY: -window.scrollY,
-            windowWidth: exportRoot.scrollWidth,
-            windowHeight: exportRoot.scrollHeight
-          },
-          jsPDF: {
-            unit: "mm",
-            format: "a4",
-            orientation: "landscape"
-          },
-          pagebreak: {
-            mode: ["css", "legacy"],
-            avoid: ["tr"]
+      const doc = new JsPdfConstructor({
+        orientation: "landscape",
+        unit: "mm",
+        format: "a4"
+      });
+
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const marginX = 10;
+      const marginTop = 10;
+      const marginBottom = 10;
+      const contentWidth = pageWidth - marginX * 2;
+      const orange = [181, 71, 8];
+      const orangeBg = [255, 244, 229];
+      const orangeBorder = [253, 176, 34];
+      const grayBorder = [208, 213, 221];
+      const grayBg = [242, 244, 247];
+      const textColor = [52, 64, 84];
+      let y = marginTop;
+
+      function setNormal(size) {
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(size || 9);
+        doc.setTextColor.apply(doc, textColor);
+      }
+
+      function setBold(size) {
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(size || 9);
+        doc.setTextColor.apply(doc, textColor);
+      }
+
+      function ensureSpace(requiredHeight) {
+        if (y + requiredHeight <= pageHeight - marginBottom) return;
+        doc.addPage("a4", "landscape");
+        y = marginTop;
+      }
+
+      function drawHeader() {
+        setBold(16);
+        doc.text(
+          "Note Blanche n°" + noteNumber + " - DSDEN." + selectedWhiteNoteDepartment,
+          marginX,
+          y + 5
+        );
+        y += 9;
+
+        setNormal(9.5);
+        const periodText =
+          formatLongDate(noteDate) +
+          " - " +
+          records.length +
+          " faits saisis " +
+          sourceDateLabel;
+        doc.text(periodText, marginX, y + 3);
+        y += 9;
+      }
+
+      function drawStats(label, degreeRecords) {
+        const counts = getWhiteNoteCounts(degreeRecords);
+        ensureSpace(20);
+
+        setBold(10.5);
+        doc.text(
+          "Récapitulatif des faits d'établissement du " +
+            label +
+            " du " +
+            selectedWhiteNoteDepartment,
+          marginX,
+          y + 4
+        );
+        y += 8;
+
+        setNormal(8.8);
+        doc.text(
+          "Faits du jour (N2) : " + counts.dayN2 +
+            " - Faits d'actualisation (N2) : " + counts.updateN2,
+          marginX,
+          y + 3
+        );
+
+        doc.setTextColor.apply(doc, orange);
+        doc.text(
+          "Faits du jour (N3) : " + counts.dayN3 +
+            " - Faits d'actualisation (N3) : " + counts.updateN3,
+          marginX + 92,
+          y + 3
+        );
+
+        setNormal(8.8);
+        doc.text(
+          "Total faits N2 : " + counts.totalN2 +
+            "   Total faits N3 : " + counts.totalN3,
+          marginX + 198,
+          y + 3
+        );
+        y += 8;
+      }
+
+      const colWidths = [24, 118, 62, contentWidth - 24 - 118 - 62];
+      const headers = ["Niveau", "Résumé", "Type de fait", "Etablissement"];
+
+      function drawTableHeader() {
+        const headerHeight = 8;
+        let x = marginX;
+        doc.setFillColor(247, 248, 250);
+        doc.setDrawColor.apply(doc, grayBorder);
+        doc.setLineWidth(0.2);
+        setBold(8.5);
+
+        headers.forEach(function(header, index) {
+          doc.rect(x, y, colWidths[index], headerHeight, "FD");
+          doc.text(header, x + 2, y + 5.2);
+          x += colWidths[index];
+        });
+        y += headerHeight;
+      }
+
+      function drawLevelBadge(level, x, rowY, rowHeight) {
+        const isN3 = String(level) === "3";
+        const badgeText = "Niveau " + (level || "-");
+        const badgeWidth = 17;
+        const badgeHeight = 6;
+        const bx = x + 2;
+        const by = rowY + Math.max(1.3, (rowHeight - badgeHeight) / 2);
+
+        if (isN3) {
+          doc.setFillColor.apply(doc, orangeBg);
+          doc.setDrawColor.apply(doc, orangeBorder);
+          doc.setTextColor.apply(doc, orange);
+        } else {
+          doc.setFillColor.apply(doc, grayBg);
+          doc.setDrawColor.apply(doc, grayBorder);
+          doc.setTextColor.apply(doc, textColor);
+        }
+
+        doc.roundedRect(bx, by, badgeWidth, badgeHeight, 1, 1, "FD");
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(7.2);
+        doc.text(badgeText, bx + badgeWidth / 2, by + 4.1, { align: "center" });
+      }
+
+      function drawDegreeTable(degree, label) {
+        const degreeRecords = records
+          .filter(function(record) {
+            return record._degre === degree;
+          })
+          .sort(function(a, b) {
+            const levelA = String(a._niveau || "");
+            const levelB = String(b._niveau || "");
+            if (levelA === "3" && levelB !== "3") return -1;
+            if (levelB === "3" && levelA !== "3") return 1;
+            return 0;
+          });
+
+        drawStats(label, degreeRecords);
+
+        if (degreeRecords.length === 0) {
+          ensureSpace(10);
+          setNormal(9);
+          doc.text("Aucun fait du " + label + " pour cette période.", marginX, y + 4);
+          y += 10;
+          return;
+        }
+
+        ensureSpace(18);
+        drawTableHeader();
+
+        degreeRecords.forEach(function(record) {
+          const resume = formatValue(record[FIELD.RESUME], FIELD.RESUME);
+          const timing = getFactTimingLabel(record);
+          const summaryText = resume + (timing ? " (" + timing + ")" : "");
+
+          const nom = formatValue(record[FIELD.ID_NOM], FIELD.ID_NOM);
+          const ville = formatValue(record[FIELD.VILLE], FIELD.VILLE);
+          const establishmentText = [nom, ville].filter(Boolean).join(" - ");
+          const typeText = Array.isArray(record._typeFait)
+            ? record._typeFait.join(" / ")
+            : "";
+
+          setNormal(7.8);
+          const summaryLines = doc.splitTextToSize(summaryText, colWidths[1] - 4);
+          const typeLines = doc.splitTextToSize(typeText || "-", colWidths[2] - 4);
+          const establishmentLines = doc.splitTextToSize(establishmentText || "-", colWidths[3] - 4);
+          const maxLines = Math.max(
+            1,
+            summaryLines.length,
+            typeLines.length,
+            establishmentLines.length
+          );
+          const rowHeight = Math.max(9, maxLines * 4.1 + 4);
+
+          if (y + rowHeight > pageHeight - marginBottom) {
+            doc.addPage("a4", "landscape");
+            y = marginTop;
+            drawTableHeader();
           }
-        })
-        .from(exportRoot)
-        .save();
+
+          const rowY = y;
+          let x = marginX;
+          doc.setDrawColor.apply(doc, grayBorder);
+          doc.setLineWidth(0.2);
+
+          colWidths.forEach(function(width) {
+            doc.rect(x, rowY, width, rowHeight);
+            x += width;
+          });
+
+          drawLevelBadge(record._niveau, marginX, rowY, rowHeight);
+
+          setNormal(7.8);
+          doc.text(summaryLines, marginX + colWidths[0] + 2, rowY + 5);
+          doc.text(
+            typeLines,
+            marginX + colWidths[0] + colWidths[1] + 2,
+            rowY + 5
+          );
+          doc.text(
+            establishmentLines,
+            marginX + colWidths[0] + colWidths[1] + colWidths[2] + 2,
+            rowY + 5
+          );
+
+          y += rowHeight;
+        });
+
+        y += 7;
+      }
+
+      drawHeader();
+      drawDegreeTable("1er", "1er degré");
+      drawDegreeTable("2nd", "2nd degré");
+
+      doc.save(filename);
     } catch (error) {
       console.error("Erreur lors de la génération de la Note Blanche en PDF :", error);
       alert("Impossible de générer le PDF pour le moment.");
     } finally {
-      exportRoot.remove();
       if (button) {
         button.disabled = false;
         button.textContent = "PDF";
