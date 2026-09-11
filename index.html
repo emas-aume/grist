@@ -4583,7 +4583,7 @@
       const pageHeight = doc.internal.pageSize.getHeight();
       const marginX = 10;
       const marginTop = 10;
-      const marginBottom = 10;
+      const marginBottom = 14;
       const contentWidth = pageWidth - marginX * 2;
       const orange = [181, 71, 8];
       const orangeBg = [255, 244, 229];
@@ -4774,7 +4774,19 @@
 
           const nom = formatValue(record[FIELD.ID_NOM], FIELD.ID_NOM);
           const ville = formatValue(record[FIELD.VILLE], FIELD.VILLE);
-          const establishmentText = [nom, ville].filter(Boolean).join(" - ");
+
+          /* PDF uniquement : retire l'identifiant établissement placé au début
+             de ID_et_Nom (ex. "0342066L - LYCEE ..."). L'identifiant peut
+             avoir une longueur variable ; on ne retire que le premier bloc
+             alphanumérique commençant par un chiffre et suivi d'un séparateur. */
+          const pdfEstablishmentName = String(nom || "").replace(
+            /^\s*[0-9][A-Z0-9]{2,20}\s*[-–—]\s*/i,
+            ""
+          ).trim();
+
+          const establishmentText = [pdfEstablishmentName, ville]
+            .filter(Boolean)
+            .join(" - ");
           /* Libellés spécifiques au PDF : pour AttPers, on affiche uniquement
              la nature des violences (sauf AttPers seul). */
           function getPdfFactLabel(type) {
@@ -4864,6 +4876,22 @@
       drawHeader();
       drawDegreeTable("1er", "1er degré");
       drawDegreeTable("2nd", "2nd degré");
+
+      /* Pied de page discret sur chaque page du PDF. */
+      const totalPdfPages = doc.getNumberOfPages();
+      for (let pageIndex = 1; pageIndex <= totalPdfPages; pageIndex += 1) {
+        doc.setPage(pageIndex);
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(6.8);
+        doc.setTextColor(128, 128, 128);
+
+        doc.text(
+          "Page " + pageIndex + " / " + totalPdfPages,
+          pageWidth / 2,
+          pageHeight - 5,
+          { align: "center" }
+        );
+      }
 
       doc.save(filename);
     } catch (error) {
