@@ -2382,15 +2382,81 @@
     return flags.ValRep || flags.Harcel || flags.VP || flags.VV || flags.VS;
   }
 
+  const BRQ_START_DATE = "2026-09-02";
+
+  /*
+    Pendant les vacances scolaires (zone C / académie de Montpellier),
+    les BRQ journaliers et les BRQ hebdomadaires de vacances sont remplacés
+    par un seul BRQ couvrant toute la période de vacances.
+  */
+  const BRQ_SCHOOL_BREAK_PERIODS = Object.freeze([
+    {
+      key: "VacOct",
+      label: "VacOct",
+      start: "2026-10-17",
+      end: "2026-11-01"
+    },
+    {
+      key: "VacNoel",
+      label: "VacDec",
+      start: "2026-12-19",
+      end: "2027-01-03"
+    },
+    {
+      key: "VacHiver",
+      label: "VacFev",
+      start: "2027-02-06",
+      end: "2027-02-21"
+    },
+    {
+      key: "VacPrintemps",
+      label: "VacAvr",
+      start: "2027-04-03",
+      end: "2027-04-18"
+    }
+  ]);
+
+  function getBrqSchoolBreakForDateKey(dateKey) {
+    if (!dateKey) return null;
+
+    return BRQ_SCHOOL_BREAK_PERIODS.find(function(period) {
+      return dateKey >= period.start && dateKey <= period.end;
+    }) || null;
+  }
+
+  function isBrqSchoolBreakDateKey(dateKey) {
+    return Boolean(getBrqSchoolBreakForDateKey(dateKey));
+  }
+
+  function getBrqVacationPeriods() {
+    return BRQ_SCHOOL_BREAK_PERIODS.filter(function(period) {
+      return allRecords.some(function(record) {
+        return record._dateKey &&
+          record._dateKey >= BRQ_START_DATE &&
+          record._dateKey >= period.start &&
+          record._dateKey <= period.end;
+      });
+    }).map(function(period) {
+      return {
+        key: period.key,
+        label: period.label,
+        start: period.start,
+        end: period.end,
+        startDate: parseGristDate(period.start),
+        endDate: parseGristDate(period.end)
+      };
+    });
+  }
+
   function getBrqDailyDates() {
     const dates = new Map();
-    const BRQ_START_DATE = "2026-09-02";
 
     allRecords.forEach(function(record) {
       if (
         record._date &&
         record._dateKey &&
-        record._dateKey >= BRQ_START_DATE
+        record._dateKey >= BRQ_START_DATE &&
+        !isBrqSchoolBreakDateKey(record._dateKey)
       ) {
         dates.set(record._dateKey, record._date);
       }
@@ -2403,7 +2469,6 @@
 
   function getBrqWeeks() {
     const weeks = new Map();
-    const BRQ_START_DATE = "2026-09-02";
 
     allRecords.forEach(function(record) {
       if (
@@ -2419,12 +2484,26 @@
 
       if (!weeks.has(record._weekKey)) {
         const monday = getMondayUTC(record._date);
+        const sunday = addDaysUTC(monday, 6);
+        const mondayKey = formatDateKey(monday);
+        const sundayKey = formatDateKey(sunday);
+
+        /*
+          Une semaine entièrement comprise dans une période de vacances
+          n'a pas de BRQ hebdomadaire propre : elle sera incluse dans le BRQ VacX.
+        */
+        const fullyInsideVacation = BRQ_SCHOOL_BREAK_PERIODS.some(function(period) {
+          return mondayKey >= period.start && sundayKey <= period.end;
+        });
+
+        if (fullyInsideVacation) return;
+
         weeks.set(record._weekKey, {
           key: record._weekKey,
           week: record._weekNumber,
           year: record._weekYear,
           monday: monday,
-          sunday: addDaysUTC(monday, 6)
+          sunday: sunday
         });
       }
     });
@@ -2440,10 +2519,43 @@
     return addDaysUTC(date, day === 0 ? -6 : 1 - day);
   }
 
-  function getBrqDailyNumber(dateKey) {
-    const datesAscending = getBrqDailyDates().map(function(item){ return item[0]; }).sort();
-    const index = datesAscending.indexOf(dateKey);
+  /*
+    Les BRQ numérotés sont constitués des BRQ journaliers hors vacances
+    + d'un seul BRQ par période de vacances contenant des données.
+  */
+  function getBrqNumberedPeriodsAscending() {
+    const periods = [];
+
+    getBrqDailyDates().forEach(function(item) {
+      periods.push({
+        value: "D:" + item[0],
+        sortKey: item[0]
+      });
+    });
+
+    getBrqVacationPeriods().forEach(function(period) {
+      periods.push({
+        value: "V:" + period.key,
+        sortKey: period.start
+      });
+    });
+
+    return periods.sort(function(a, b) {
+      if (a.sortKey !== b.sortKey) return a.sortKey.localeCompare(b.sortKey);
+      return a.value.localeCompare(b.value);
+    });
+  }
+
+  function getBrqPeriodNumber(value) {
+    const periods = getBrqNumberedPeriodsAscending();
+    const index = periods.findIndex(function(period) {
+      return period.value === value;
+    });
     return index === -1 ? "" : index + 1;
+  }
+
+  function getBrqDailyNumber(dateKey) {
+    return getBrqPeriodNumber("D:" + dateKey);
   }
 
   function renderBrqPeriodOptions() {
@@ -2451,23 +2563,45 @@
     if (!select) return;
 
     const dailyDates = getBrqDailyDates();
+    const vacationPeriods = getBrqVacationPeriods();
     const weeks = getBrqWeeks();
-    const validValues = [];
-    let html = "";
+    const options = [];
 
     dailyDates.forEach(function(item) {
       const dateKey = item[0];
       const date = item[1];
       const value = "D:" + dateKey;
-      validValues.push(value);
-      html += `<option value="${escapeHtml(value)}">BRQ n°${getBrqDailyNumber(dateKey)} - ${escapeHtml(formatLongDate(date))}</option>`;
+      options.push({
+        value: value,
+        sortKey: dateKey,
+        label: `BRQ n°${getBrqPeriodNumber(value)} - ${formatLongDate(date)}`
+      });
+    });
+
+    vacationPeriods.forEach(function(period) {
+      const value = "V:" + period.key;
+      options.push({
+        value: value,
+        sortKey: period.start,
+        label: `BRQ n°${getBrqPeriodNumber(value)} - ${period.label}`
+      });
     });
 
     weeks.forEach(function(info) {
       const value = "W:" + info.key;
-      validValues.push(value);
-      html += `<option value="${escapeHtml(value)}">BRQ S${info.week} - ${escapeHtml(formatDayMonth(info.monday))} au ${escapeHtml(formatDayMonth(info.sunday))}</option>`;
+      options.push({
+        value: value,
+        sortKey: formatDateKey(info.monday),
+        label: `BRQ S${info.week} - ${formatDayMonth(info.monday)} au ${formatDayMonth(info.sunday)}`
+      });
     });
+
+    options.sort(function(a, b) {
+      if (a.sortKey !== b.sortKey) return b.sortKey.localeCompare(a.sortKey);
+      return a.value.localeCompare(b.value);
+    });
+
+    const validValues = options.map(function(option) { return option.value; });
 
     if (!validValues.length) {
       selectedBrqPeriod = "";
@@ -2475,8 +2609,14 @@
       return;
     }
 
-    if (!selectedBrqPeriod || !validValues.includes(selectedBrqPeriod)) selectedBrqPeriod = validValues[0];
-    select.innerHTML = html;
+    if (!selectedBrqPeriod || !validValues.includes(selectedBrqPeriod)) {
+      selectedBrqPeriod = validValues[0];
+    }
+
+    select.innerHTML = options.map(function(option) {
+      return `<option value="${escapeHtml(option.value)}">${escapeHtml(option.label)}</option>`;
+    }).join("");
+
     select.value = selectedBrqPeriod;
   }
 
@@ -2487,14 +2627,32 @@
 
   function getSelectedBrqRecords() {
     if (!selectedBrqPeriod) return [];
+
     if (selectedBrqPeriod.startsWith("D:")) {
       const dateKey = selectedBrqPeriod.slice(2);
       return allRecords.filter(function(record){ return record._dateKey === dateKey; });
     }
+
     if (selectedBrqPeriod.startsWith("W:")) {
       const weekKey = selectedBrqPeriod.slice(2);
       return allRecords.filter(function(record){ return record._weekKey === weekKey; });
     }
+
+    if (selectedBrqPeriod.startsWith("V:")) {
+      const vacationKey = selectedBrqPeriod.slice(2);
+      const period = BRQ_SCHOOL_BREAK_PERIODS.find(function(item) {
+        return item.key === vacationKey;
+      });
+
+      if (!period) return [];
+
+      return allRecords.filter(function(record) {
+        return record._dateKey &&
+          record._dateKey >= period.start &&
+          record._dateKey <= period.end;
+      });
+    }
+
     return [];
   }
 
@@ -2594,12 +2752,22 @@
     }
 
     const weeklyMode = selectedBrqPeriod.startsWith("W:");
+    const vacationMode = selectedBrqPeriod.startsWith("V:");
     const records = getSelectedBrqRecords();
 
     if (weeklyMode) {
       const weekKey = selectedBrqPeriod.slice(2);
       const info = getBrqWeeks().find(function(item){ return item.key === weekKey; });
       title.textContent = info ? "BRQ S" + info.week + " - " + formatDayMonth(info.monday) + " au " + formatDayMonth(info.sunday) : "BRQ hebdomadaire";
+    } else if (vacationMode) {
+      const vacationKey = selectedBrqPeriod.slice(2);
+      const period = BRQ_SCHOOL_BREAK_PERIODS.find(function(item) {
+        return item.key === vacationKey;
+      });
+      const number = getBrqPeriodNumber(selectedBrqPeriod);
+      title.textContent = period
+        ? "BRQ n°" + number + " - " + period.label
+        : "BRQ vacances";
     } else {
       const dateKey = selectedBrqPeriod.slice(2);
       const date = parseGristDate(dateKey);
@@ -2622,7 +2790,7 @@
     }
 
     content.innerHTML = departments.map(function(department){
-      return renderBrqDepartment(department, records, weeklyMode);
+      return renderBrqDepartment(department, records, weeklyMode || vacationMode);
     }).join("");
   }
 
@@ -4517,6 +4685,20 @@
 
         headers.forEach(function(header, index) {
           doc.rect(x, y, colWidths[index], headerHeight, "FD");
+
+          /*
+            On conserve strictement le rendu existant de la cellule « Niveau ».
+            Pour les autres intitulés, on force explicitement le texte en blanc
+            et en gras afin qu'ils apparaissent bien dans le PDF.
+          */
+          if (index === 0) {
+            setBold(8.5);
+          } else {
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(8.5);
+            doc.setTextColor(255, 255, 255);
+          }
+
           doc.text(header, x + 2, y + 5.2);
           x += colWidths[index];
         });
@@ -4525,10 +4707,11 @@
 
       function drawLevelBadge(level, x, rowY, rowHeight) {
         const isN3 = String(level) === "3";
-        const badgeText = "Niveau " + (level || "-");
-        const badgeWidth = 17;
+        const badgeText = String(level || "-");
+        const badgeWidth = 10;
         const badgeHeight = 6;
-        const bx = x + 2;
+        /* Centre le badge dans la colonne Niveau, horizontalement et verticalement. */
+        const bx = x + (colWidths[0] - badgeWidth) / 2;
         const by = rowY + Math.max(1.3, (rowHeight - badgeHeight) / 2);
 
         if (isN3) {
@@ -4581,8 +4764,11 @@
           const nom = formatValue(record[FIELD.ID_NOM], FIELD.ID_NOM);
           const ville = formatValue(record[FIELD.VILLE], FIELD.VILLE);
           const establishmentText = [nom, ville].filter(Boolean).join(" - ");
+          /* Dans le PDF, toujours afficher le libellé complet du type de fait. */
           const typeText = Array.isArray(record._typeFait)
-            ? record._typeFait.join(" / ")
+            ? record._typeFait.map(function(type) {
+                return getFullFactLabel(type);
+              }).join(" & ")
             : "";
 
           setNormal(7.8);
@@ -4617,11 +4803,22 @@
 
           setNormal(7.8);
           doc.text(summaryLines, marginX + colWidths[0] + 2, rowY + 5);
+
+          /* Dans le PDF, les types de fait d'un FE de niveau 3
+             utilisent la même couleur orange que le niveau 3. */
+          if (String(record._niveau || "") === "3") {
+            doc.setTextColor.apply(doc, orange);
+          } else {
+            doc.setTextColor.apply(doc, textColor);
+          }
           doc.text(
             typeLines,
             marginX + colWidths[0] + colWidths[1] + 2,
             rowY + 5
           );
+
+          /* Revenir à la couleur normale pour la colonne établissement. */
+          doc.setTextColor.apply(doc, textColor);
           doc.text(
             establishmentLines,
             marginX + colWidths[0] + colWidths[1] + colWidths[2] + 2,
