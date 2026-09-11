@@ -346,6 +346,14 @@
       white-space: normal;
     }
 
+    /* Si le FE est de niveau 3, ses types reprennent exactement
+       le code couleur orange du badge Niveau 3. */
+    .fact-badge.level-3 {
+      background: #fff4e5;
+      border-color: #fdb022;
+      color: #b54708;
+    }
+
     td.type-cell {
       white-space: normal;
       min-width: 380px;
@@ -2122,7 +2130,7 @@
   }
 
 
-  function renderFactBadges(types) {
+  function renderFactBadges(types, level) {
 
     if (
       !Array.isArray(types) ||
@@ -2138,9 +2146,14 @@
           const fullLabel =
             getFullFactLabel(type);
 
+          const levelClass =
+            String(level) === "3"
+              ? "fact-badge level-3"
+              : "fact-badge";
+
           return `
             <span
-              class="fact-badge"
+              class="${levelClass}"
               title="${escapeHtml(fullLabel)}"
             >
               ${escapeHtml(type)}
@@ -3398,7 +3411,7 @@
 
           html +=
             '<td class="type-cell">' +
-            renderFactBadges(record._typeFait) +
+            renderFactBadges(record._typeFait, record._niveau) +
             "</td>";
 
           return;
@@ -3728,9 +3741,19 @@
 
   function renderWhiteNoteDegree(degree, label, records) {
 
-    const degreeRecords = records.filter(function(record) {
-      return record._degre === degree;
-    });
+    const degreeRecords = records
+      .filter(function(record) {
+        return record._degre === degree;
+      })
+      .sort(function(a, b) {
+        /* Dans les Notes Blanches, afficher les niveaux 3 en premier. */
+        const levelA = String(a._niveau || "");
+        const levelB = String(b._niveau || "");
+
+        if (levelA === "3" && levelB !== "3") return -1;
+        if (levelB === "3" && levelA !== "3") return 1;
+        return 0;
+      });
 
     const counts = getWhiteNoteCounts(degreeRecords);
 
@@ -3745,13 +3768,13 @@
             <p class="white-note-counts">
               Faits du jour (N2) : ${counts.dayN2}
               -
-              <span class="level-3-text">Faits du jour (N3) : ${counts.dayN3}</span>
+              <em>Faits d'actualisation (N2) : ${counts.updateN2}</em>
             </p>
 
-            <p class="white-note-counts actualisation">
-              Faits d'actualisation (N2) : ${counts.updateN2}
+            <p class="white-note-counts level-3-text">
+              Faits du jour (N3) : ${counts.dayN3}
               -
-              <span class="level-3-text">Faits d'actualisation (N3) : ${counts.updateN3}</span>
+              <em>Faits d'actualisation (N3) : ${counts.updateN3}</em>
             </p>
 
             <p class="white-note-total">
@@ -3820,7 +3843,7 @@
             ${escapeHtml(resume)}
           </td>
           <td class="type-cell">
-            ${renderFactBadges(record._typeFait)}
+            ${renderFactBadges(record._typeFait, record._niveau)}
           </td>
           <td>
             ${escapeHtml(nomVille)}
@@ -3977,11 +4000,11 @@
       selectedWhiteNoteDepartment;
 
     period.innerHTML =
-      escapeHtml(formatLongDate(factsDate)) +
+      escapeHtml(formatLongDate(noteDate)) +
       " — <strong>" +
       records.length +
       "</strong> faits saisis le " +
-      escapeHtml(formatLongDate(noteDate));
+      escapeHtml(formatLongDate(factsDate));
 
     content.innerHTML =
       renderWhiteNoteDegree("1er", "1er degré", records) +
