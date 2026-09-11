@@ -14,6 +14,7 @@
   <title>Portail Grist</title>
 
   <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
   <style>
 
@@ -481,6 +482,91 @@
       font-size: 14px;
     }
 
+    .white-note-download-btn {
+      margin-top: 2px;
+      padding: 9px 12px;
+      border: 1px solid var(--primary);
+      border-radius: 8px;
+      background: var(--primary);
+      color: #ffffff;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
+    }
+
+    .white-note-download-btn:hover:not(:disabled) {
+      background: var(--primary-hover);
+      border-color: var(--primary-hover);
+    }
+
+    .white-note-download-btn:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
+    .white-note-pdf-export {
+      width: 1040px;
+      padding: 28px 30px;
+      background: #ffffff;
+      color: var(--text);
+      font-family: Inter, Segoe UI, Arial, sans-serif;
+    }
+
+    .white-note-pdf-export .white-note-title {
+      margin: 0 0 4px;
+      font-size: 24px;
+    }
+
+    .white-note-pdf-export .white-note-period {
+      margin: 0 0 18px;
+    }
+
+    .white-note-pdf-export .white-note-table-wrap {
+      overflow: visible;
+    }
+
+    .white-note-pdf-export .white-note-table {
+      width: 100%;
+      min-width: 0;
+      table-layout: fixed;
+    }
+
+    .white-note-pdf-export .white-note-table th,
+    .white-note-pdf-export .white-note-table td {
+      font-size: 11px;
+      padding: 7px 8px;
+      overflow-wrap: anywhere;
+    }
+
+    .white-note-pdf-export .white-note-table th:nth-child(1),
+    .white-note-pdf-export .white-note-table td:nth-child(1) {
+      width: 9%;
+    }
+
+    .white-note-pdf-export .white-note-table th:nth-child(2),
+    .white-note-pdf-export .white-note-table td:nth-child(2) {
+      width: 41%;
+      min-width: 0;
+    }
+
+    .white-note-pdf-export .white-note-table th:nth-child(3),
+    .white-note-pdf-export .white-note-table td:nth-child(3) {
+      width: 25%;
+      min-width: 0;
+    }
+
+    .white-note-pdf-export .white-note-table th:nth-child(4),
+    .white-note-pdf-export .white-note-table td:nth-child(4) {
+      width: 25%;
+      min-width: 0;
+    }
+
+    .white-note-pdf-export tr {
+      break-inside: avoid;
+      page-break-inside: avoid;
+    }
+
     .white-note-period {
       margin: 0 0 18px;
       color: var(--muted);
@@ -928,6 +1014,14 @@
             class="white-note-select"
             onchange="setWhiteNoteDate(this.value)"
           ></select>
+          <button
+            id="white-note-download"
+            class="white-note-download-btn"
+            type="button"
+            onclick="downloadSelectedWhiteNotePdf()"
+          >
+            Télécharger la note en PDF
+          </button>
         </div>
       </div>
     </div>
@@ -3930,6 +4024,9 @@
     const content =
       document.getElementById("white-note-content");
 
+    const downloadButton =
+      document.getElementById("white-note-download");
+
     if (
       !departmentSelect ||
       !dateSelect ||
@@ -4015,6 +4112,7 @@
           Aucune Note Blanche disponible pour ce département.
         </div>
       `;
+      if (downloadButton) downloadButton.disabled = true;
       return;
     }
 
@@ -4038,6 +4136,7 @@
           Aucune Note Blanche disponible pour ce département.
         </div>
       `;
+      if (downloadButton) downloadButton.disabled = true;
       return;
     }
 
@@ -4059,6 +4158,110 @@
     content.innerHTML =
       renderWhiteNoteDegree("1er", "1er degré", records) +
       renderWhiteNoteDegree("2nd", "2nd degré", records);
+
+    if (downloadButton) downloadButton.disabled = false;
+  }
+
+
+  async function downloadSelectedWhiteNotePdf() {
+
+    const title = document.getElementById("white-note-title");
+    const period = document.getElementById("white-note-period");
+    const content = document.getElementById("white-note-content");
+    const button = document.getElementById("white-note-download");
+
+    if (
+      !selectedWhiteNoteDepartment ||
+      !selectedWhiteNoteDate ||
+      !title ||
+      !period ||
+      !content
+    ) {
+      return;
+    }
+
+    if (typeof html2pdf === "undefined") {
+      alert("Le module de génération PDF n'a pas pu être chargé. Vérifiez votre connexion puis réessayez.");
+      return;
+    }
+
+    const noteNumber = getWhiteNoteNumber(
+      selectedWhiteNoteDate,
+      selectedWhiteNoteDepartment
+    );
+
+    if (!noteNumber) return;
+
+    const exportRoot = document.createElement("div");
+    exportRoot.className = "white-note-pdf-export";
+
+    const exportTitle = title.cloneNode(true);
+    const exportPeriod = period.cloneNode(true);
+    const exportContent = content.cloneNode(true);
+
+    exportRoot.appendChild(exportTitle);
+    exportRoot.appendChild(exportPeriod);
+    exportRoot.appendChild(exportContent);
+
+    /*
+      Le conteneur est ajouté temporairement au DOM pour que html2canvas
+      récupère exactement les styles visibles du widget.
+    */
+    exportRoot.style.position = "fixed";
+    exportRoot.style.left = "-12000px";
+    exportRoot.style.top = "0";
+    exportRoot.style.zIndex = "-1";
+    document.body.appendChild(exportRoot);
+
+    const safeDate = String(selectedWhiteNoteDate).replaceAll("/", "-");
+    const filename =
+      "Note_Blanche_" +
+      noteNumber +
+      "_DSDEN_" +
+      selectedWhiteNoteDepartment +
+      "_" +
+      safeDate +
+      ".pdf";
+
+    if (button) {
+      button.disabled = true;
+      button.textContent = "Création du PDF...";
+    }
+
+    try {
+      await html2pdf()
+        .set({
+          margin: [8, 8, 8, 8],
+          filename: filename,
+          image: { type: "jpeg", quality: 0.98 },
+          html2canvas: {
+            scale: 2,
+            useCORS: true,
+            backgroundColor: "#ffffff",
+            logging: false
+          },
+          jsPDF: {
+            unit: "mm",
+            format: "a4",
+            orientation: "landscape"
+          },
+          pagebreak: {
+            mode: ["css", "legacy"],
+            avoid: ["tr"]
+          }
+        })
+        .from(exportRoot)
+        .save();
+    } catch (error) {
+      console.error("Erreur lors de la génération de la Note Blanche en PDF :", error);
+      alert("Impossible de générer le PDF pour le moment.");
+    } finally {
+      exportRoot.remove();
+      if (button) {
+        button.disabled = false;
+        button.textContent = "Télécharger la note en PDF";
+      }
+    }
   }
 
 
