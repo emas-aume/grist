@@ -4646,29 +4646,45 @@
         );
         y += 8;
 
-        setNormal(8.8);
-        doc.text(
-          "Faits du jour (N2) : " + counts.dayN2 +
-            " - Faits d'actualisation (N2) : " + counts.updateN2,
-          marginX,
-          y + 3
-        );
+        /* Dans les statistiques PDF, seul un nombre non nul est en gras. */
+        function drawPdfStatParts(parts, startX, baselineY, color) {
+          let x = startX;
+          const activeColor = color || textColor;
 
-        doc.setTextColor.apply(doc, orange);
-        doc.text(
-          "Faits du jour (N3) : " + counts.dayN3 +
-            " - Faits d'actualisation (N3) : " + counts.updateN3,
-          marginX + 92,
-          y + 3
-        );
+          parts.forEach(function(part) {
+            doc.setFont("helvetica", part.bold ? "bold" : "normal");
+            doc.setFontSize(8.8);
+            doc.setTextColor.apply(doc, activeColor);
+            doc.text(String(part.text), x, baselineY);
+            x += doc.getTextWidth(String(part.text));
+          });
+        }
 
-        setNormal(8.8);
-        doc.text(
-          "Total faits N2 : " + counts.totalN2 +
-            "   Total faits N3 : " + counts.totalN3,
-          marginX + 198,
-          y + 3
-        );
+        function statNumber(value) {
+          return { text: String(value), bold: Number(value) !== 0 };
+        }
+
+        drawPdfStatParts([
+          { text: "Faits du jour (N2) : ", bold: false },
+          statNumber(counts.dayN2),
+          { text: " - Faits d'actualisation (N2) : ", bold: false },
+          statNumber(counts.updateN2)
+        ], marginX, y + 3, textColor);
+
+        drawPdfStatParts([
+          { text: "Faits du jour (N3) : ", bold: false },
+          statNumber(counts.dayN3),
+          { text: " - Faits d'actualisation (N3) : ", bold: false },
+          statNumber(counts.updateN3)
+        ], marginX + 92, y + 3, orange);
+
+        drawPdfStatParts([
+          { text: "Total faits N2 : ", bold: false },
+          statNumber(counts.totalN2),
+          { text: "   Total faits N3 : ", bold: false },
+          statNumber(counts.totalN3)
+        ], marginX + 198, y + 3, textColor);
+
         y += 8;
       }
 
@@ -4815,9 +4831,8 @@
           setNormal(7.8);
           doc.text(summaryLines, marginX + colWidths[0] + 2, rowY + 5);
 
-          /* Les contenus de la colonne Type de fait sont en gras.
-             Pour un FE de niveau 3, ils conservent la couleur orange. */
-          doc.setFont("helvetica", "bold");
+          /* Type de fait : poids normal ; le niveau 3 conserve l'orange. */
+          doc.setFont("helvetica", "normal");
           doc.setFontSize(7.8);
           if (String(record._niveau || "") === "3") {
             doc.setTextColor.apply(doc, orange);
@@ -4830,7 +4845,9 @@
             rowY + 5
           );
 
-          /* Revenir à la couleur normale pour la colonne établissement. */
+          /* Etablissement : poids et couleur normaux. */
+          doc.setFont("helvetica", "normal");
+          doc.setFontSize(7.8);
           doc.setTextColor.apply(doc, textColor);
           doc.text(
             establishmentLines,
