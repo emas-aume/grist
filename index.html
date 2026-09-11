@@ -4681,25 +4681,20 @@
         doc.setFillColor(247, 248, 250);
         doc.setDrawColor.apply(doc, grayBorder);
         doc.setLineWidth(0.2);
-        setBold(8.5);
 
         headers.forEach(function(header, index) {
+          /* Tous les intitulés reprennent exactement le style de « Niveau ». */
+          doc.setFillColor(247, 248, 250);
+          doc.setDrawColor.apply(doc, grayBorder);
           doc.rect(x, y, colWidths[index], headerHeight, "FD");
 
-          /*
-            On conserve strictement le rendu existant de la cellule « Niveau ».
-            Pour les autres intitulés, on force explicitement le texte en blanc
-            et en gras afin qu'ils apparaissent bien dans le PDF.
-          */
-          if (index === 0) {
-            setBold(8.5);
-          } else {
-            doc.setFont("helvetica", "bold");
-            doc.setFontSize(8.5);
-            doc.setTextColor(255, 255, 255);
-          }
-
-          doc.text(header, x + 2, y + 5.2);
+          setBold(8.5);
+          doc.text(
+            header,
+            x + colWidths[index] / 2,
+            y + 5.2,
+            { align: "center" }
+          );
           x += colWidths[index];
         });
         y += headerHeight;
@@ -4764,10 +4759,26 @@
           const nom = formatValue(record[FIELD.ID_NOM], FIELD.ID_NOM);
           const ville = formatValue(record[FIELD.VILLE], FIELD.VILLE);
           const establishmentText = [nom, ville].filter(Boolean).join(" - ");
-          /* Dans le PDF, toujours afficher le libellé complet du type de fait. */
+          /* Libellés spécifiques au PDF : pour AttPers, on affiche uniquement
+             la nature des violences (sauf AttPers seul). */
+          function getPdfFactLabel(type) {
+            const labels = {
+              "AttPers": "Atteintes aux personnes",
+              "AttPers: VP": "Violences physiques",
+              "AttPers: VS": "Violences sexuelles",
+              "AttPers: VV": "Violences verbales",
+              "AttPers: VP + VS": "Violences physiques et sexuelles",
+              "AttPers: VP + VV": "Violences physiques et verbales",
+              "AttPers: VS + VV": "Violences sexuelles et verbales",
+              "AttPers: VP + VS + VV": "Violences physiques, sexuelles et verbales"
+            };
+
+            return labels[type] || getFullFactLabel(type);
+          }
+
           const typeText = Array.isArray(record._typeFait)
             ? record._typeFait.map(function(type) {
-                return getFullFactLabel(type);
+                return getPdfFactLabel(type);
               }).join(" & ")
             : "";
 
@@ -4804,8 +4815,10 @@
           setNormal(7.8);
           doc.text(summaryLines, marginX + colWidths[0] + 2, rowY + 5);
 
-          /* Dans le PDF, les types de fait d'un FE de niveau 3
-             utilisent la même couleur orange que le niveau 3. */
+          /* Les contenus de la colonne Type de fait sont en gras.
+             Pour un FE de niveau 3, ils conservent la couleur orange. */
+          doc.setFont("helvetica", "bold");
+          doc.setFontSize(7.8);
           if (String(record._niveau || "") === "3") {
             doc.setTextColor.apply(doc, orange);
           } else {
