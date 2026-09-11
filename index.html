@@ -482,6 +482,16 @@
       font-size: 14px;
     }
 
+    .white-note-date-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .white-note-date-row .white-note-select {
+      min-width: 190px;
+    }
+
     .white-note-download-btn {
       margin-top: 2px;
       padding: 9px 12px;
@@ -1009,19 +1019,22 @@
 
         <div class="white-note-control">
           <label for="white-note-date">Jour de la note</label>
-          <select
-            id="white-note-date"
-            class="white-note-select"
-            onchange="setWhiteNoteDate(this.value)"
-          ></select>
-          <button
-            id="white-note-download"
-            class="white-note-download-btn"
-            type="button"
-            onclick="downloadSelectedWhiteNotePdf()"
-          >
-            Télécharger la note en PDF
-          </button>
+          <div class="white-note-date-row">
+            <select
+              id="white-note-date"
+              class="white-note-select"
+              onchange="setWhiteNoteDate(this.value)"
+            ></select>
+            <button
+              id="white-note-download"
+              class="white-note-download-btn"
+              type="button"
+              onclick="downloadSelectedWhiteNotePdf()"
+              title="Télécharger la Note Blanche en PDF"
+            >
+              PDF
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -4207,25 +4220,30 @@
       Le conteneur est ajouté temporairement au DOM pour que html2canvas
       récupère exactement les styles visibles du widget.
     */
-    exportRoot.style.position = "fixed";
-    exportRoot.style.left = "-12000px";
-    exportRoot.style.top = "0";
-    exportRoot.style.zIndex = "-1";
+    /*
+      html2canvas peut produire une page blanche si la source est placée
+      très loin hors écran. On rend donc temporairement la copie dans la
+      page, au-dessus du widget, puis on la retire dès que le PDF est créé.
+    */
+    exportRoot.style.position = "absolute";
+    exportRoot.style.left = "0";
+    exportRoot.style.top = window.scrollY + "px";
+    exportRoot.style.zIndex = "2147483647";
+    exportRoot.style.background = "#ffffff";
+    exportRoot.style.boxSizing = "border-box";
+    exportRoot.style.pointerEvents = "none";
     document.body.appendChild(exportRoot);
 
-    const safeDate = String(selectedWhiteNoteDate).replaceAll("/", "-");
     const filename =
-      "Note_Blanche_" +
-      noteNumber +
-      "_DSDEN_" +
+      "EMAS " +
       selectedWhiteNoteDepartment +
-      "_" +
-      safeDate +
-      ".pdf";
+      "." +
+      noteNumber +
+      " année 2026-2027.pdf";
 
     if (button) {
       button.disabled = true;
-      button.textContent = "Création du PDF...";
+      button.textContent = "...";
     }
 
     try {
@@ -4238,7 +4256,11 @@
             scale: 2,
             useCORS: true,
             backgroundColor: "#ffffff",
-            logging: false
+            logging: false,
+            scrollX: 0,
+            scrollY: -window.scrollY,
+            windowWidth: exportRoot.scrollWidth,
+            windowHeight: exportRoot.scrollHeight
           },
           jsPDF: {
             unit: "mm",
@@ -4259,7 +4281,7 @@
       exportRoot.remove();
       if (button) {
         button.disabled = false;
-        button.textContent = "Télécharger la note en PDF";
+        button.textContent = "PDF";
       }
     }
   }
