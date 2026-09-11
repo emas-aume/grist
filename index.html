@@ -1523,6 +1523,192 @@
   }
 
 
+
+
+  /*
+    Détection robuste des types de faits.
+
+    Objectifs :
+    - ignorer accents, ponctuation, retours à la ligne et espaces multiples ;
+    - tolérer de petites fautes d'orthographe ;
+    - reconnaître plusieurs types sur un même fait ;
+    - éviter de dépendre d'une citation exacte.
+  */
+  function levenshteinDistance(a, b) {
+    a = String(a || "");
+    b = String(b || "");
+
+    if (a === b) return 0;
+    if (!a.length) return b.length;
+    if (!b.length) return a.length;
+
+    const previous = new Array(b.length + 1);
+    const current = new Array(b.length + 1);
+
+    for (let j = 0; j <= b.length; j++) previous[j] = j;
+
+    for (let i = 1; i <= a.length; i++) {
+      current[0] = i;
+
+      for (let j = 1; j <= b.length; j++) {
+        const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+        current[j] = Math.min(
+          current[j - 1] + 1,
+          previous[j] + 1,
+          previous[j - 1] + cost
+        );
+      }
+
+      for (let j = 0; j <= b.length; j++) previous[j] = current[j];
+    }
+
+    return previous[b.length];
+  }
+
+
+  function normalizeFactDetectionText(value) {
+    return String(value || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[’‘`´]/g, "'")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+
+  function factDetectionTokens(value) {
+    const normalized = normalizeFactDetectionText(value);
+    return normalized ? normalized.split(" " ).filter(Boolean) : [];
+  }
+
+
+  function tokenApproximatelyMatches(token, target) {
+    token = String(token || "");
+    target = String(target || "");
+
+    if (!token || !target) return false;
+    if (token === target) return true;
+
+    /* Tolérance prudente : 1 faute sur les mots courts, 2 sur les mots longs. */
+    const maxDistance = target.length >= 9 ? 2 : 1;
+
+    /* Empêche les mots très courts de produire des faux positifs. */
+    if (Math.min(token.length, target.length) < 4) {
+      return false;
+    }
+
+    return levenshteinDistance(token, target) <= maxDistance;
+  }
+
+
+  function hasApproxToken(tokens, targets) {
+    const targetList = Array.isArray(targets) ? targets : [targets];
+
+    return targetList.some(function(target) {
+      return tokens.some(function(token) {
+        return tokenApproximatelyMatches(token, target);
+      });
+    });
+  }
+
+
+  function hasAllApproxTokens(tokens, groups) {
+    return groups.every(function(group) {
+      return hasApproxToken(tokens, group);
+    });
+  }
+
+
+  function detectFactTypeFlags(value) {
+    const normalized = normalizeFactDetectionText(value);
+    const tokens = factDetectionTokens(value);
+
+    /*
+      Version compacte : gère aussi les libellés coupés avec des espaces
+      entre les lettres ou des retours à la ligne très inhabituels.
+    */
+    const compact = normalized.replace(/[^a-z0-9]/g, "");
+
+    const hasValRep =
+      compact.includes("valeursdelarepublique") ||
+      compact.includes("valeurdelarepublique") ||
+      compact.includes("valrep") ||
+      hasAllApproxTokens(tokens, [
+        ["valeur", "valeurs"],
+        ["republique"]
+      ]);
+
+    const hasHarassment =
+      compact.includes("harcelement") ||
+      compact.includes("cyberharcelement") ||
+      hasApproxToken(tokens, ["harcelement", "harcelements"]);
+
+    const hasGoods =
+      compact.includes("atteintesauxbiens") ||
+      compact.includes("atteinteauxbiens") ||
+      hasAllApproxTokens(tokens, [
+        ["atteinte", "atteintes"],
+        ["bien", "biens"]
+      ]);
+
+    const hasSecurityClimate =
+      compact.includes("atteintealasecurite") ||
+      compact.includes("atteintesalasecurite") ||
+      compact.includes("climatscolaire") ||
+      compact.includes("climatdeletablissement") ||
+      hasApproxToken(tokens, ["securite"]) ||
+      (
+        hasApproxToken(tokens, ["climat"]) &&
+        hasApproxToken(tokens, ["scolaire", "etablissement"])
+      );
+
+    const hasPersonsGeneric =
+      compact.includes("atteintesauxpersonnes") ||
+      compact.includes("atteinteauxpersonnes") ||
+      hasAllApproxTokens(tokens, [
+        ["atteinte", "atteintes"],
+        ["personne", "personnes"]
+      ]);
+
+    const hasPhysical =
+      compact.includes("violencesphysiques") ||
+      compact.includes("violencephysique") ||
+      hasAllApproxTokens(tokens, [
+        ["violence", "violences"],
+        ["physique", "physiques"]
+      ]);
+
+    const hasSexual =
+      compact.includes("violencessexuelles") ||
+      compact.includes("violencesexuelle") ||
+      hasAllApproxTokens(tokens, [
+        ["violence", "violences"],
+        ["sexuelle", "sexuelles", "sexuel", "sexuels"]
+      ]);
+
+    const hasVerbal =
+      compact.includes("violencesverbales") ||
+      compact.includes("violenceverbale") ||
+      hasAllApproxTokens(tokens, [
+        ["violence", "violences"],
+        ["verbale", "verbales", "verbal", "verbaux"]
+      ]);
+
+    return {
+      hasValRep,
+      hasHarassment,
+      hasGoods,
+      hasSecurityClimate,
+      hasPersonsGeneric,
+      hasPhysical,
+      hasSexual,
+      hasVerbal
+    };
+  }
+
+
   function extractFactDate(value) {
 
     const text =
@@ -1757,57 +1943,20 @@
     });
 
     /*
-      Une seule normalisation globale pour les catégories.
+      Détection tolérante des catégories :
+      aucune citation exacte n'est exigée et les catégories sont indépendantes.
     */
-    const text =
-      normalizeText(values.join(" "));
+    const detectedFactTypes =
+      detectFactTypeFlags(values.join(" "));
 
-    hasValRep =
-      text.includes(
-        "atteintes aux valeurs de la republique"
-      );
-
-    hasHarassment =
-      text.includes(
-        "harcelement ou suspicion de harcelement"
-      ) ||
-      text.includes(
-        "cyber-harcelement"
-      ) ||
-      text.includes(
-        "cyber harcelement"
-      );
-
-    hasGoods =
-      text.includes(
-        "atteintes aux biens"
-      );
-
-    hasSecurityClimate =
-      text.includes("atteintes a la securite") ||
-      text.includes("atteinte a la securite") ||
-      text.includes("climat de l'etablissement") ||
-      text.includes("climat scolaire");
-
-    hasPersonsGeneric =
-      text.includes(
-        "atteintes aux personnes"
-      );
-
-    hasPhysical =
-      text.includes(
-        "violences physiques"
-      );
-
-    hasSexual =
-      text.includes(
-        "violences sexuelles"
-      );
-
-    hasVerbal =
-      text.includes(
-        "violences verbales"
-      );
+    hasValRep = detectedFactTypes.hasValRep;
+    hasHarassment = detectedFactTypes.hasHarassment;
+    hasGoods = detectedFactTypes.hasGoods;
+    hasSecurityClimate = detectedFactTypes.hasSecurityClimate;
+    hasPersonsGeneric = detectedFactTypes.hasPersonsGeneric;
+    hasPhysical = detectedFactTypes.hasPhysical;
+    hasSexual = detectedFactTypes.hasSexual;
+    hasVerbal = detectedFactTypes.hasVerbal;
 
     const types = [];
 
@@ -2060,12 +2209,6 @@
   function getBrqTypeFlags(record) {
     const types = Array.isArray(record._typeFait) ? record._typeFait : [];
     const joinedTypes = types.join(" | ");
-
-    /*
-      Détection spécifique au BRQ uniquement.
-      On relit aussi le contenu brut de la ligne pour reconnaître les libellés
-      malgré les retours à la ligne ou espaces inhabituels.
-    */
     const rawParts = [];
 
     Object.keys(record || {}).forEach(function(key) {
@@ -2088,45 +2231,14 @@
       }
     });
 
-    const rawText = normalizeText(rawParts.join(" "))
-      .replace(/\s+/g, " ")
-      .trim();
-
-    const compactText = rawText.replace(/[^a-z0-9]/g, "");
-
-    const hasValRep =
-      types.includes("AttValRep") ||
-      compactText.includes("atteintesauxvaleursdelarepublique") ||
-      compactText.includes("atteinteauxvaleursdelarepublique") ||
-      compactText.includes("valeursdelarepublique") ||
-      compactText.includes("valrep");
-
-    const hasHarcel =
-      types.includes("Harcel") ||
-      compactText.includes("harcelement") ||
-      compactText.includes("cyberharcelement");
-
-    const hasVP =
-      joinedTypes.includes("VP") ||
-      compactText.includes("violencesphysiques") ||
-      compactText.includes("violencephysique");
-
-    const hasVV =
-      joinedTypes.includes("VV") ||
-      compactText.includes("violencesverbales") ||
-      compactText.includes("violenceverbale");
-
-    const hasVS =
-      joinedTypes.includes("VS") ||
-      compactText.includes("violencessexuelles") ||
-      compactText.includes("violencesexuelle");
+    const detected = detectFactTypeFlags(rawParts.join(" "));
 
     return {
-      ValRep: hasValRep,
-      Harcel: hasHarcel,
-      VP: hasVP,
-      VV: hasVV,
-      VS: hasVS
+      ValRep: types.includes("AttValRep") || detected.hasValRep,
+      Harcel: types.includes("Harcel") || detected.hasHarassment,
+      VP: joinedTypes.includes("VP") || detected.hasPhysical,
+      VV: joinedTypes.includes("VV") || detected.hasVerbal,
+      VS: joinedTypes.includes("VS") || detected.hasSexual
     };
   }
 
