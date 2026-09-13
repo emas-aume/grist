@@ -4645,25 +4645,25 @@
       <div class="white-note-degree">
         <div class="white-note-recap">
           <p class="white-note-recap-title">
-            Récapitulatif des faits d'établissement du ${escapeHtml(label)} du ${escapeHtml(selectedWhiteNoteDepartment)}
+            Récapitulatif des faits d'établissement du ${degree === "1" ? "premier degré" : "second degré"}
           </p>
 
           <div class="white-note-stats-line">
             <p class="white-note-counts">
-              Faits du jour (N2) : ${formatNonZeroCount(counts.dayN2)}
+              ${counts.dayN2 === 0 ? "Fait du jour" : "Faits du jour"} (N2) : ${formatNonZeroCount(counts.dayN2)}
               -
-              <em>Faits d'actualisation (N2) : ${formatNonZeroCount(counts.updateN2)}</em>
+              <em>${counts.updateN2 === 0 ? "Fait d'actualisation" : "Faits d'actualisation"} (N2) : ${formatNonZeroCount(counts.updateN2)}</em>
             </p>
 
             <p class="white-note-counts level-3-text">
-              Faits du jour (N3) : ${formatNonZeroCount(counts.dayN3)}
+              ${counts.dayN3 === 0 ? "Fait du jour" : "Faits du jour"} (N3) : ${formatNonZeroCount(counts.dayN3)}
               -
-              <em>Faits d'actualisation (N3) : ${formatNonZeroCount(counts.updateN3)}</em>
+              <em>${counts.updateN3 === 0 ? "Fait d'actualisation" : "Faits d'actualisation"} (N3) : ${formatNonZeroCount(counts.updateN3)}</em>
             </p>
 
             <p class="white-note-total">
-              Total faits N2 : ${formatNonZeroCount(counts.totalN2)}
-              &nbsp;&nbsp; Total faits N3 : ${formatNonZeroCount(counts.totalN3)}
+              Total ${counts.totalN2 === 0 ? "fait" : "faits"} N2 : ${formatNonZeroCount(counts.totalN2)}
+              &nbsp;&nbsp; Total ${counts.totalN3 === 0 ? "fait" : "faits"} N3 : ${formatNonZeroCount(counts.totalN3)}
             </p>
           </div>
         </div>
