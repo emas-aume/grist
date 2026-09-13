@@ -2494,6 +2494,24 @@
     });
   }
 
+  function getBrqEffectiveDailyDate(recordDate) {
+    if (!recordDate) return null;
+
+    /*
+      BRQ : les faits du vendredi, samedi et dimanche sont regroupés
+      dans le BRQ du lundi. Les autres jours conservent leur date.
+      Cela permet notamment aux faits du vendredi 11/09/2026
+      d'apparaître dans le BRQ daté du lundi 14/09/2026.
+    */
+    const day = recordDate.getUTCDay();
+
+    if (day === 5) return addDaysUTC(recordDate, 3); // vendredi -> lundi
+    if (day === 6) return addDaysUTC(recordDate, 2); // samedi -> lundi
+    if (day === 0) return addDaysUTC(recordDate, 1); // dimanche -> lundi
+
+    return new Date(recordDate.getTime());
+  }
+
   function getBrqDailyDates() {
     const dates = new Map();
 
@@ -2504,7 +2522,11 @@
         record._dateKey >= BRQ_START_DATE &&
         !isBrqSchoolBreakDateKey(record._dateKey)
       ) {
-        dates.set(record._dateKey, record._date);
+        const brqDate = getBrqEffectiveDailyDate(record._date);
+        if (!brqDate) return;
+
+        const brqDateKey = formatDateKey(brqDate);
+        dates.set(brqDateKey, brqDate);
       }
     });
 
@@ -2676,7 +2698,19 @@
 
     if (selectedBrqPeriod.startsWith("D:")) {
       const dateKey = selectedBrqPeriod.slice(2);
-      return allRecords.filter(function(record){ return record._dateKey === dateKey; });
+      return allRecords.filter(function(record) {
+        if (
+          !record._date ||
+          !record._dateKey ||
+          record._dateKey < BRQ_START_DATE ||
+          isBrqSchoolBreakDateKey(record._dateKey)
+        ) {
+          return false;
+        }
+
+        const brqDate = getBrqEffectiveDailyDate(record._date);
+        return Boolean(brqDate && formatDateKey(brqDate) === dateKey);
+      });
     }
 
     if (selectedBrqPeriod.startsWith("W:")) {
