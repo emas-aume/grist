@@ -2748,7 +2748,7 @@
 
     html += `
       <div class="brq-department-stats">
-        <span>Total FE : <strong>${totalFE}</strong> dont <strong>${totalDayFacts}</strong> ${totalDayFacts === 0 ? "Fait du jour" : "Faits du jour"} et <strong>${totalUpdates}</strong> ${totalUpdates === 0 ? "Fait d'actualisation" : "Faits d'actualisation"}</span>
+        <span>Total FE : <strong>${totalFE}</strong> dont <strong>${totalDayFacts}</strong> ${totalDayFacts <= 1 ? "Fait du jour" : "Faits du jour"} et <strong>${totalUpdates}</strong> ${totalUpdates <= 1 ? "Fait d'actualisation" : "Faits d'actualisation"}</span>
         <span>Total FE N2 : <strong>${totalN2}</strong> - Total FE N3 : <strong>${totalN3}</strong></span>
       </div>
     `;
@@ -2981,8 +2981,8 @@
         drawParts([
           { text: "Total FE : ", bold: false }, n(totalFE),
           { text: " dont ", bold: false }, n(totalDayFacts),
-          { text: " Faits du jour et ", bold: false }, n(totalUpdates),
-          { text: " Faits d'actualisation", bold: false }
+          { text: " " + (totalDayFacts <= 1 ? "Fait du jour" : "Faits du jour") + " et ", bold: false }, n(totalUpdates),
+          { text: " " + (totalUpdates <= 1 ? "Fait d'actualisation" : "Faits d'actualisation"), bold: false }
         ], marginX, y + 3, textColor, 8.8);
 
         drawParts([
@@ -4650,20 +4650,20 @@
 
           <div class="white-note-stats-line">
             <p class="white-note-counts">
-              ${counts.dayN2 === 0 ? "Fait du jour" : "Faits du jour"} (N2) : ${formatNonZeroCount(counts.dayN2)}
+              ${counts.dayN2 <= 1 ? "Fait du jour" : "Faits du jour"} (N2) : ${formatNonZeroCount(counts.dayN2)}
               -
-              <em>${counts.updateN2 === 0 ? "Fait d'actualisation" : "Faits d'actualisation"} (N2) : ${formatNonZeroCount(counts.updateN2)}</em>
+              <em>${counts.updateN2 <= 1 ? "Fait d'actualisation" : "Faits d'actualisation"} (N2) : ${formatNonZeroCount(counts.updateN2)}</em>
             </p>
 
             <p class="white-note-counts level-3-text">
-              ${counts.dayN3 === 0 ? "Fait du jour" : "Faits du jour"} (N3) : ${formatNonZeroCount(counts.dayN3)}
+              ${counts.dayN3 <= 1 ? "Fait du jour" : "Faits du jour"} (N3) : ${formatNonZeroCount(counts.dayN3)}
               -
-              <em>${counts.updateN3 === 0 ? "Fait d'actualisation" : "Faits d'actualisation"} (N3) : ${formatNonZeroCount(counts.updateN3)}</em>
+              <em>${counts.updateN3 <= 1 ? "Fait d'actualisation" : "Faits d'actualisation"} (N3) : ${formatNonZeroCount(counts.updateN3)}</em>
             </p>
 
             <p class="white-note-total">
-              Total ${counts.totalN2 === 0 ? "fait" : "faits"} N2 : ${formatNonZeroCount(counts.totalN2)}
-              &nbsp;&nbsp; Total ${counts.totalN3 === 0 ? "fait" : "faits"} N3 : ${formatNonZeroCount(counts.totalN3)}
+              Total ${counts.totalN2 <= 1 ? "fait" : "faits"} N2 : ${formatNonZeroCount(counts.totalN2)}
+              &nbsp;&nbsp; Total ${counts.totalN3 <= 1 ? "fait" : "faits"} N3 : ${formatNonZeroCount(counts.totalN3)}
             </p>
           </div>
         </div>
@@ -5039,23 +5039,23 @@
         }
 
         drawPdfStatParts([
-          { text: (counts.dayN2 === 0 ? "Fait du jour" : "Faits du jour") + " (N2) : ", bold: false },
+          { text: (counts.dayN2 <= 1 ? "Fait du jour" : "Faits du jour") + " (N2) : ", bold: false },
           statNumber(counts.dayN2),
-          { text: " - " + (counts.updateN2 === 0 ? "Fait d'actualisation" : "Faits d'actualisation") + " (N2) : ", bold: false },
+          { text: " - " + (counts.updateN2 <= 1 ? "Fait d'actualisation" : "Faits d'actualisation") + " (N2) : ", bold: false },
           statNumber(counts.updateN2)
         ], marginX, y + 3, textColor);
 
         drawPdfStatParts([
-          { text: (counts.dayN3 === 0 ? "Fait du jour" : "Faits du jour") + " (N3) : ", bold: false },
+          { text: (counts.dayN3 <= 1 ? "Fait du jour" : "Faits du jour") + " (N3) : ", bold: false },
           statNumber(counts.dayN3),
-          { text: " - " + (counts.updateN3 === 0 ? "Fait d'actualisation" : "Faits d'actualisation") + " (N3) : ", bold: false },
+          { text: " - " + (counts.updateN3 <= 1 ? "Fait d'actualisation" : "Faits d'actualisation") + " (N3) : ", bold: false },
           statNumber(counts.updateN3)
         ], marginX + 92, y + 3, orange);
 
         drawPdfStatParts([
-          { text: "Total " + (counts.totalN2 === 0 ? "fait" : "faits") + " N2 : ", bold: false },
+          { text: "Total " + (counts.totalN2 <= 1 ? "fait" : "faits") + " N2 : ", bold: false },
           statNumber(counts.totalN2),
-          { text: "   Total " + (counts.totalN3 === 0 ? "fait" : "faits") + " N3 : ", bold: false },
+          { text: "   Total " + (counts.totalN3 <= 1 ? "fait" : "faits") + " N3 : ", bold: false },
           statNumber(counts.totalN3)
         ], marginX + 198, y + 3, textColor);
 
