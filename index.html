@@ -4645,7 +4645,7 @@
       <div class="white-note-degree">
         <div class="white-note-recap">
           <p class="white-note-recap-title">
-            Récapitulatif des faits d'établissement du ${degree === "1" ? "premier degré" : "second degré"}
+            Récapitulatif des faits d'établissement du ${degree === "1er" ? "premier degré" : "second degré"}
           </p>
 
           <div class="white-note-stats-line">
@@ -5014,9 +5014,7 @@
         setBold(10.5);
         doc.text(
           "Récapitulatif des faits d'établissement du " +
-            label +
-            " du " +
-            selectedWhiteNoteDepartment,
+            (label === "1er degré" ? "premier degré" : "second degré"),
           marginX,
           y + 4
         );
@@ -5041,23 +5039,23 @@
         }
 
         drawPdfStatParts([
-          { text: "Faits du jour (N2) : ", bold: false },
+          { text: (counts.dayN2 === 0 ? "Fait du jour" : "Faits du jour") + " (N2) : ", bold: false },
           statNumber(counts.dayN2),
-          { text: " - Faits d'actualisation (N2) : ", bold: false },
+          { text: " - " + (counts.updateN2 === 0 ? "Fait d'actualisation" : "Faits d'actualisation") + " (N2) : ", bold: false },
           statNumber(counts.updateN2)
         ], marginX, y + 3, textColor);
 
         drawPdfStatParts([
-          { text: "Faits du jour (N3) : ", bold: false },
+          { text: (counts.dayN3 === 0 ? "Fait du jour" : "Faits du jour") + " (N3) : ", bold: false },
           statNumber(counts.dayN3),
-          { text: " - Faits d'actualisation (N3) : ", bold: false },
+          { text: " - " + (counts.updateN3 === 0 ? "Fait d'actualisation" : "Faits d'actualisation") + " (N3) : ", bold: false },
           statNumber(counts.updateN3)
         ], marginX + 92, y + 3, orange);
 
         drawPdfStatParts([
-          { text: "Total faits N2 : ", bold: false },
+          { text: "Total " + (counts.totalN2 === 0 ? "fait" : "faits") + " N2 : ", bold: false },
           statNumber(counts.totalN2),
-          { text: "   Total faits N3 : ", bold: false },
+          { text: "   Total " + (counts.totalN3 === 0 ? "fait" : "faits") + " N3 : ", bold: false },
           statNumber(counts.totalN3)
         ], marginX + 198, y + 3, textColor);
 
