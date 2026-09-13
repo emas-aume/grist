@@ -1,5 +1,6 @@
 
 
+
 <!DOCTYPE html>
 <html lang="fr">
 
@@ -738,6 +739,42 @@
       font-size: 14px;
     }
 
+    .brq-period-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .brq-period-row .brq-select {
+      flex: 1 1 auto;
+      min-width: 0;
+    }
+
+    .brq-download-btn {
+      flex: 0 0 auto;
+      min-width: 54px;
+      height: 38px;
+      padding: 0 14px;
+      border: 1px solid #175cd3;
+      border-radius: 8px;
+      background: #175cd3;
+      color: #ffffff;
+      font: inherit;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .brq-download-btn:hover:not(:disabled) {
+      background: #1849a9;
+      border-color: #1849a9;
+    }
+
+    .brq-download-btn:disabled {
+      opacity: 0.55;
+      cursor: default;
+    }
+
+
     .brq-department {
       margin-top: 24px;
       padding-top: 22px;
@@ -1061,7 +1098,16 @@
       <div class="brq-controls">
         <div class="brq-control">
           <label for="brq-period">Période</label>
-          <select id="brq-period" class="brq-select" onchange="setBrqPeriod(this.value)"></select>
+          <div class="brq-period-row">
+            <select id="brq-period" class="brq-select" onchange="setBrqPeriod(this.value)"></select>
+            <button
+              id="brq-download"
+              class="brq-download-btn"
+              type="button"
+              onclick="downloadSelectedBrqPdf()"
+              title="Télécharger le BRQ en PDF"
+            >PDF</button>
+          </div>
         </div>
       </div>
     </div>
@@ -2739,17 +2785,326 @@
     return html;
   }
 
+
+  function getSelectedBrqPdfMeta() {
+    if (!selectedBrqPeriod) return null;
+
+    if (selectedBrqPeriod.startsWith("W:")) {
+      const weekKey = selectedBrqPeriod.slice(2);
+      const info = getBrqWeeks().find(function(item) { return item.key === weekKey; });
+      if (!info) return null;
+      return {
+        title: "BRQ S" + info.week,
+        subtitle: formatDayMonth(info.monday) + " au " + formatDayMonth(info.sunday),
+        filenameBase: "BRQ S" + info.week + " année 2026-2027",
+        weeklyMode: true,
+        vacationMode: false
+      };
+    }
+
+    if (selectedBrqPeriod.startsWith("V:")) {
+      const vacationKey = selectedBrqPeriod.slice(2);
+      const period = BRQ_SCHOOL_BREAK_PERIODS.find(function(item) {
+        return item.key === vacationKey;
+      });
+      if (!period) return null;
+      const number = getBrqPeriodNumber(selectedBrqPeriod);
+      return {
+        title: "BRQ n°" + number + " - " + period.label,
+        subtitle: formatLongDate(parseGristDate(period.start)) + " au " + formatLongDate(parseGristDate(period.end)),
+        filenameBase: "BRQ n°" + number + " année 2026-2027",
+        weeklyMode: false,
+        vacationMode: true
+      };
+    }
+
+    const dateKey = selectedBrqPeriod.slice(2);
+    const date = parseGristDate(dateKey);
+    const number = getBrqDailyNumber(dateKey);
+    return {
+      title: "BRQ n°" + number,
+      subtitle: date ? formatLongDate(date) : dateKey,
+      filenameBase: "BRQ n°" + number + " année 2026-2027",
+      weeklyMode: false,
+      vacationMode: false
+    };
+  }
+
+  async function downloadSelectedBrqPdf() {
+    const button = document.getElementById("brq-download");
+    const meta = getSelectedBrqPdfMeta();
+    if (!meta) return;
+
+    const JsPdfConstructor =
+      window.jspdf && window.jspdf.jsPDF
+        ? window.jspdf.jsPDF
+        : (window.jsPDF || null);
+
+    if (!JsPdfConstructor) {
+      alert("Le module PDF n'a pas pu être chargé. Vérifiez votre connexion puis réessayez.");
+      return;
+    }
+
+    const records = getSelectedBrqRecords();
+    const brqDepartmentOrder = ["34", "30", "66", "11", "48"];
+    const availableDepartments = new Set(getDepartments());
+    const departments = brqDepartmentOrder.filter(function(department) {
+      return availableDepartments.has(department);
+    });
+
+    if (button) {
+      button.disabled = true;
+      button.textContent = "...";
+    }
+
+    try {
+      const doc = new JsPdfConstructor({
+        orientation: "landscape",
+        unit: "mm",
+        format: "a4"
+      });
+
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const marginX = 10;
+      const marginTop = 10;
+      const marginBottom = 14;
+      const contentWidth = pageWidth - marginX * 2;
+      const orange = [181, 71, 8];
+      const grayBorder = [208, 213, 221];
+      const textColor = [52, 64, 84];
+      const headerBg = [247, 248, 250];
+      let y = marginTop;
+
+      function setNormal(size, color) {
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(size || 9);
+        doc.setTextColor.apply(doc, color || textColor);
+      }
+
+      function setBold(size, color) {
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(size || 9);
+        doc.setTextColor.apply(doc, color || textColor);
+      }
+
+      function ensureSpace(requiredHeight) {
+        if (y + requiredHeight <= pageHeight - marginBottom) return;
+        doc.addPage("a4", "landscape");
+        y = marginTop;
+      }
+
+      function drawParts(parts, startX, baselineY, color, size) {
+        let x = startX;
+        parts.forEach(function(part) {
+          doc.setFont("helvetica", part.bold ? "bold" : "normal");
+          doc.setFontSize(size || 8.8);
+          doc.setTextColor.apply(doc, color || textColor);
+          const text = String(part.text);
+          doc.text(text, x, baselineY);
+          x += doc.getTextWidth(text);
+        });
+      }
+
+      function n(value) {
+        const numericValue = Number(value) || 0;
+        return { text: String(numericValue), bold: numericValue !== 0 };
+      }
+
+      setBold(16);
+      doc.text(meta.title, marginX, y + 5);
+      y += 9;
+      setNormal(9.5);
+      doc.text(meta.subtitle, marginX, y + 3);
+      y += 10;
+
+      const tableWidths = [contentWidth - 96, 32, 32, 32];
+      const headers = ["Type de fait", "1er degré", "2nd degré", "Privé"];
+
+      function drawBrqTableHeader() {
+        const h = 8;
+        let x = marginX;
+        headers.forEach(function(header, index) {
+          doc.setFillColor.apply(doc, headerBg);
+          doc.setDrawColor.apply(doc, grayBorder);
+          doc.setLineWidth(0.2);
+          doc.rect(x, y, tableWidths[index], h, "FD");
+          setBold(8.5);
+          doc.text(header, x + tableWidths[index] / 2, y + 5.2, { align: "center" });
+          x += tableWidths[index];
+        });
+        y += h;
+      }
+
+      function drawDepartment(department) {
+        const departmentRecords = records.filter(function(record) {
+          return record._departement === department;
+        });
+
+        ensureSpace(24);
+        setBold(11.5);
+        doc.text("DSDEN." + department, marginX, y + 4);
+        y += 8;
+
+        if (!departmentRecords.length) {
+          setNormal(8.5);
+          doc.text(
+            "Aucun fait d'établissement recensé dans le département " + department + " pour cette période.",
+            marginX,
+            y + 3
+          );
+          y += 10;
+          return;
+        }
+
+        const totalFE = departmentRecords.length;
+        const totalDayFacts = departmentRecords.filter(isWhiteNoteDayFact).length;
+        const totalUpdates = departmentRecords.filter(isWhiteNoteUpdate).length;
+        const totalN2 = departmentRecords.filter(function(record) { return record._niveau === "2"; }).length;
+        const totalN3 = departmentRecords.filter(function(record) { return record._niveau === "3"; }).length;
+
+        drawParts([
+          { text: "Total FE : ", bold: false }, n(totalFE),
+          { text: " dont ", bold: false }, n(totalDayFacts),
+          { text: " Faits du jour et ", bold: false }, n(totalUpdates),
+          { text: " Faits d'actualisation", bold: false }
+        ], marginX, y + 3, textColor, 8.8);
+
+        drawParts([
+          { text: "Total FE N2 : ", bold: false }, n(totalN2),
+          { text: " - Total FE N3 : ", bold: false }, n(totalN3)
+        ], marginX + 150, y + 3, textColor, 8.8);
+        y += 8;
+
+        ensureSpace(12);
+        drawBrqTableHeader();
+        const counts = getBrqCounts(departmentRecords);
+
+        BRQ_TYPES.forEach(function(type) {
+          const values = [
+            type.label,
+            counts[type.key].first,
+            counts[type.key].second,
+            counts[type.key].private
+          ];
+          const rowH = 8;
+          if (y + rowH > pageHeight - marginBottom) {
+            doc.addPage("a4", "landscape");
+            y = marginTop;
+            drawBrqTableHeader();
+          }
+
+          let x = marginX;
+          values.forEach(function(value, index) {
+            doc.setDrawColor.apply(doc, grayBorder);
+            doc.setLineWidth(0.2);
+            doc.rect(x, y, tableWidths[index], rowH);
+
+            if (index === 0) {
+              setNormal(8.3);
+              doc.text(String(value), x + 2, y + 5.1);
+            } else {
+              const num = Number(value) || 0;
+              if (num !== 0) setBold(8.3); else setNormal(8.3);
+              doc.text(String(num), x + tableWidths[index] / 2, y + 5.1, { align: "center" });
+            }
+            x += tableWidths[index];
+          });
+          y += rowH;
+        });
+
+        if (!meta.weeklyMode && !meta.vacationMode) {
+          const unaccounted = departmentRecords.filter(function(record) {
+            return !isBrqCountedRecord(record);
+          });
+
+          if (unaccounted.length) {
+            y += 4;
+            ensureSpace(12);
+            setBold(9.2);
+            doc.text("FE non comptabilisés dans le tableau :", marginX, y + 3);
+            y += 6;
+
+            unaccounted.forEach(function(record) {
+              const idNom = record[FIELD.ID_NOM] || "Établissement non renseigné";
+              const niveau = record._niveau || "?";
+              const type = formatBrqTypeForLine(record);
+              const resume = record[FIELD.RESUME] || "Résumé non renseigné";
+              const timingLabel = getFactTimingLabel(record);
+              const prefix = String(idNom) + " ";
+              const levelText = "(Niveau " + String(niveau) + ")";
+              const suffix = " - " + type + " - " + String(resume) + (timingLabel ? " (" + timingLabel + ")" : "");
+              const full = prefix + levelText + suffix;
+              const lines = doc.splitTextToSize(full, contentWidth);
+              const h = Math.max(5, lines.length * 4.1 + 1);
+              ensureSpace(h);
+
+              /* Le texte est normal ; si N3, seule la mention (Niveau 3) est orange. */
+              setNormal(7.8);
+              if (lines.length === 1 && String(niveau) === "3") {
+                doc.text(prefix, marginX, y + 3);
+                const prefixW = doc.getTextWidth(prefix);
+                doc.setTextColor.apply(doc, orange);
+                doc.text(levelText, marginX + prefixW, y + 3);
+                const levelW = doc.getTextWidth(levelText);
+                doc.setTextColor.apply(doc, textColor);
+                doc.text(suffix, marginX + prefixW + levelW, y + 3);
+              } else {
+                doc.text(lines, marginX, y + 3);
+              }
+              y += h;
+            });
+          }
+        }
+
+        y += 7;
+      }
+
+      departments.forEach(drawDepartment);
+
+      const totalPdfPages = doc.getNumberOfPages();
+      for (let pageIndex = 1; pageIndex <= totalPdfPages; pageIndex += 1) {
+        doc.setPage(pageIndex);
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(6.8);
+        doc.setTextColor(128, 128, 128);
+        doc.text(
+          "Page " + pageIndex + " / " + totalPdfPages,
+          pageWidth / 2,
+          pageHeight - 5,
+          { align: "center" }
+        );
+      }
+
+      /* Un slash n'est pas valide dans un nom de fichier Windows : on garde
+         la forme demandée visuellement, avec un tiret dans le nom du fichier. */
+      doc.save(meta.filenameBase + ".pdf");
+    } catch (error) {
+      console.error("Erreur lors de la génération du BRQ en PDF :", error);
+      alert("Impossible de générer le PDF du BRQ pour le moment.");
+    } finally {
+      if (button) {
+        button.disabled = false;
+        button.textContent = "PDF";
+      }
+    }
+  }
+
   function renderBRQ() {
     const title = document.getElementById("brq-title");
     const content = document.getElementById("brq-content");
+    const downloadButton = document.getElementById("brq-download");
     if (!title || !content) return;
 
     renderBrqPeriodOptions();
     if (!selectedBrqPeriod) {
       title.textContent = "BRQ";
       content.innerHTML = '<div class="brq-empty">Aucun BRQ disponible.</div>';
+      if (downloadButton) downloadButton.disabled = true;
       return;
     }
+
+    if (downloadButton) downloadButton.disabled = false;
 
     const weeklyMode = selectedBrqPeriod.startsWith("W:");
     const vacationMode = selectedBrqPeriod.startsWith("V:");
