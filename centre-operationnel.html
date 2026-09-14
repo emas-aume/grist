@@ -394,6 +394,17 @@
       overflow-wrap: anywhere;
     }
 
+    .full-explanation-label {
+      display: block;
+      margin-top: 18px;
+      padding-top: 16px;
+      border-top: 1px solid #e5e7eb;
+    }
+
+    .full-explanation-text {
+      white-space: pre-wrap;
+    }
+
     .assignment-current {
       min-width: 0;
     }
@@ -634,6 +645,9 @@
           <div class="summary-current">
             <span class="meta-label">Résumé du fait</span>
             <div id="detail-summary" class="summary-text">—</div>
+
+            <span class="meta-label full-explanation-label">Explications complètes</span>
+            <div id="detail-full-explanation" class="summary-text full-explanation-text">—</div>
           </div>
         </div>
 
@@ -1038,6 +1052,48 @@
        CHARGEMENT / INDEXATION
        ============================================================ */
 
+    function extractFullExplanation(record) {
+      if (!record || typeof record !== "object") return "";
+
+      const values = Object.values(record);
+      const startRegex = /expos[eé]\s+des\s+faits/i;
+      const endRegex = /r[eé]sum[eé]/i;
+      const parts = [];
+      let collecting = false;
+
+      for (const value of values) {
+        if (value === null || value === undefined || value === "") continue;
+
+        let text;
+        if (Array.isArray(value)) {
+          text = value.map(item => String(item ?? "")).join(" ");
+        } else if (typeof value === "string" || typeof value === "number") {
+          text = String(value);
+        } else {
+          continue;
+        }
+
+        if (!collecting) {
+          const startMatch = text.match(startRegex);
+          if (!startMatch) continue;
+          collecting = true;
+          text = text.slice(startMatch.index + startMatch[0].length);
+        }
+
+        const endMatch = text.match(endRegex);
+        if (endMatch) {
+          const beforeResume = text.slice(0, endMatch.index).trim();
+          if (beforeResume) parts.push(beforeResume);
+          break;
+        }
+
+        text = text.replace(/^\s*[:;\-–—]?\s*/, "").trim();
+        if (text) parts.push(text);
+      }
+
+      return parts.join("\n").trim();
+    }
+
     function processFacts() {
       allFacts = rawFactRecords
         .map(function(record) {
@@ -1055,7 +1111,8 @@
             _degre: analysis.degree,
             _typeFait: analysis.types,
             _nom: stripEstablishmentId(record[FIELD.ID_NOM]),
-            _ville: String(record[FIELD.VILLE] || "").trim()
+            _ville: String(record[FIELD.VILLE] || "").trim(),
+            _fullExplanation: extractFullExplanation(record)
           };
         })
         .filter(record => record._departement === DEPARTMENT && record._numeroFE);
@@ -1224,10 +1281,10 @@
       return `<span class="assignment-badge">${escapeHtml(getEquipierName(assigneeId))}</span>`;
     }
 
-    function factBadgesHtml(types, level) {
+    function factBadgesHtml(types, level, fullLabels = false) {
       if (!Array.isArray(types) || !types.length) return '<span class="muted">—</span>';
       return `<div class="fact-badges">${types.map(type =>
-        `<span class="fact-badge ${String(level) === "3" ? "level-3" : ""}">${escapeHtml(getFullFactLabel(type))}</span>`
+        `<span class="fact-badge ${String(level) === "3" ? "level-3" : ""}" title="${escapeHtml(getFullFactLabel(type))}">${escapeHtml(fullLabels ? getFullFactLabel(type) : type)}</span>`
       ).join("")}</div>`;
     }
 
@@ -1296,8 +1353,9 @@
       $("detail-title").textContent = "FE n°" + selectedFE._numeroFE + " — Niveau " + (selectedFE._niveau || "non renseigné");
       const degreeLabel = selectedFE._degre === "1er" ? "1er degré" : (selectedFE._degre === "2nd" ? "2nd degré" : "Degré non renseigné");
       $("detail-subtitle").textContent = formatDateFR(selectedFE._date) + " — " + (selectedFE._nom || "Établissement non renseigné") + " — " + (selectedFE._ville || "Ville non renseignée") + " — " + degreeLabel;
-      $("detail-types").innerHTML = factBadgesHtml(selectedFE._typeFait, selectedFE._niveau);
+      $("detail-types").innerHTML = factBadgesHtml(selectedFE._typeFait, selectedFE._niveau, true);
       $("detail-summary").textContent = String(selectedFE[FIELD.RESUME] || "Résumé non renseigné").trim() || "Résumé non renseigné";
+      $("detail-full-explanation").textContent = selectedFE._fullExplanation || "Explications complètes non renseignées";
       $("detail-status").innerHTML = statusBadgeHtml(workflow.status);
       $("current-assignee").textContent = workflow.assigneeId ? getEquipierName(workflow.assigneeId) : "Non attribué";
 
