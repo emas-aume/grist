@@ -394,16 +394,50 @@
       overflow-wrap: anywhere;
     }
 
-    .full-explanation-label {
-      display: block;
+    .full-explanation-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
       margin-top: 18px;
       padding-top: 16px;
       border-top: 1px solid #e5e7eb;
     }
 
-    .full-explanation-text {
-      white-space: pre-wrap;
+    .full-explanation-header .meta-label { margin-bottom: 0; }
+
+    .explanation-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 2px 7px;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      background: #fff;
+      color: #475569;
+      font: inherit;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
     }
+
+    .explanation-toggle:hover { background: #f8fafc; }
+
+    .explanation-toggle .chevron {
+      display: inline-block;
+      font-size: 10px;
+      transition: transform .15s ease;
+    }
+
+    .explanation-toggle[aria-expanded="false"] .chevron { transform: rotate(-90deg); }
+
+    .full-explanation-text {
+      margin-top: 7px;
+      white-space: normal;
+      line-height: 1.6;
+      max-width: none;
+    }
+
+    .full-explanation-text.hidden { display: none; }
 
     .assignment-current {
       min-width: 0;
@@ -646,7 +680,12 @@
             <span class="meta-label">Résumé du fait</span>
             <div id="detail-summary" class="summary-text">—</div>
 
-            <span class="meta-label full-explanation-label">Explications complètes</span>
+            <div class="full-explanation-header">
+              <span class="meta-label">Explications complètes</span>
+              <button id="explanation-toggle" class="explanation-toggle" type="button" aria-expanded="true">
+                <span class="chevron">▼</span><span id="explanation-toggle-text">Masquer</span>
+              </button>
+            </div>
             <div id="detail-full-explanation" class="summary-text full-explanation-text">—</div>
           </div>
         </div>
@@ -1061,6 +1100,10 @@
       const parts = [];
       let collecting = false;
 
+      // Les FE peuvent être éclatés sur un nombre variable de colonnes.
+      // On repère donc les bornes par leur contenu, puis on reconstitue un
+      // paragraphe continu au lieu de conserver les retours à la ligne de
+      // chaque cellule Grist/Excel.
       for (const value of values) {
         if (value === null || value === undefined || value === "") continue;
 
@@ -1082,16 +1125,30 @@
 
         const endMatch = text.match(endRegex);
         if (endMatch) {
-          const beforeResume = text.slice(0, endMatch.index).trim();
-          if (beforeResume) parts.push(beforeResume);
+          text = text.slice(0, endMatch.index);
+          const cleaned = cleanExplanationFragment(text);
+          if (cleaned) parts.push(cleaned);
           break;
         }
 
-        text = text.replace(/^\s*[:;\-–—]?\s*/, "").trim();
-        if (text) parts.push(text);
+        const cleaned = cleanExplanationFragment(text);
+        if (cleaned) parts.push(cleaned);
       }
 
-      return parts.join("\n").trim();
+      return parts.join(" ")
+        .replace(/\s+([,.;:!?])/g, "$1")
+        .replace(/([.!?])(?=[A-ZÀ-ÖØ-Ý])/g, "$1 ")
+        .replace(/\s{2,}/g, " ")
+        .trim();
+    }
+
+    function cleanExplanationFragment(value) {
+      return String(value || "")
+        .replace(/\r?\n+/g, " ")
+        .replace(/\t+/g, " ")
+        .replace(/^\s*[:;\-–—]?\s*/, "")
+        .replace(/\s+/g, " ")
+        .trim();
     }
 
     function processFacts() {
@@ -1356,6 +1413,9 @@
       $("detail-types").innerHTML = factBadgesHtml(selectedFE._typeFait, selectedFE._niveau, true);
       $("detail-summary").textContent = String(selectedFE[FIELD.RESUME] || "Résumé non renseigné").trim() || "Résumé non renseigné";
       $("detail-full-explanation").textContent = selectedFE._fullExplanation || "Explications complètes non renseignées";
+      $("detail-full-explanation").classList.remove("hidden");
+      $("explanation-toggle").setAttribute("aria-expanded", "true");
+      $("explanation-toggle-text").textContent = "Masquer";
       $("detail-status").innerHTML = statusBadgeHtml(workflow.status);
       $("current-assignee").textContent = workflow.assigneeId ? getEquipierName(workflow.assigneeId) : "Non attribué";
 
@@ -1598,6 +1658,15 @@
 
     $("back-button").addEventListener("click", closeFactDetail);
     $("send-button").addEventListener("click", sendMessage);
+    $("explanation-toggle").addEventListener("click", function() {
+      const panel = $("detail-full-explanation");
+      const button = $("explanation-toggle");
+      const willShow = panel.classList.contains("hidden");
+      panel.classList.toggle("hidden", !willShow);
+      button.setAttribute("aria-expanded", willShow ? "true" : "false");
+      $("explanation-toggle-text").textContent = willShow ? "Masquer" : "Afficher";
+    });
+
     $("assign-button").addEventListener("click", assignFact);
     $("close-button").addEventListener("click", closeCurrentFact);
     $("reopen-button").addEventListener("click", reopenCurrentFact);
