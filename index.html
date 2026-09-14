@@ -1,6 +1,5 @@
 
 
-
 <!DOCTYPE html>
 <html lang="fr">
 
@@ -790,6 +789,16 @@
     .brq-department-title {
       margin: 0 0 10px;
       font-size: 16px;
+      font-weight: 700;
+    }
+
+    .brq-source-period {
+      margin: -4px 0 10px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .brq-source-period strong {
       font-weight: 700;
     }
 
@@ -2498,10 +2507,18 @@
     if (!recordDate) return null;
 
     /*
-      BRQ : les faits du vendredi, samedi et dimanche sont regroupés
-      dans le BRQ du lundi. Les autres jours conservent leur date.
-      Cela permet notamment aux faits du vendredi 11/09/2026
-      d'apparaître dans le BRQ daté du lundi 14/09/2026.
+      Un BRQ porte la date du JOUR D'ENVOI et reprend les faits saisis
+      depuis le BRQ précédent :
+      - lundi -> mardi ;
+      - mardi -> mercredi ;
+      - mercredi -> jeudi ;
+      - jeudi -> vendredi ;
+      - vendredi + samedi + dimanche -> lundi.
+
+      Exemples 2026 :
+      faits du 02/09 -> BRQ du 03/09 ;
+      faits du 04, 05 et 06/09 -> BRQ du 07/09 ;
+      faits du 11, 12 et 13/09 -> BRQ du 14/09.
     */
     const day = recordDate.getUTCDay();
 
@@ -2509,7 +2526,41 @@
     if (day === 6) return addDaysUTC(recordDate, 2); // samedi -> lundi
     if (day === 0) return addDaysUTC(recordDate, 1); // dimanche -> lundi
 
-    return new Date(recordDate.getTime());
+    return addDaysUTC(recordDate, 1); // lundi à jeudi -> lendemain
+  }
+
+  function getBrqDailySourceRange(dateKey) {
+    const brqDate = parseGristDate(dateKey);
+    if (!brqDate) return null;
+
+    /* Un BRQ daté du lundi reprend vendredi, samedi et dimanche. */
+    if (brqDate.getUTCDay() === 1) {
+      const startDate = addDaysUTC(brqDate, -3);
+      const endDate = addDaysUTC(brqDate, -1);
+      return {
+        brqDate: brqDate,
+        startDate: startDate,
+        endDate: endDate,
+        startKey: formatDateKey(startDate),
+        endKey: formatDateKey(endDate),
+        weekendGroup: true
+      };
+    }
+
+    const sourceDate = addDaysUTC(brqDate, -1);
+    return {
+      brqDate: brqDate,
+      startDate: sourceDate,
+      endDate: sourceDate,
+      startKey: formatDateKey(sourceDate),
+      endKey: formatDateKey(sourceDate),
+      weekendGroup: false
+    };
+  }
+
+  function getSelectedBrqDailySourceRange() {
+    if (!selectedBrqPeriod || !selectedBrqPeriod.startsWith("D:")) return null;
+    return getBrqDailySourceRange(selectedBrqPeriod.slice(2));
   }
 
   function getBrqDailyDates() {
@@ -2774,6 +2825,19 @@
       return html;
     }
 
+    const dailySourceRange = getSelectedBrqDailySourceRange();
+    if (dailySourceRange && dailySourceRange.weekendGroup) {
+      const factWord = departmentRecords.length <= 1 ? "fait saisi" : "faits saisis";
+      html += `
+        <p class="brq-source-period">
+          ${escapeHtml(formatLongDate(dailySourceRange.brqDate))} —
+          <strong>${departmentRecords.length}</strong> ${factWord} du
+          ${escapeHtml(formatLongDate(dailySourceRange.startDate))} au
+          ${escapeHtml(formatLongDate(dailySourceRange.endDate))}
+        </p>
+      `;
+    }
+
     const totalFE = departmentRecords.length;
     const totalDayFacts = departmentRecords.filter(isWhiteNoteDayFact).length;
     const totalUpdates = departmentRecords.filter(isWhiteNoteUpdate).length;
@@ -2875,7 +2939,8 @@
       subtitle: date ? formatLongDate(date) : dateKey,
       filenameBase: "BRQ n°" + number + " année 2026-2027",
       weeklyMode: false,
-      vacationMode: false
+      vacationMode: false,
+      sourceRange: getBrqDailySourceRange(dateKey)
     };
   }
 
@@ -3004,6 +3069,16 @@
           );
           y += 10;
           return;
+        }
+
+        if (meta.sourceRange && meta.sourceRange.weekendGroup) {
+          const factWord = departmentRecords.length <= 1 ? "fait saisi" : "faits saisis";
+          drawParts([
+            { text: formatLongDate(meta.sourceRange.brqDate) + " — ", bold: false },
+            { text: String(departmentRecords.length), bold: true },
+            { text: " " + factWord + " du " + formatLongDate(meta.sourceRange.startDate) + " au " + formatLongDate(meta.sourceRange.endDate), bold: false }
+          ], marginX, y + 2.5, [102, 112, 133], 8.4);
+          y += 6.5;
         }
 
         const totalFE = departmentRecords.length;
