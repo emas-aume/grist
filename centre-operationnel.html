@@ -724,7 +724,7 @@
             <span id="detail-types" class="meta-value"></span>
           </div>
           <div class="meta-item assignment-current">
-            <span class="meta-label">Attribué à</span>
+            <span id="assignee-label" class="meta-label">Attribué à</span>
             <strong id="current-assignee">Non attribué</strong>
             <div class="assignment-controls">
               <select id="assignee-select"></select>
@@ -1621,7 +1621,13 @@
       $("explanation-toggle").setAttribute("aria-expanded", "true");
       $("explanation-toggle-text").textContent = "Masquer";
       $("detail-status").innerHTML = statusBadgeHtml(workflow.status);
-      $("current-assignee").textContent = workflow.assigneeId ? getEquipierName(workflow.assigneeId) : "Non attribué";
+      if (workflow.assigneeId) {
+        $("assignee-label").textContent = "Attribué à";
+        $("current-assignee").textContent = getEquipierName(workflow.assigneeId);
+      } else {
+        $("assignee-label").textContent = "Fait non attribué";
+        $("current-assignee").textContent = "";
+      }
 
       if (workflow.assigneeId && equipiers.some(e => Number(e.id) === Number(workflow.assigneeId))) {
         $("assignee-select").value = String(workflow.assigneeId);
@@ -1797,7 +1803,7 @@
       ).join("");
 
       const assignee = $("assignee-select");
-      assignee.innerHTML = '<option value="">— Choisir un équipier —</option>' + options;
+      assignee.innerHTML = '<option value="">Choisir</option>' + options;
     }
 
     /* ============================================================
