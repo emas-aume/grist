@@ -859,6 +859,13 @@
       line-height: 1.45;
     }
 
+    /* Dans les FE non comptabilisés du BRQ, la mention Niveau 3
+       doit toujours ressortir en orange, sans gras. */
+    .brq-unaccounted-line .level-3-text {
+      color: #b54708 !important;
+      font-weight: 400;
+    }
+
     .brq-empty-department,
     .brq-empty {
       padding: 14px 16px;
@@ -3123,9 +3130,21 @@
         });
 
         if (!meta.weeklyMode && !meta.vacationMode) {
-          const unaccounted = departmentRecords.filter(function(record) {
-            return !isBrqCountedRecord(record);
-          });
+          const unaccounted = departmentRecords
+            .filter(function(record) {
+              return !isBrqCountedRecord(record);
+            })
+            .sort(function(a, b) {
+              /* PDF BRQ : niveaux 3 d'abord, puis niveaux 2, comme dans le BRQ affiché. */
+              const levelA = String(a._niveau || "");
+              const levelB = String(b._niveau || "");
+
+              if (levelA === "3" && levelB !== "3") return -1;
+              if (levelB === "3" && levelA !== "3") return 1;
+              if (levelA === "2" && levelB !== "2") return -1;
+              if (levelB === "2" && levelA !== "2") return 1;
+              return 0;
+            });
 
           if (unaccounted.length) {
             y += 4;
@@ -3149,24 +3168,62 @@
               const prefix = String(pdfEstablishmentName) + " ";
               const levelText = "(Niveau " + String(niveau) + ")";
               const suffix = " - " + type + " - " + String(resume) + (timingLabel ? " (" + timingLabel + ")" : "");
-              const full = prefix + levelText + suffix;
-              const lines = doc.splitTextToSize(full, contentWidth);
-              const h = Math.max(5, lines.length * 4.1 + 1);
+              /* PDF BRQ : mise en page mot par mot pour conserver (Niveau 3)
+                 en orange même lorsque la ligne se replie sur plusieurs lignes. */
+              setNormal(7.8);
+
+              const chunks = [];
+              function pushWords(text, color) {
+                String(text).split(/(\s+)/).forEach(function(part) {
+                  if (part) chunks.push({ text: part, color: color });
+                });
+              }
+
+              pushWords(prefix, textColor);
+              chunks.push({
+                text: levelText,
+                color: String(niveau) === "3" ? orange : textColor
+              });
+              pushWords(suffix, textColor);
+
+              const lineHeight = 4.1;
+              const laidOutLines = [[]];
+              let currentWidth = 0;
+
+              chunks.forEach(function(chunk) {
+                doc.setFont("helvetica", "normal");
+                doc.setFontSize(7.8);
+                const chunkWidth = doc.getTextWidth(chunk.text);
+                const currentLine = laidOutLines[laidOutLines.length - 1];
+                const isWhitespace = /^\s+$/.test(chunk.text);
+
+                if (!isWhitespace && currentLine.length && currentWidth + chunkWidth > contentWidth) {
+                  laidOutLines.push([]);
+                  currentWidth = 0;
+                }
+
+                /* Ne pas commencer une nouvelle ligne par un espace. */
+                if (!(currentWidth === 0 && isWhitespace)) {
+                  laidOutLines[laidOutLines.length - 1].push(chunk);
+                  currentWidth += chunkWidth;
+                }
+              });
+
+              const h = Math.max(5, laidOutLines.length * lineHeight + 1);
               ensureSpace(h);
 
-              /* Le texte est normal ; si N3, seule la mention (Niveau 3) est orange. */
-              setNormal(7.8);
-              if (lines.length === 1 && String(niveau) === "3") {
-                doc.text(prefix, marginX, y + 3);
-                const prefixW = doc.getTextWidth(prefix);
-                doc.setTextColor.apply(doc, orange);
-                doc.text(levelText, marginX + prefixW, y + 3);
-                const levelW = doc.getTextWidth(levelText);
-                doc.setTextColor.apply(doc, textColor);
-                doc.text(suffix, marginX + prefixW + levelW, y + 3);
-              } else {
-                doc.text(lines, marginX, y + 3);
-              }
+              laidOutLines.forEach(function(line, lineIndex) {
+                let x = marginX;
+                line.forEach(function(chunk) {
+                  doc.setFont("helvetica", "normal");
+                  doc.setFontSize(7.8);
+                  doc.setTextColor.apply(doc, chunk.color);
+                  doc.text(chunk.text, x, y + 3 + lineIndex * lineHeight);
+                  x += doc.getTextWidth(chunk.text);
+                });
+              });
+
+              doc.setTextColor.apply(doc, textColor);
               y += h;
             });
           }
@@ -4553,6 +4610,23 @@
   }
 
 
+  function isWhiteNoteDisplayableRecord(record, department) {
+
+    /*
+      Une Note Blanche ne doit exister que si elle contient au moins
+      un FE réellement affichable dans l'un des deux tableaux.
+      Cela évite notamment de créer une note vide à partir d'une ligne
+      dont le degré n'a pas pu être identifié.
+    */
+    return Boolean(
+      record &&
+      record._date &&
+      record._departement === department &&
+      (record._degre === "1er" || record._degre === "2nd")
+    );
+  }
+
+
   function getWhiteNoteCalendarDates(department) {
 
     /*
@@ -4575,11 +4649,7 @@
 
     allRecords.forEach(function(record) {
 
-      if (
-        !record ||
-        record._departement !== department ||
-        !record._date
-      ) {
+      if (!isWhiteNoteDisplayableRecord(record, department)) {
         return;
       }
 
@@ -4679,7 +4749,7 @@
 
     return allRecords.filter(function(record) {
       return (
-        record._departement === selectedWhiteNoteDepartment &&
+        isWhiteNoteDisplayableRecord(record, selectedWhiteNoteDepartment) &&
         sourceDateKeys.has(record._dateKey)
       );
     });
