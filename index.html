@@ -4670,8 +4670,28 @@
       }
     });
 
+    /*
+      Important : un fait antérieur à la période réellement couverte par
+      une note peut malgré tout être projeté vers cette date par
+      getWhiteNoteDateForRecordDate(). On vérifie donc ici qu'au moins un
+      FE du département appartient réellement aux dates sources de la note.
+      Cela empêche les Notes Blanches vides d'apparaître dans le sélecteur.
+    */
     return Array
       .from(dates.entries())
+      .filter(function(entry) {
+        const noteDate = entry[1];
+        const sourceDateKeys = new Set(
+          getWhiteNoteSourceDates(noteDate).map(formatDateKey)
+        );
+
+        return allRecords.some(function(record) {
+          return (
+            isWhiteNoteDisplayableRecord(record, department) &&
+            sourceDateKeys.has(record._dateKey)
+          );
+        });
+      })
       .sort(function(a, b) {
         return a[0].localeCompare(b[0]);
       });
