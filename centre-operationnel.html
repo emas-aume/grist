@@ -347,6 +347,12 @@
 
     .operation-header h2 { font-size: 22px; margin-bottom: 7px; }
     .operation-subtitle { color: var(--muted); font-size: 14px; }
+    .operation-author {
+      color: var(--muted);
+      font-size: 14px;
+      margin-top: 4px;
+      line-height: 1.45;
+    }
 
     .operation-meta {
       display: grid;
@@ -443,27 +449,40 @@
       min-width: 0;
       display: flex;
       align-items: center;
-      gap: 9px;
+      gap: 8px;
       flex-wrap: nowrap;
     }
 
-    .assignment-current .meta-label,
-    .assignment-current #current-assignee {
+    .assignment-current .meta-label {
       flex: 0 0 auto;
       margin: 0;
       white-space: nowrap;
     }
 
+    .assignment-current #current-assignee {
+      flex: 0 0 auto;
+      margin: 0;
+      white-space: nowrap;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
     .assignment-controls {
       display: flex;
       align-items: center;
-      gap: 9px;
+      gap: 8px;
       margin-top: 0;
+      margin-left: auto;
       min-width: 0;
-      flex: 1 1 auto;
+      flex: 0 0 auto;
     }
 
-    .assignment-controls select { min-width: 150px; flex: 1 1 auto; }
+    .assignment-controls select {
+      width: 170px;
+      min-width: 0;
+      max-width: 170px;
+      flex: 0 0 170px;
+    }
 
     .summary-row { display: block; }
 
@@ -696,6 +715,7 @@
         <header class="operation-header">
           <h2 id="detail-title">FE — Niveau</h2>
           <div id="detail-subtitle" class="operation-subtitle"></div>
+          <div id="detail-author" class="operation-author"></div>
         </header>
 
         <div class="operation-meta">
@@ -1196,6 +1216,78 @@
        CHARGEMENT / INDEXATION
        ============================================================ */
 
+    function collectTextBetweenLabels(record, startRegex, endRegexes) {
+      if (!record || typeof record !== "object") return "";
+
+      const values = Object.values(record);
+      const parts = [];
+      let collecting = false;
+
+      for (const value of values) {
+        if (value === null || value === undefined || value === "") continue;
+
+        let text;
+        if (Array.isArray(value)) {
+          text = value.map(item => String(item ?? "")).join(" ");
+        } else if (typeof value === "string" || typeof value === "number") {
+          text = String(value);
+        } else {
+          continue;
+        }
+
+        if (!collecting) {
+          const startMatch = text.match(startRegex);
+          if (!startMatch) continue;
+          collecting = true;
+          text = text.slice(startMatch.index + startMatch[0].length);
+        }
+
+        let nearestEnd = null;
+        for (const regex of endRegexes) {
+          const match = text.match(regex);
+          if (match && (!nearestEnd || match.index < nearestEnd.index)) nearestEnd = match;
+        }
+
+        if (nearestEnd) {
+          text = text.slice(0, nearestEnd.index);
+          const cleaned = cleanExplanationFragment(text);
+          if (cleaned) parts.push(cleaned);
+          break;
+        }
+
+        const cleaned = cleanExplanationFragment(text);
+        if (cleaned) parts.push(cleaned);
+      }
+
+      return parts.join(" ").replace(/\s{2,}/g, " ").trim();
+    }
+
+    function extractWriterInfo(record) {
+      const name = collectTextBetweenLabels(
+        record,
+        /pr[eé]nom\s*,?\s*nom/i,
+        [/courriel/i]
+      ).replace(/^\s*[:;\-–—]?\s*/, "").trim();
+
+      const emailRaw = collectTextBetweenLabels(
+        record,
+        /courriel/i,
+        [/t[eé]l[eé]phone\s+indiqu[eé]/i, /description\s+des\s+faits/i, /expos[eé]\s+des\s+faits/i]
+      );
+      const emailMatch = emailRaw.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
+      const email = emailMatch ? emailMatch[0] : emailRaw.replace(/^\s*[:;\-–—]?\s*/, "").trim();
+
+      const phoneRaw = collectTextBetweenLabels(
+        record,
+        /t[eé]l[eé]phone\s+indiqu[eé]/i,
+        [/description\s+des\s+faits/i, /expos[eé]\s+des\s+faits/i]
+      ).replace(/^\s*[:;\-–—]?\s*/, "").trim();
+
+      // Un champ vide ou un libellé parasite ne doit pas produire un faux téléphone.
+      const phone = /\d/.test(phoneRaw) ? phoneRaw : "";
+      return { name, email, phone };
+    }
+
     function extractFullExplanation(record) {
       if (!record || typeof record !== "object") return "";
 
@@ -1274,6 +1366,7 @@
             _typeFait: analysis.types,
             _nom: stripEstablishmentId(record[FIELD.ID_NOM]),
             _ville: String(record[FIELD.VILLE] || "").trim(),
+            _writerInfo: extractWriterInfo(record),
             _fullExplanation: extractFullExplanation(record)
           };
         })
@@ -1515,6 +1608,12 @@
       $("detail-title").textContent = "FE n°" + selectedFE._numeroFE + " — Niveau " + (selectedFE._niveau || "non renseigné");
       const degreeLabel = selectedFE._degre === "1er" ? "1er degré" : (selectedFE._degre === "2nd" ? "2nd degré" : "Degré non renseigné");
       $("detail-subtitle").textContent = formatDateFR(selectedFE._date) + " — " + (selectedFE._nom || "Établissement non renseigné") + " — " + (selectedFE._ville || "Ville non renseignée") + " — " + degreeLabel;
+      const writer = selectedFE._writerInfo || {};
+      const writerParts = [];
+      if (writer.name) writerParts.push(writer.name);
+      if (writer.email) writerParts.push(writer.email);
+      if (writer.phone) writerParts.push(writer.phone);
+      $("detail-author").textContent = writerParts.length ? writerParts.join(" — ") : "Rédacteur non renseigné";
       $("detail-types").innerHTML = factBadgesHtml(selectedFE._typeFait, selectedFE._niveau, true);
       $("detail-summary").textContent = String(selectedFE[FIELD.RESUME] || "Résumé non renseigné").trim() || "Résumé non renseigné";
       $("detail-full-explanation").textContent = selectedFE._fullExplanation || "Explications complètes non renseignées";
