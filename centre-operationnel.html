@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Suivi des faits d'établissement - DSDEN 34</title>
+  <title>Centre opérationnel - DSDEN 34</title>
   <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
   <style>
     :root {
@@ -124,6 +124,75 @@
       border-radius: 10px;
       background: #fafafa;
       margin-bottom: 18px;
+    }
+
+    .listing-heading {
+      margin-bottom: 18px;
+    }
+
+    .listing-heading h1 {
+      margin: 0 0 8px;
+      font-size: 28px;
+    }
+
+    .combined-filters {
+      display: flex;
+      align-items: center;
+      gap: 10px 12px;
+      flex-wrap: wrap;
+    }
+
+    .combined-filters .filter-label {
+      min-width: auto;
+      margin-left: 10px;
+    }
+
+    .combined-filters .filter-label:first-child {
+      margin-left: 0;
+    }
+
+    .period-filters {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      flex: 1;
+      flex-wrap: wrap;
+    }
+
+    .period-filter-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .week-select, .date-select {
+      min-width: 230px;
+    }
+
+    .status-assignment {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .assignment-badge {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 999px;
+      padding: 7px 10px;
+      font-size: 12px;
+      line-height: 1;
+      white-space: nowrap;
+      font-weight: 700;
+      background: #eef4ff;
+      color: #175cd3;
+    }
+
+    .assignment-badge.unassigned {
+      background: #f2f4f7;
+      color: #667085;
+      font-weight: 600;
     }
 
     .filter-row {
@@ -393,52 +462,55 @@
       .hero, .section { padding: 16px; }
       .operation-meta { grid-template-columns: 1fr; }
       .filter-label { width: 100%; min-width: 0; }
-      .period-select, .search-input { width: 100%; min-width: 0; }
+      .week-select, .date-select, .search-input { width: 100%; min-width: 0; }
     }
   </style>
 </head>
 <body>
   <main class="page">
-    <section class="hero">
-      <div class="hero-row">
-        <div>
-          <h1>Suivi des faits d'établissement — DSDEN 34</h1>
-          <div class="muted">Consultation et suivi opérationnel des faits d'établissement de l'Hérault.</div>
-        </div>
-      </div>
-      <div id="diagnostic" class="diagnostic">Connexion à Grist…</div>
-    </section>
-
     <section id="listing-view" class="section">
+      <div class="listing-heading">
+        <h1>Centre opérationnel — DSDEN 34</h1>
+        <div class="muted">Consultation et suivi opérationnel des faits d'établissement de l'Hérault.</div>
+      </div>
+
       <div class="filters-area">
         <div class="filter-row">
           <span class="filter-label">Période</span>
-          <div class="segmented" id="period-mode-buttons">
-            <button class="filter-btn active" data-mode="day" type="button">Jour</button>
-            <button class="filter-btn" data-mode="week" type="button">Semaine</button>
+          <div class="period-filters">
+            <div class="period-filter-item">
+              <select id="week-filter" class="week-select">
+                <option value="all">Toutes les semaines</option>
+              </select>
+            </div>
+            <div class="period-filter-item">
+              <select id="date-filter" class="date-select">
+                <option value="all">Toutes les dates</option>
+              </select>
+            </div>
           </div>
-          <select id="period-select" class="period-select"></select>
         </div>
 
         <div class="filter-row">
+          <span class="filter-label">Recherche</span>
+          <input id="search-input" class="search-input" type="search" placeholder="Nom, ville, numéro FE, type de fait…">
+        </div>
+
+        <div class="filter-row combined-filters">
           <span class="filter-label">Niveau</span>
           <div class="segmented" id="level-buttons">
             <button class="filter-btn active" data-value="all" type="button">Tous</button>
             <button class="filter-btn" data-value="2" type="button">Niveau 2</button>
             <button class="filter-btn" data-value="3" type="button">Niveau 3</button>
           </div>
-        </div>
 
-        <div class="filter-row">
           <span class="filter-label">Degré</span>
           <div class="segmented" id="degree-buttons">
             <button class="filter-btn active" data-value="all" type="button">Tous</button>
             <button class="filter-btn" data-value="1er" type="button">1er degré</button>
             <button class="filter-btn" data-value="2nd" type="button">2nd degré</button>
           </div>
-        </div>
 
-        <div class="filter-row">
           <span class="filter-label">Statut</span>
           <div class="segmented" id="status-buttons">
             <button class="filter-btn active" data-value="all" type="button">Tous</button>
@@ -446,11 +518,6 @@
             <button class="filter-btn" data-value="progress" type="button">En cours</button>
             <button class="filter-btn" data-value="done" type="button">Terminé</button>
           </div>
-        </div>
-
-        <div class="filter-row">
-          <span class="filter-label">Recherche</span>
-          <input id="search-input" class="search-input" type="search" placeholder="Nom, ville, numéro FE, type de fait…">
         </div>
       </div>
 
@@ -582,8 +649,8 @@
     let followUps = [];
     let followUpsByFE = new Map();
 
-    let periodMode = "day";
-    let selectedPeriod = "";
+    let selectedWeek = "all";
+    let selectedDate = "all";
     let selectedLevel = "all";
     let selectedDegree = "all";
     let selectedStatus = "all";
@@ -600,7 +667,7 @@
       rawFactRecords = Array.isArray(records) ? records : [];
       processFacts();
       await reloadAuxiliaryTables();
-      populatePeriodSelect(true);
+      populatePeriodFilters(true);
       renderListing();
     });
 
@@ -628,14 +695,17 @@
     }
 
     function showDiagnostic(message, type) {
-      const el = $("diagnostic");
-      el.textContent = message;
-      el.className = "diagnostic" + (type ? " " + type : "");
+      if (type === "error") console.error(message);
+      else console.info(message);
     }
 
     function getNumeroFE(value) {
       if (value === null || value === undefined || value === "") return "";
-      return String(value).trim();
+      const raw = String(value).trim();
+      const explicit = raw.match(/fait\s*n(?:°|º|o)?\s*["'«»]?\s*(\d{4,})/i);
+      if (explicit) return explicit[1];
+      const number = raw.match(/\b(\d{4,})\b/);
+      return number ? number[1] : raw;
     }
 
     function parseGristDate(value) {
@@ -719,6 +789,22 @@
       const eq = equipiers.find(e => Number(e.id) === Number(rowId));
       if (!eq) return "Équipier inconnu";
       return String(eq[EQUIPIER_FIELD.NOM] || eq[EQUIPIER_FIELD.EMAIL] || ("Équipier " + eq.id)).trim();
+    }
+
+    function getFollowUpAuthorName(entry) {
+      const email = normalizeText(entry?.[SUIVI_FIELD.AUTEUR_EMAIL] || "");
+      if (email) {
+        const equipier = equipiers.find(eq => normalizeText(eq?.[EQUIPIER_FIELD.EMAIL] || "") === email);
+        if (equipier) return getRawEquipierName(equipier);
+      }
+
+      const name = String(entry?.[SUIVI_FIELD.AUTEUR_NOM] || "").trim();
+      if (name) return name;
+
+      const rawEmail = String(entry?.[SUIVI_FIELD.AUTEUR_EMAIL] || "").trim();
+      if (rawEmail) return rawEmail;
+
+      return "Auteur non renseigné";
     }
 
     function tableToRows(table) {
@@ -1008,34 +1094,38 @@
        FILTRES ET LISTING
        ============================================================ */
 
-    function populatePeriodSelect(preserve) {
-      const select = $("period-select");
-      const old = preserve ? selectedPeriod : "";
-      const keys = Array.from(new Set(allFacts.map(f => periodMode === "day" ? f._dateKey : f._weekKey).filter(Boolean)))
+    function populatePeriodFilters(preserve) {
+      const weekSelect = $("week-filter");
+      const dateSelect = $("date-filter");
+      const oldWeek = preserve ? selectedWeek : "all";
+      const oldDate = preserve ? selectedDate : "all";
+
+      const weekKeys = Array.from(new Set(allFacts.map(f => f._weekKey).filter(Boolean)))
+        .sort((a, b) => b.localeCompare(a));
+      const dateKeys = Array.from(new Set(allFacts.map(f => f._dateKey).filter(Boolean)))
         .sort((a, b) => b.localeCompare(a));
 
-      select.innerHTML = keys.map(key => {
-        let label = key;
-        if (periodMode === "day") {
-          const fact = allFacts.find(f => f._dateKey === key);
-          label = fact ? formatDateFR(fact._date) : key;
-        } else {
-          label = getWeekLabel(key);
-        }
+      weekSelect.innerHTML = '<option value="all">Toutes les semaines</option>' + weekKeys.map(key =>
+        `<option value="${escapeHtml(key)}">${escapeHtml(getWeekLabel(key))}</option>`
+      ).join("");
+
+      dateSelect.innerHTML = '<option value="all">Toutes les dates</option>' + dateKeys.map(key => {
+        const fact = allFacts.find(f => f._dateKey === key);
+        const label = fact ? formatDateFR(fact._date) : key;
         return `<option value="${escapeHtml(key)}">${escapeHtml(label)}</option>`;
       }).join("");
 
-      selectedPeriod = old && keys.includes(old) ? old : (keys[0] || "");
-      select.value = selectedPeriod;
+      selectedWeek = oldWeek === "all" || weekKeys.includes(oldWeek) ? oldWeek : "all";
+      selectedDate = oldDate === "all" || dateKeys.includes(oldDate) ? oldDate : "all";
+      weekSelect.value = selectedWeek;
+      dateSelect.value = selectedDate;
     }
 
     function getFilteredFacts() {
       const q = normalizeText(searchTerm);
       return allFacts.filter(function(fact) {
-        if (selectedPeriod) {
-          const value = periodMode === "day" ? fact._dateKey : fact._weekKey;
-          if (value !== selectedPeriod) return false;
-        }
+        if (selectedWeek !== "all" && fact._weekKey !== selectedWeek) return false;
+        if (selectedDate !== "all" && fact._dateKey !== selectedDate) return false;
         if (selectedLevel !== "all" && fact._niveau !== selectedLevel) return false;
         if (selectedDegree !== "all" && fact._degre !== selectedDegree) return false;
 
@@ -1073,6 +1163,13 @@
       return `<span class="status-badge ${cls}">${statusLabel(status)}</span>`;
     }
 
+    function assignmentBadgeHtml(assigneeId) {
+      if (!assigneeId) {
+        return '<span class="assignment-badge unassigned">Non attribué</span>';
+      }
+      return `<span class="assignment-badge">${escapeHtml(getEquipierName(assigneeId))}</span>`;
+    }
+
     function factBadgesHtml(types, level) {
       if (!Array.isArray(types) || !types.length) return '<span class="muted">—</span>';
       return `<div class="fact-badges">${types.map(type =>
@@ -1101,7 +1198,7 @@
               <td>${factBadgesHtml(fact._typeFait, fact._niveau)}</td>
               <td>${escapeHtml(fact._nom || "Établissement non renseigné")}</td>
               <td>${escapeHtml(fact._ville || "—")}</td>
-              <td>${statusBadgeHtml(workflow.status)}</td>
+              <td><div class="status-assignment">${statusBadgeHtml(workflow.status)}${assignmentBadgeHtml(workflow.assigneeId)}</div></td>
               <td><strong>${escapeHtml(fact._numeroFE)}</strong></td>
               <td><button class="btn btn-small open-fe" data-fe="${escapeHtml(fact._numeroFE)}" type="button">Ouvrir</button></td>
             </tr>`;
@@ -1171,11 +1268,7 @@
 
       container.innerHTML = entries.map(function(entry) {
         const type = normalizeText(entry[SUIVI_FIELD.TYPE_ENTREE]);
-        const author = String(
-          entry[SUIVI_FIELD.AUTEUR_NOM] ||
-          entry[SUIVI_FIELD.AUTEUR_EMAIL] ||
-          "Utilisateur Grist"
-        ).trim();
+        const author = getFollowUpAuthorName(entry);
         const date = formatDateTimeFR(entry[SUIVI_FIELD.DATE_HEURE]);
 
         if (type === "message") {
@@ -1288,18 +1381,28 @@
        ÉVÉNEMENTS UI
        ============================================================ */
 
-    $("period-mode-buttons").addEventListener("click", function(event) {
-      const btn = event.target.closest("button[data-mode]");
-      if (!btn) return;
-      periodMode = btn.dataset.mode;
-      this.querySelectorAll("button").forEach(b => b.classList.toggle("active", b === btn));
+    $("week-filter").addEventListener("change", function() {
+      selectedWeek = this.value || "all";
+      if (selectedWeek !== "all" && selectedDate !== "all") {
+        const selectedFact = allFacts.find(f => f._dateKey === selectedDate);
+        if (!selectedFact || selectedFact._weekKey !== selectedWeek) {
+          selectedDate = "all";
+          $("date-filter").value = "all";
+        }
+      }
       currentPage = 1;
-      populatePeriodSelect(false);
       renderListing();
     });
 
-    $("period-select").addEventListener("change", function() {
-      selectedPeriod = this.value;
+    $("date-filter").addEventListener("change", function() {
+      selectedDate = this.value || "all";
+      if (selectedDate !== "all") {
+        const selectedFact = allFacts.find(f => f._dateKey === selectedDate);
+        if (selectedFact) {
+          selectedWeek = selectedFact._weekKey || "all";
+          $("week-filter").value = selectedWeek;
+        }
+      }
       currentPage = 1;
       renderListing();
     });
