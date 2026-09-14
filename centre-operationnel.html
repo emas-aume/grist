@@ -1280,11 +1280,34 @@
       const phoneRaw = collectTextBetweenLabels(
         record,
         /t[eé]l[eé]phone\s+indiqu[eé]/i,
-        [/description\s+des\s+faits/i, /expos[eé]\s+des\s+faits/i]
+        [
+          /description\s+des\s+faits/i,
+          /description\s+du\s+fait/i,
+          /expos[eé]\s+des\s+faits/i
+        ]
       ).replace(/^\s*[:;\-–—]?\s*/, "").trim();
 
-      // Un champ vide ou un libellé parasite ne doit pas produire un faux téléphone.
-      const phone = /\d/.test(phoneRaw) ? phoneRaw : "";
+      // Le téléphone peut partager sa cellule avec les rubriques suivantes.
+      // On ne conserve donc que la première séquence qui ressemble réellement
+      // à un numéro, au lieu d'afficher tout le texte situé après le libellé.
+      const phoneMatch = phoneRaw.match(/(?:\+?\d[\d\s().-]{5,}\d)/);
+      let phone = phoneMatch ? phoneMatch[0].replace(/\s{2,}/g, " ").trim() : "";
+      let phoneDigits = phone.replace(/\D/g, "");
+
+      // Normalisation des numéros français :
+      // 33XXXXXXXXX / +33XXXXXXXXX -> 0XXXXXXXXX
+      if (phoneDigits.length === 11 && phoneDigits.startsWith("33")) {
+        phoneDigits = "0" + phoneDigits.slice(2);
+      }
+
+      // Un numéro français normalisé doit comporter exactement 10 chiffres.
+      // Affichage systématique sous la forme XX XX XX XX XX.
+      if (phoneDigits.length === 10) {
+        phone = phoneDigits.replace(/(\d{2})(?=\d)/g, "$1 ");
+      } else {
+        phone = "";
+      }
+
       return { name, email, phone };
     }
 
