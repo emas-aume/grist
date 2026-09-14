@@ -1102,6 +1102,7 @@
     <div class="brq-header">
       <div>
         <h2 id="brq-title" class="brq-title">BRQ</h2>
+        <p id="brq-source-period-title" class="brq-source-period"></p>
       </div>
 
       <div class="brq-controls">
@@ -2825,19 +2826,6 @@
       return html;
     }
 
-    const dailySourceRange = getSelectedBrqDailySourceRange();
-    if (dailySourceRange && dailySourceRange.weekendGroup) {
-      const factWord = departmentRecords.length <= 1 ? "fait saisi" : "faits saisis";
-      html += `
-        <p class="brq-source-period">
-          ${escapeHtml(formatLongDate(dailySourceRange.brqDate))} —
-          <strong>${departmentRecords.length}</strong> ${factWord} du
-          ${escapeHtml(formatLongDate(dailySourceRange.startDate))} au
-          ${escapeHtml(formatLongDate(dailySourceRange.endDate))}
-        </p>
-      `;
-    }
-
     const totalFE = departmentRecords.length;
     const totalDayFacts = departmentRecords.filter(isWhiteNoteDayFact).length;
     const totalUpdates = departmentRecords.filter(isWhiteNoteUpdate).length;
@@ -2934,13 +2922,16 @@
     const dateKey = selectedBrqPeriod.slice(2);
     const date = parseGristDate(dateKey);
     const number = getBrqDailyNumber(dateKey);
+    const sourceRange = getBrqDailySourceRange(dateKey);
     return {
-      title: "BRQ n°" + number,
-      subtitle: date ? formatLongDate(date) : dateKey,
+      title: "BRQ n°" + number + " - " + (date ? formatLongDate(date) : dateKey),
+      subtitle: sourceRange && sourceRange.weekendGroup
+        ? "du " + formatLongDate(sourceRange.startDate) + " au " + formatLongDate(sourceRange.endDate)
+        : "",
       filenameBase: "BRQ n°" + number + " année 2026-2027",
       weeklyMode: false,
       vacationMode: false,
-      sourceRange: getBrqDailySourceRange(dateKey)
+      sourceRange: sourceRange
     };
   }
 
@@ -3028,9 +3019,13 @@
       setBold(16);
       doc.text(meta.title, marginX, y + 5);
       y += 9;
-      setNormal(9.5);
-      doc.text(meta.subtitle, marginX, y + 3);
-      y += 10;
+      if (meta.subtitle) {
+        setNormal(9.5);
+        doc.text(meta.subtitle, marginX, y + 3);
+        y += 10;
+      } else {
+        y += 4;
+      }
 
       const tableWidths = [contentWidth - 96, 32, 32, 32];
       const headers = ["Type de fait", "1er degré", "2nd degré", "Privé"];
@@ -3069,16 +3064,6 @@
           );
           y += 10;
           return;
-        }
-
-        if (meta.sourceRange && meta.sourceRange.weekendGroup) {
-          const factWord = departmentRecords.length <= 1 ? "fait saisi" : "faits saisis";
-          drawParts([
-            { text: formatLongDate(meta.sourceRange.brqDate) + " — ", bold: false },
-            { text: String(departmentRecords.length), bold: true },
-            { text: " " + factWord + " du " + formatLongDate(meta.sourceRange.startDate) + " au " + formatLongDate(meta.sourceRange.endDate), bold: false }
-          ], marginX, y + 2.5, [102, 112, 133], 8.4);
-          y += 6.5;
         }
 
         const totalFE = departmentRecords.length;
@@ -3236,6 +3221,9 @@
 
     if (downloadButton) downloadButton.disabled = false;
 
+    const sourcePeriodTitle = document.getElementById("brq-source-period-title");
+    if (sourcePeriodTitle) sourcePeriodTitle.textContent = "";
+
     const weeklyMode = selectedBrqPeriod.startsWith("W:");
     const vacationMode = selectedBrqPeriod.startsWith("V:");
     const records = getSelectedBrqRecords();
@@ -3257,6 +3245,12 @@
       const dateKey = selectedBrqPeriod.slice(2);
       const date = parseGristDate(dateKey);
       title.textContent = "BRQ n°" + getBrqDailyNumber(dateKey) + " - " + (date ? formatLongDate(date) : dateKey);
+      const sourceRange = getBrqDailySourceRange(dateKey);
+      if (sourcePeriodTitle && sourceRange && sourceRange.weekendGroup) {
+        sourcePeriodTitle.textContent =
+          "du " + formatLongDate(sourceRange.startDate) +
+          " au " + formatLongDate(sourceRange.endDate);
+      }
     }
 
     /*
