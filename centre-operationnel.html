@@ -1,0 +1,1345 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Suivi des faits d'établissement - DSDEN 34</title>
+  <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
+  <style>
+    :root {
+      --bg: #f6f7f9;
+      --card: #ffffff;
+      --text: #1f2937;
+      --muted: #667085;
+      --line: #e5e7eb;
+      --primary: #2f6fed;
+      --primary-hover: #245bcc;
+      --orange: #b54708;
+      --orange-bg: #fff7ed;
+      --green: #067647;
+      --green-bg: #ecfdf3;
+      --red: #b42318;
+      --red-bg: #fef3f2;
+      --amber: #b54708;
+      --amber-bg: #fffaeb;
+      --radius: 14px;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Inter, "Segoe UI", Arial, sans-serif;
+    }
+
+    button, input, select, textarea { font: inherit; }
+
+    .page {
+      max-width: 1320px;
+      margin: 0 auto;
+      padding: 30px 22px 60px;
+    }
+
+    .hero, .section {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 24px;
+      margin-bottom: 20px;
+    }
+
+    .hero-row {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 18px;
+      flex-wrap: wrap;
+    }
+
+    h1 { margin: 0 0 8px; font-size: 28px; }
+    h2 { margin: 0; font-size: 21px; }
+    h3 { margin: 0; font-size: 17px; }
+    p { line-height: 1.55; }
+    .muted { color: var(--muted); }
+    .hidden { display: none !important; }
+
+    .author-box {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      padding: 10px 12px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #fafafa;
+    }
+
+    .author-box label {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--muted);
+    }
+
+    select, input[type="search"], textarea {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      color: var(--text);
+    }
+
+    select, input[type="search"] {
+      min-height: 38px;
+      padding: 8px 11px;
+    }
+
+    textarea {
+      width: 100%;
+      min-height: 112px;
+      resize: vertical;
+      padding: 12px;
+      line-height: 1.45;
+    }
+
+    select:focus, input:focus, textarea:focus {
+      outline: 2px solid rgba(47,111,237,.15);
+      border-color: var(--primary);
+    }
+
+    .diagnostic {
+      margin-top: 14px;
+      padding: 11px 13px;
+      border-radius: 9px;
+      background: #f8fafc;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .diagnostic.ok { background: var(--green-bg); color: var(--green); }
+    .diagnostic.error { background: var(--red-bg); color: var(--red); }
+
+    .filters-area {
+      padding: 16px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #fafafa;
+      margin-bottom: 18px;
+    }
+
+    .filter-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 12px;
+    }
+
+    .filter-row:last-child { margin-bottom: 0; }
+
+    .filter-label {
+      min-width: 82px;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--muted);
+    }
+
+    .segmented {
+      display: inline-flex;
+      gap: 5px;
+      flex-wrap: wrap;
+    }
+
+    .filter-btn, .btn {
+      border: 1px solid var(--line);
+      background: #fff;
+      color: var(--text);
+      border-radius: 8px;
+      padding: 8px 13px;
+      cursor: pointer;
+      transition: .15s ease;
+    }
+
+    .filter-btn:hover, .btn:hover { border-color: #cfd4dc; background: #f9fafb; }
+    .filter-btn.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+
+    .btn-primary { background: var(--primary); color: #fff; border-color: var(--primary); }
+    .btn-primary:hover { background: var(--primary-hover); border-color: var(--primary-hover); }
+    .btn-danger { background: #fff; color: var(--red); border-color: #f3b7b2; }
+    .btn-danger:hover { background: var(--red-bg); }
+    .btn-success { background: #fff; color: var(--green); border-color: #a6e0c2; }
+    .btn-success:hover { background: var(--green-bg); }
+    .btn-small { padding: 7px 11px; font-size: 13px; }
+
+    .search-input { flex: 1; min-width: 260px; }
+    .period-select { min-width: 210px; }
+
+    .table-wrap {
+      overflow-x: auto;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: #fff;
+      min-width: 980px;
+    }
+
+    th {
+      background: #f8fafc;
+      color: #475467;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: .025em;
+      text-align: left;
+      padding: 11px 12px;
+      border-bottom: 1px solid var(--line);
+      white-space: nowrap;
+    }
+
+    td {
+      padding: 12px;
+      border-bottom: 1px solid #eef0f3;
+      vertical-align: middle;
+      font-size: 14px;
+    }
+
+    tbody tr:last-child td { border-bottom: 0; }
+    tbody tr:hover { background: #fafbfc; }
+
+    .level-badge, .fact-badge, .status-badge {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 999px;
+      font-size: 12px;
+      line-height: 1;
+      white-space: nowrap;
+    }
+
+    .level-badge {
+      min-width: 29px;
+      justify-content: center;
+      padding: 6px 9px;
+      background: #eef4ff;
+      color: #175cd3;
+      font-weight: 800;
+    }
+
+    .level-badge.level-3 { background: var(--orange-bg); color: var(--orange); }
+
+    .fact-badges { display: flex; gap: 5px; flex-wrap: wrap; }
+    .fact-badge { padding: 6px 8px; background: #f2f4f7; color: #344054; }
+    .fact-badge.level-3 { background: var(--orange-bg); color: var(--orange); }
+
+    .status-badge { padding: 7px 10px; font-weight: 700; }
+    .status-waiting { background: #f2f4f7; color: #475467; }
+    .status-progress { background: var(--amber-bg); color: var(--amber); }
+    .status-done { background: var(--green-bg); color: var(--green); }
+
+    .empty-state {
+      text-align: center;
+      padding: 34px 16px;
+      color: var(--muted);
+    }
+
+    .pagination {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-top: 14px;
+      flex-wrap: wrap;
+    }
+
+    /* FICHE */
+    .sheet-toolbar {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+      flex-wrap: wrap;
+      margin-bottom: 18px;
+    }
+
+    .operation-card {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      overflow: hidden;
+      background: #fff;
+    }
+
+    .operation-header {
+      padding: 18px 20px;
+      border-bottom: 1px solid var(--line);
+      background: #fafafa;
+    }
+
+    .operation-header h2 { font-size: 22px; margin-bottom: 7px; }
+    .operation-subtitle { color: var(--muted); font-size: 14px; }
+
+    .operation-meta {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .meta-item {
+      padding: 11px 12px;
+      background: #f8fafc;
+      border-radius: 9px;
+    }
+
+    .meta-label {
+      display: block;
+      font-size: 11px;
+      font-weight: 800;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+
+    .meta-value { font-size: 14px; font-weight: 600; }
+
+    .assignment-row {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      flex-wrap: wrap;
+      padding: 15px 20px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .assignment-current { margin-right: auto; }
+
+    .timeline {
+      padding: 20px;
+      background: #fff;
+    }
+
+    .timeline-title { margin-bottom: 14px; }
+
+    .timeline-entry {
+      position: relative;
+      padding: 0 0 18px 22px;
+      margin-left: 5px;
+      border-left: 2px solid #e4e7ec;
+    }
+
+    .timeline-entry:last-child { padding-bottom: 0; }
+
+    .timeline-entry::before {
+      content: "";
+      position: absolute;
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      left: -5.5px;
+      top: 4px;
+      background: #98a2b3;
+    }
+
+    .timeline-entry.message::before { background: var(--primary); }
+    .timeline-entry.cloture::before { background: var(--green); }
+    .timeline-entry.reouverture::before { background: var(--amber); }
+
+    .timeline-meta {
+      font-size: 12px;
+      font-weight: 700;
+      color: #475467;
+      margin-bottom: 6px;
+    }
+
+    .timeline-message {
+      white-space: pre-wrap;
+      line-height: 1.5;
+      color: var(--text);
+    }
+
+    .timeline-system { color: var(--muted); font-style: italic; }
+
+    .composer {
+      padding: 18px 20px 20px;
+      border-top: 1px solid var(--line);
+      background: #fafafa;
+    }
+
+    .composer-actions {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-top: 10px;
+      flex-wrap: wrap;
+    }
+
+    .closed-panel {
+      padding: 18px 20px;
+      border-top: 1px solid var(--line);
+      background: var(--green-bg);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+      color: var(--green);
+      font-weight: 700;
+    }
+
+    @media (max-width: 780px) {
+      .page { padding: 18px 12px 40px; }
+      .hero, .section { padding: 16px; }
+      .operation-meta { grid-template-columns: 1fr; }
+      .filter-label { width: 100%; min-width: 0; }
+      .period-select, .search-input { width: 100%; min-width: 0; }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <section class="hero">
+      <div class="hero-row">
+        <div>
+          <h1>Suivi des faits d'établissement — DSDEN 34</h1>
+          <div class="muted">Consultation et suivi opérationnel des faits d'établissement de l'Hérault.</div>
+        </div>
+      </div>
+      <div id="diagnostic" class="diagnostic">Connexion à Grist…</div>
+    </section>
+
+    <section id="listing-view" class="section">
+      <div class="filters-area">
+        <div class="filter-row">
+          <span class="filter-label">Période</span>
+          <div class="segmented" id="period-mode-buttons">
+            <button class="filter-btn active" data-mode="day" type="button">Jour</button>
+            <button class="filter-btn" data-mode="week" type="button">Semaine</button>
+          </div>
+          <select id="period-select" class="period-select"></select>
+        </div>
+
+        <div class="filter-row">
+          <span class="filter-label">Niveau</span>
+          <div class="segmented" id="level-buttons">
+            <button class="filter-btn active" data-value="all" type="button">Tous</button>
+            <button class="filter-btn" data-value="2" type="button">Niveau 2</button>
+            <button class="filter-btn" data-value="3" type="button">Niveau 3</button>
+          </div>
+        </div>
+
+        <div class="filter-row">
+          <span class="filter-label">Degré</span>
+          <div class="segmented" id="degree-buttons">
+            <button class="filter-btn active" data-value="all" type="button">Tous</button>
+            <button class="filter-btn" data-value="1er" type="button">1er degré</button>
+            <button class="filter-btn" data-value="2nd" type="button">2nd degré</button>
+          </div>
+        </div>
+
+        <div class="filter-row">
+          <span class="filter-label">Statut</span>
+          <div class="segmented" id="status-buttons">
+            <button class="filter-btn active" data-value="all" type="button">Tous</button>
+            <button class="filter-btn" data-value="waiting" type="button">En attente</button>
+            <button class="filter-btn" data-value="progress" type="button">En cours</button>
+            <button class="filter-btn" data-value="done" type="button">Terminé</button>
+          </div>
+        </div>
+
+        <div class="filter-row">
+          <span class="filter-label">Recherche</span>
+          <input id="search-input" class="search-input" type="search" placeholder="Nom, ville, numéro FE, type de fait…">
+        </div>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Niveau</th>
+              <th>Type de fait</th>
+              <th>Nom</th>
+              <th>Ville</th>
+              <th>Statut</th>
+              <th>Numéro FE</th>
+              <th>Ouvrir</th>
+            </tr>
+          </thead>
+          <tbody id="facts-body"></tbody>
+        </table>
+      </div>
+
+      <div class="pagination">
+        <div id="results-count" class="muted"></div>
+        <div>
+          <button id="prev-page" class="btn btn-small" type="button">Précédent</button>
+          <span id="page-info" class="muted" style="margin:0 9px"></span>
+          <button id="next-page" class="btn btn-small" type="button">Suivant</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="detail-view" class="section hidden">
+      <div class="sheet-toolbar">
+        <button id="back-button" class="btn" type="button">← Retour au listing</button>
+        <div id="detail-status"></div>
+      </div>
+
+      <div class="operation-card">
+        <header class="operation-header">
+          <h2 id="detail-title">FE — Niveau</h2>
+          <div id="detail-subtitle" class="operation-subtitle"></div>
+        </header>
+
+        <div class="operation-meta">
+          <div class="meta-item">
+            <span class="meta-label">Ville</span>
+            <span id="detail-city" class="meta-value"></span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">Degré</span>
+            <span id="detail-degree" class="meta-value"></span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">Type de fait</span>
+            <span id="detail-types" class="meta-value"></span>
+          </div>
+        </div>
+
+        <div class="assignment-row">
+          <div class="assignment-current">
+            <span class="meta-label">Attribué à</span>
+            <strong id="current-assignee">Non attribué</strong>
+          </div>
+          <select id="assignee-select"></select>
+          <button id="assign-button" class="btn btn-small" type="button">Attribuer</button>
+        </div>
+
+        <div class="timeline">
+          <h3 class="timeline-title">Suivi du fait</h3>
+          <div id="timeline-content"></div>
+        </div>
+
+        <div id="composer" class="composer">
+          <textarea id="message-input" placeholder="Ajouter un message de suivi…"></textarea>
+          <div class="composer-actions">
+            <button id="close-button" class="btn btn-danger" type="button">Clôturer le fait</button>
+            <button id="send-button" class="btn btn-primary" type="button">Envoyer le message</button>
+          </div>
+        </div>
+
+        <div id="closed-panel" class="closed-panel hidden">
+          <span>Ce fait est clôturé. Son historique reste consultable.</span>
+          <button id="reopen-button" class="btn btn-success" type="button">Réouvrir le fait</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    "use strict";
+
+    /* ============================================================
+       CONFIGURATION : IDs GRIST EXACTS
+       ============================================================ */
+
+    const FIELD = Object.freeze({
+      NUMERO_FE: "Numero_FE",
+      DATE_SAISIE: "Date_de_saisie",
+      ID_NOM: "ID_et_Nom",
+      VILLE: "Ville",
+      RESUME: "Resume_du_fait"
+    });
+
+    const TABLE = Object.freeze({
+      EQUIPIERS: "EQUIPIERS",
+      SUIVI: "SUIVI_FE"
+    });
+
+    const EQUIPIER_FIELD = Object.freeze({
+      NOM: "Nom",
+      EMAIL: "Email"
+    });
+
+    const SUIVI_FIELD = Object.freeze({
+      NUMERO_FE: "Numero_FE",
+      TYPE_ENTREE: "Type_entree",
+      DATE_HEURE: "Date_heure",
+      AUTEUR_NOM: "Auteur_Nom",
+      AUTEUR_EMAIL: "Auteur_Email",
+      ATTRIBUE_A: "Attribue_a",
+      MESSAGE: "Message"
+    });
+
+    const DEPARTMENT = "34";
+    const PAGE_SIZE = 25;
+
+    let rawFactRecords = [];
+    let allFacts = [];
+    let equipiers = [];
+    let followUps = [];
+    let followUpsByFE = new Map();
+
+    let periodMode = "day";
+    let selectedPeriod = "";
+    let selectedLevel = "all";
+    let selectedDegree = "all";
+    let selectedStatus = "all";
+    let searchTerm = "";
+    let currentPage = 1;
+    let selectedFE = null;
+    let isWriting = false;
+
+    const $ = id => document.getElementById(id);
+
+    grist.ready({ requiredAccess: "full" });
+
+    grist.onRecords(async function(records) {
+      rawFactRecords = Array.isArray(records) ? records : [];
+      processFacts();
+      await reloadAuxiliaryTables();
+      populatePeriodSelect(true);
+      renderListing();
+    });
+
+    /* ============================================================
+       UTILITAIRES
+       ============================================================ */
+
+    function escapeHtml(value) {
+      return String(value ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+
+    function normalizeText(value) {
+      return String(value ?? "")
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[’‘`´]/g, "'")
+        .toLowerCase()
+        .replace(/\s+/g, " ")
+        .trim();
+    }
+
+    function showDiagnostic(message, type) {
+      const el = $("diagnostic");
+      el.textContent = message;
+      el.className = "diagnostic" + (type ? " " + type : "");
+    }
+
+    function getNumeroFE(value) {
+      if (value === null || value === undefined || value === "") return "";
+      return String(value).trim();
+    }
+
+    function parseGristDate(value) {
+      if (!value) return null;
+      if (value instanceof Date && !isNaN(value)) return value;
+      if (typeof value === "number") {
+        const ms = Math.abs(value) < 100000000000 ? value * 1000 : value;
+        const d = new Date(ms);
+        return isNaN(d) ? null : d;
+      }
+      const raw = String(value).trim();
+      let m = raw.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+      if (m) return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+      m = raw.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})$/);
+      if (m) {
+        let y = Number(m[3]);
+        if (y < 100) y += y >= 70 ? 1900 : 2000;
+        return new Date(y, Number(m[2]) - 1, Number(m[1]));
+      }
+      const d = new Date(raw);
+      return isNaN(d) ? null : d;
+    }
+
+    function formatDateKey(date) {
+      if (!date) return "";
+      return [
+        date.getFullYear(),
+        String(date.getMonth() + 1).padStart(2, "0"),
+        String(date.getDate()).padStart(2, "0")
+      ].join("-");
+    }
+
+    function formatDateFR(date) {
+      if (!date) return "Date non renseignée";
+      return new Intl.DateTimeFormat("fr-FR", {
+        day: "2-digit", month: "2-digit", year: "numeric"
+      }).format(date);
+    }
+
+    function formatDateTimeFR(value) {
+      const date = parseGristDate(value);
+      if (!date) return "Date inconnue";
+      return new Intl.DateTimeFormat("fr-FR", {
+        day: "2-digit", month: "2-digit", year: "numeric",
+        hour: "2-digit", minute: "2-digit"
+      }).format(date);
+    }
+
+    function getISOWeekInfo(date) {
+      if (!date) return null;
+      const tmp = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+      const day = tmp.getUTCDay() || 7;
+      tmp.setUTCDate(tmp.getUTCDate() + 4 - day);
+      const yearStart = new Date(Date.UTC(tmp.getUTCFullYear(), 0, 1));
+      const week = Math.ceil((((tmp - yearStart) / 86400000) + 1) / 7);
+      return {
+        year: tmp.getUTCFullYear(),
+        week,
+        key: tmp.getUTCFullYear() + "-W" + String(week).padStart(2, "0")
+      };
+    }
+
+    function getWeekLabel(key) {
+      const m = String(key).match(/^(\d{4})-W(\d{2})$/);
+      return m ? "Semaine " + Number(m[2]) + " — " + m[1] : key;
+    }
+
+    function stripEstablishmentId(value) {
+      return String(value || "")
+        .replace(/^\s*[0-9][A-Z0-9]{2,20}\s*[-–—]\s*/i, "")
+        .trim();
+    }
+
+    function getDepartement(record) {
+      const text = String(record?.[FIELD.ID_NOM] || "").trim();
+      const match = text.match(/^(\d{3})/);
+      return match ? String(Number(match[1])) : "";
+    }
+
+    function getEquipierName(rowId) {
+      const eq = equipiers.find(e => Number(e.id) === Number(rowId));
+      if (!eq) return "Équipier inconnu";
+      return String(eq[EQUIPIER_FIELD.NOM] || eq[EQUIPIER_FIELD.EMAIL] || ("Équipier " + eq.id)).trim();
+    }
+
+    function tableToRows(table) {
+      if (!table || !Array.isArray(table.id)) return [];
+      return table.id.map(function(id, index) {
+        const row = { id };
+        Object.keys(table).forEach(function(key) {
+          if (Array.isArray(table[key])) row[key] = table[key][index];
+        });
+        return row;
+      });
+    }
+
+    /* ============================================================
+       DÉTECTION NIVEAU / DEGRÉ / TYPE DE FAIT
+       ============================================================ */
+
+    function levenshteinDistance(a, b) {
+      a = String(a || ""); b = String(b || "");
+      if (a === b) return 0;
+      if (!a.length) return b.length;
+      if (!b.length) return a.length;
+      const previous = new Array(b.length + 1);
+      const current = new Array(b.length + 1);
+      for (let j = 0; j <= b.length; j++) previous[j] = j;
+      for (let i = 1; i <= a.length; i++) {
+        current[0] = i;
+        for (let j = 1; j <= b.length; j++) {
+          const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+          current[j] = Math.min(current[j - 1] + 1, previous[j] + 1, previous[j - 1] + cost);
+        }
+        for (let j = 0; j <= b.length; j++) previous[j] = current[j];
+      }
+      return previous[b.length];
+    }
+
+    function normalizeFactDetectionText(value) {
+      return String(value || "")
+        .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+        .replace(/[’‘`´]/g, "'").toLowerCase()
+        .replace(/[^a-z0-9]+/g, " ").replace(/\s+/g, " ").trim();
+    }
+
+    function factDetectionTokens(value) {
+      const normalized = normalizeFactDetectionText(value);
+      return normalized ? normalized.split(" ").filter(Boolean) : [];
+    }
+
+    function tokenApproximatelyMatches(token, target) {
+      token = String(token || ""); target = String(target || "");
+      if (!token || !target) return false;
+      if (token === target) return true;
+      if (Math.min(token.length, target.length) < 4) return false;
+      return levenshteinDistance(token, target) <= (target.length >= 9 ? 2 : 1);
+    }
+
+    function hasApproxToken(tokens, targets) {
+      const list = Array.isArray(targets) ? targets : [targets];
+      return list.some(target => tokens.some(token => tokenApproximatelyMatches(token, target)));
+    }
+
+    function hasAllApproxTokens(tokens, groups) {
+      return groups.every(group => hasApproxToken(tokens, group));
+    }
+
+    function detectFactTypeFlags(value) {
+      const normalized = normalizeFactDetectionText(value);
+      const tokens = factDetectionTokens(value);
+      const compact = normalized.replace(/[^a-z0-9]/g, "");
+      return {
+        hasValRep:
+          compact.includes("valeursdelarepublique") || compact.includes("valeurdelarepublique") || compact.includes("valrep") ||
+          hasAllApproxTokens(tokens, [["valeur", "valeurs"], ["republique"]]),
+        hasHarassment:
+          compact.includes("harcelement") || compact.includes("cyberharcelement") ||
+          hasApproxToken(tokens, ["harcelement", "harcelements"]),
+        hasGoods:
+          compact.includes("atteintesauxbiens") || compact.includes("atteinteauxbiens") ||
+          hasAllApproxTokens(tokens, [["atteinte", "atteintes"], ["bien", "biens"]]),
+        hasSecurityClimate:
+          compact.includes("atteintealasecurite") || compact.includes("atteintesalasecurite") ||
+          compact.includes("climatscolaire") || compact.includes("climatdeletablissement") ||
+          hasApproxToken(tokens, ["securite"]) ||
+          (hasApproxToken(tokens, ["climat"]) && hasApproxToken(tokens, ["scolaire", "etablissement"])),
+        hasPersonsGeneric:
+          compact.includes("atteintesauxpersonnes") || compact.includes("atteinteauxpersonnes") ||
+          hasAllApproxTokens(tokens, [["atteinte", "atteintes"], ["personne", "personnes"]]),
+        hasPhysical:
+          compact.includes("violencesphysiques") || compact.includes("violencephysique") ||
+          hasAllApproxTokens(tokens, [["violence", "violences"], ["physique", "physiques"]]),
+        hasSexual:
+          compact.includes("violencessexuelles") || compact.includes("violencesexuelle") ||
+          hasAllApproxTokens(tokens, [["violence", "violences"], ["sexuelle", "sexuelles", "sexuel", "sexuels"]]),
+        hasVerbal:
+          compact.includes("violencesverbales") || compact.includes("violenceverbale") ||
+          hasAllApproxTokens(tokens, [["violence", "violences"], ["verbale", "verbales", "verbal", "verbaux"]])
+      };
+    }
+
+    function analyzeRecord(record) {
+      const values = [];
+      const levelCandidates = [];
+      let hasSecondDegree = false;
+      let hasFirstDegree = false;
+
+      Object.keys(record || {}).forEach(function(key) {
+        const value = record[key];
+        if (value === null || value === undefined || typeof value === "object") return;
+        const textValue = String(value).slice(0, 20000);
+        if (!textValue) return;
+        values.push(textValue);
+
+        const nk = normalizeText(key);
+        const nv = normalizeText(textValue);
+
+        if (nk.includes("niveau") || nk.includes("level")) {
+          const m = nv.match(/(?:^|\D)([23])(?:\D|$)/);
+          if (m) levelCandidates.push(m[1]);
+        }
+        if (/\bniveau\s*3\b/.test(nv)) levelCandidates.push("3");
+        else if (/\bniveau\s*2\b/.test(nv)) levelCandidates.push("2");
+
+        if (/\bcollege\b/.test(nv) || /\bclg\b/.test(nv) || /\blycee\b/.test(nv) || /\blyc\b/.test(nv)) {
+          hasSecondDegree = true;
+        }
+        if (/\bcirconscription\b/.test(nv) || /\becole maternelle\b/.test(nv) || /\becole elementaire\b/.test(nv) || /\becole primaire\b/.test(nv)) {
+          hasFirstDegree = true;
+        }
+      });
+
+      const flags = detectFactTypeFlags(values.join(" "));
+      const types = [];
+      if (flags.hasValRep) types.push("AttValRep");
+      if (flags.hasHarassment) types.push("Harcel");
+      if (flags.hasGoods) types.push("AttBiens");
+
+      if (flags.hasPhysical && flags.hasSexual && flags.hasVerbal) types.push("AttPers: VP + VS + VV");
+      else if (flags.hasPhysical && flags.hasSexual) types.push("AttPers: VP + VS");
+      else if (flags.hasPhysical && flags.hasVerbal) types.push("AttPers: VP + VV");
+      else if (flags.hasSexual && flags.hasVerbal) types.push("AttPers: VS + VV");
+      else if (flags.hasPhysical) types.push("AttPers: VP");
+      else if (flags.hasSexual) types.push("AttPers: VS");
+      else if (flags.hasVerbal) types.push("AttPers: VV");
+      else if (flags.hasPersonsGeneric) types.push("AttPers");
+
+      if (flags.hasSecurityClimate) types.push("AttSecu");
+
+      return {
+        level: levelCandidates.includes("3") ? "3" : (levelCandidates.includes("2") ? "2" : ""),
+        degree: hasSecondDegree ? "2nd" : (hasFirstDegree ? "1er" : ""),
+        types
+      };
+    }
+
+    function getFullFactLabel(type) {
+      const labels = {
+        "AttValRep": "Atteintes aux valeurs de la République",
+        "Harcel": "Harcèlement ou suspicion de harcèlement / Cyber-harcèlement",
+        "AttBiens": "Atteintes aux biens",
+        "AttSecu": "Atteinte à la sécurité",
+        "AttPers": "Atteintes aux personnes",
+        "AttPers: VP": "Atteintes aux personnes : Violences physiques",
+        "AttPers: VS": "Atteintes aux personnes : Violences sexuelles",
+        "AttPers: VV": "Atteintes aux personnes : Violences verbales",
+        "AttPers: VP + VS": "Atteintes aux personnes : Violences physiques et sexuelles",
+        "AttPers: VP + VV": "Atteintes aux personnes : Violences physiques et verbales",
+        "AttPers: VS + VV": "Atteintes aux personnes : Violences sexuelles et verbales",
+        "AttPers: VP + VS + VV": "Atteintes aux personnes : Violences physiques, sexuelles et verbales"
+      };
+      return labels[type] || type;
+    }
+
+    /* ============================================================
+       CHARGEMENT / INDEXATION
+       ============================================================ */
+
+    function processFacts() {
+      allFacts = rawFactRecords
+        .map(function(record) {
+          const date = parseGristDate(record[FIELD.DATE_SAISIE]);
+          const week = getISOWeekInfo(date);
+          const analysis = analyzeRecord(record);
+          return {
+            ...record,
+            _numeroFE: getNumeroFE(record[FIELD.NUMERO_FE]),
+            _departement: getDepartement(record),
+            _date: date,
+            _dateKey: formatDateKey(date),
+            _weekKey: week ? week.key : "",
+            _niveau: analysis.level,
+            _degre: analysis.degree,
+            _typeFait: analysis.types,
+            _nom: stripEstablishmentId(record[FIELD.ID_NOM]),
+            _ville: String(record[FIELD.VILLE] || "").trim()
+          };
+        })
+        .filter(record => record._departement === DEPARTMENT && record._numeroFE);
+    }
+
+    async function reloadAuxiliaryTables() {
+      try {
+        const [eqTable, followTable] = await Promise.all([
+          grist.docApi.fetchTable(TABLE.EQUIPIERS),
+          grist.docApi.fetchTable(TABLE.SUIVI)
+        ]);
+
+        equipiers = tableToRows(eqTable)
+          .sort((a, b) => getRawEquipierName(a).localeCompare(getRawEquipierName(b), "fr"));
+
+        followUps = tableToRows(followTable);
+        rebuildFollowUpIndex();
+        populateEquipierSelects();
+
+        showDiagnostic(
+          allFacts.length + " fait(s) du département 34 chargé(s) — " + equipiers.length + " équipier(s).",
+          "ok"
+        );
+      } catch (error) {
+        console.error(error);
+        equipiers = [];
+        followUps = [];
+        followUpsByFE = new Map();
+        populateEquipierSelects();
+        showDiagnostic(
+          "Impossible de charger EQUIPIERS ou SUIVI_FE. Vérifie les IDs de tables/colonnes indiqués sous le fichier.",
+          "error"
+        );
+      }
+    }
+
+    function getRawEquipierName(eq) {
+      return String(eq?.[EQUIPIER_FIELD.NOM] || eq?.[EQUIPIER_FIELD.EMAIL] || "Équipier").trim();
+    }
+
+    function rebuildFollowUpIndex() {
+      followUpsByFE = new Map();
+      followUps.forEach(function(entry) {
+        const fe = getNumeroFE(entry[SUIVI_FIELD.NUMERO_FE]);
+        if (!fe) return;
+        if (!followUpsByFE.has(fe)) followUpsByFE.set(fe, []);
+        followUpsByFE.get(fe).push(entry);
+      });
+      followUpsByFE.forEach(entries => entries.sort(compareFollowUps));
+    }
+
+    function compareFollowUps(a, b) {
+      const da = parseGristDate(a[SUIVI_FIELD.DATE_HEURE]);
+      const db = parseGristDate(b[SUIVI_FIELD.DATE_HEURE]);
+      const ta = da ? da.getTime() : 0;
+      const tb = db ? db.getTime() : 0;
+      return ta - tb || Number(a.id || 0) - Number(b.id || 0);
+    }
+
+    function getFollowUpsForFE(feNumber) {
+      return followUpsByFE.get(getNumeroFE(feNumber)) || [];
+    }
+
+    function getWorkflowState(feNumber) {
+      const entries = getFollowUpsForFE(feNumber);
+      let status = "waiting";
+      let assigneeId = null;
+      let hasMessage = false;
+
+      entries.forEach(function(entry) {
+        const type = normalizeText(entry[SUIVI_FIELD.TYPE_ENTREE]);
+        if (type === "message") {
+          hasMessage = true;
+          status = "progress";
+        } else if (type === "cloture") {
+          status = "done";
+        } else if (type === "reouverture") {
+          status = "progress";
+        } else if (type === "attribution") {
+          const target = Number(entry[SUIVI_FIELD.ATTRIBUE_A]);
+          if (target) assigneeId = target;
+        }
+      });
+
+      if (!hasMessage && status !== "done" && !entries.some(e => normalizeText(e[SUIVI_FIELD.TYPE_ENTREE]) === "reouverture")) {
+        status = "waiting";
+      }
+
+      return { status, assigneeId, entries };
+    }
+
+    /* ============================================================
+       FILTRES ET LISTING
+       ============================================================ */
+
+    function populatePeriodSelect(preserve) {
+      const select = $("period-select");
+      const old = preserve ? selectedPeriod : "";
+      const keys = Array.from(new Set(allFacts.map(f => periodMode === "day" ? f._dateKey : f._weekKey).filter(Boolean)))
+        .sort((a, b) => b.localeCompare(a));
+
+      select.innerHTML = keys.map(key => {
+        let label = key;
+        if (periodMode === "day") {
+          const fact = allFacts.find(f => f._dateKey === key);
+          label = fact ? formatDateFR(fact._date) : key;
+        } else {
+          label = getWeekLabel(key);
+        }
+        return `<option value="${escapeHtml(key)}">${escapeHtml(label)}</option>`;
+      }).join("");
+
+      selectedPeriod = old && keys.includes(old) ? old : (keys[0] || "");
+      select.value = selectedPeriod;
+    }
+
+    function getFilteredFacts() {
+      const q = normalizeText(searchTerm);
+      return allFacts.filter(function(fact) {
+        if (selectedPeriod) {
+          const value = periodMode === "day" ? fact._dateKey : fact._weekKey;
+          if (value !== selectedPeriod) return false;
+        }
+        if (selectedLevel !== "all" && fact._niveau !== selectedLevel) return false;
+        if (selectedDegree !== "all" && fact._degre !== selectedDegree) return false;
+
+        const workflow = getWorkflowState(fact._numeroFE);
+        if (selectedStatus !== "all" && workflow.status !== selectedStatus) return false;
+
+        if (q) {
+          const haystack = normalizeText([
+            fact._numeroFE,
+            fact._nom,
+            fact._ville,
+            fact._degre,
+            fact._niveau,
+            fact._typeFait.join(" "),
+            fact[FIELD.RESUME] || ""
+          ].join(" "));
+          if (!haystack.includes(q)) return false;
+        }
+        return true;
+      }).sort(function(a, b) {
+        const ta = a._date ? a._date.getTime() : 0;
+        const tb = b._date ? b._date.getTime() : 0;
+        return tb - ta || Number(b._numeroFE || 0) - Number(a._numeroFE || 0);
+      });
+    }
+
+    function statusLabel(status) {
+      if (status === "done") return "Terminé";
+      if (status === "progress") return "En cours";
+      return "En attente";
+    }
+
+    function statusBadgeHtml(status) {
+      const cls = status === "done" ? "status-done" : (status === "progress" ? "status-progress" : "status-waiting");
+      return `<span class="status-badge ${cls}">${statusLabel(status)}</span>`;
+    }
+
+    function factBadgesHtml(types, level) {
+      if (!Array.isArray(types) || !types.length) return '<span class="muted">—</span>';
+      return `<div class="fact-badges">${types.map(type =>
+        `<span class="fact-badge ${String(level) === "3" ? "level-3" : ""}" title="${escapeHtml(getFullFactLabel(type))}">${escapeHtml(type)}</span>`
+      ).join("")}</div>`;
+    }
+
+    function renderListing() {
+      const filtered = getFilteredFacts();
+      const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+      if (currentPage > totalPages) currentPage = totalPages;
+      if (currentPage < 1) currentPage = 1;
+
+      const start = (currentPage - 1) * PAGE_SIZE;
+      const pageRows = filtered.slice(start, start + PAGE_SIZE);
+      const body = $("facts-body");
+
+      if (!pageRows.length) {
+        body.innerHTML = `<tr><td colspan="7"><div class="empty-state">Aucun fait ne correspond aux filtres sélectionnés.</div></td></tr>`;
+      } else {
+        body.innerHTML = pageRows.map(function(fact) {
+          const workflow = getWorkflowState(fact._numeroFE);
+          return `
+            <tr>
+              <td>${fact._niveau ? `<span class="level-badge ${fact._niveau === "3" ? "level-3" : ""}">${escapeHtml(fact._niveau)}</span>` : '<span class="muted">—</span>'}</td>
+              <td>${factBadgesHtml(fact._typeFait, fact._niveau)}</td>
+              <td>${escapeHtml(fact._nom || "Établissement non renseigné")}</td>
+              <td>${escapeHtml(fact._ville || "—")}</td>
+              <td>${statusBadgeHtml(workflow.status)}</td>
+              <td><strong>${escapeHtml(fact._numeroFE)}</strong></td>
+              <td><button class="btn btn-small open-fe" data-fe="${escapeHtml(fact._numeroFE)}" type="button">Ouvrir</button></td>
+            </tr>`;
+        }).join("");
+      }
+
+      body.querySelectorAll(".open-fe").forEach(btn => {
+        btn.addEventListener("click", () => openFact(btn.dataset.fe));
+      });
+
+      $("results-count").textContent = filtered.length + " fait(s) affiché(s)";
+      $("page-info").textContent = "Page " + currentPage + " / " + totalPages;
+      $("prev-page").disabled = currentPage <= 1;
+      $("next-page").disabled = currentPage >= totalPages;
+    }
+
+    /* ============================================================
+       FICHE FE
+       ============================================================ */
+
+    function openFact(feNumber) {
+      selectedFE = allFacts.find(f => f._numeroFE === getNumeroFE(feNumber)) || null;
+      if (!selectedFE) return;
+      $("listing-view").classList.add("hidden");
+      $("detail-view").classList.remove("hidden");
+      renderFactDetail();
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    function closeFactDetail() {
+      selectedFE = null;
+      $("detail-view").classList.add("hidden");
+      $("listing-view").classList.remove("hidden");
+      renderListing();
+    }
+
+    function renderFactDetail() {
+      if (!selectedFE) return;
+      const workflow = getWorkflowState(selectedFE._numeroFE);
+
+      $("detail-title").textContent = "FE n°" + selectedFE._numeroFE + " — Niveau " + (selectedFE._niveau || "non renseigné");
+      $("detail-subtitle").textContent = formatDateFR(selectedFE._date) + " — " + (selectedFE._nom || "Établissement non renseigné");
+      $("detail-city").textContent = selectedFE._ville || "Non renseignée";
+      $("detail-degree").textContent = selectedFE._degre === "1er" ? "1er degré" : (selectedFE._degre === "2nd" ? "2nd degré" : "Non renseigné");
+      $("detail-types").innerHTML = factBadgesHtml(selectedFE._typeFait, selectedFE._niveau);
+      $("detail-status").innerHTML = statusBadgeHtml(workflow.status);
+      $("current-assignee").textContent = workflow.assigneeId ? getEquipierName(workflow.assigneeId) : "Non attribué";
+
+      if (workflow.assigneeId && equipiers.some(e => Number(e.id) === Number(workflow.assigneeId))) {
+        $("assignee-select").value = String(workflow.assigneeId);
+      }
+
+      renderTimeline(workflow.entries);
+
+      const done = workflow.status === "done";
+      $("composer").classList.toggle("hidden", done);
+      $("closed-panel").classList.toggle("hidden", !done);
+      $("message-input").value = "";
+    }
+
+    function renderTimeline(entries) {
+      const container = $("timeline-content");
+      if (!entries.length) {
+        container.innerHTML = '<div class="empty-state" style="padding:18px 0;text-align:left">Aucun suivi pour le moment. Le fait est en attente.</div>';
+        return;
+      }
+
+      container.innerHTML = entries.map(function(entry) {
+        const type = normalizeText(entry[SUIVI_FIELD.TYPE_ENTREE]);
+        const author = String(
+          entry[SUIVI_FIELD.AUTEUR_NOM] ||
+          entry[SUIVI_FIELD.AUTEUR_EMAIL] ||
+          "Utilisateur Grist"
+        ).trim();
+        const date = formatDateTimeFR(entry[SUIVI_FIELD.DATE_HEURE]);
+
+        if (type === "message") {
+          return `<div class="timeline-entry message">
+            <div class="timeline-meta">${escapeHtml(date)} — ${escapeHtml(author)}</div>
+            <div class="timeline-message">${escapeHtml(entry[SUIVI_FIELD.MESSAGE] || "")}</div>
+          </div>`;
+        }
+
+        if (type === "attribution") {
+          const target = getEquipierName(entry[SUIVI_FIELD.ATTRIBUE_A]);
+          return `<div class="timeline-entry attribution">
+            <div class="timeline-meta">${escapeHtml(date)} — ${escapeHtml(author)}</div>
+            <div class="timeline-system">Attribution du fait à ${escapeHtml(target)}.</div>
+          </div>`;
+        }
+
+        if (type === "cloture") {
+          return `<div class="timeline-entry cloture">
+            <div class="timeline-meta">${escapeHtml(date)} — ${escapeHtml(author)}</div>
+            <div class="timeline-system">Fait clôturé.</div>
+          </div>`;
+        }
+
+        if (type === "reouverture") {
+          return `<div class="timeline-entry reouverture">
+            <div class="timeline-meta">${escapeHtml(date)} — ${escapeHtml(author)}</div>
+            <div class="timeline-system">Fait réouvert.</div>
+          </div>`;
+        }
+
+        return "";
+      }).join("");
+    }
+
+    /* ============================================================
+       ÉCRITURE GRIST
+       L'auteur est renseigné automatiquement par les formules déclenchées
+       user.Name / user.Email de la table SUIVI_FE.
+       ============================================================ */
+
+    async function addFollowUp(type, options) {
+      if (isWriting || !selectedFE) return;
+      const fields = {
+        [SUIVI_FIELD.NUMERO_FE]: selectedFE._numeroFE,
+        [SUIVI_FIELD.TYPE_ENTREE]: type,
+        [SUIVI_FIELD.DATE_HEURE]: Math.floor(Date.now() / 1000),
+        [SUIVI_FIELD.ATTRIBUE_A]: options?.assigneeId || null,
+        [SUIVI_FIELD.MESSAGE]: options?.message || ""
+      };
+
+      isWriting = true;
+      try {
+        await grist.docApi.applyUserActions([
+          ["AddRecord", TABLE.SUIVI, null, fields]
+        ]);
+        await reloadAuxiliaryTables();
+        renderListing();
+        renderFactDetail();
+      } catch (error) {
+        console.error(error);
+        alert("Écriture impossible dans SUIVI_FE. Vérifie que le widget dispose d'un accès complet et que les IDs de colonnes sont corrects.");
+      } finally {
+        isWriting = false;
+      }
+    }
+
+    async function sendMessage() {
+      const message = $("message-input").value.trim();
+      if (!message) {
+        alert("Écris un message avant de l'envoyer.");
+        return;
+      }
+      await addFollowUp("message", { message });
+    }
+
+    async function assignFact() {
+      const assigneeId = Number($("assignee-select").value);
+      if (!assigneeId) {
+        alert("Choisis un équipier à qui attribuer ce fait.");
+        return;
+      }
+      await addFollowUp("attribution", { assigneeId });
+    }
+
+    async function closeCurrentFact() {
+      if (!confirm("Clôturer ce fait ? La fiche restera consultable mais aucun nouveau message ne pourra être envoyé tant qu'elle n'est pas réouverte.")) return;
+      await addFollowUp("cloture");
+    }
+
+    async function reopenCurrentFact() {
+      if (!confirm("Réouvrir ce fait et permettre à nouveau l'ajout de messages ?")) return;
+      await addFollowUp("reouverture");
+    }
+
+    /* ============================================================
+       ÉQUIPIERS
+       ============================================================ */
+
+    function populateEquipierSelects() {
+      const options = equipiers.map(eq =>
+        `<option value="${escapeHtml(eq.id)}">${escapeHtml(getRawEquipierName(eq))}</option>`
+      ).join("");
+
+      const assignee = $("assignee-select");
+      assignee.innerHTML = '<option value="">— Choisir un équipier —</option>' + options;
+    }
+
+    /* ============================================================
+       ÉVÉNEMENTS UI
+       ============================================================ */
+
+    $("period-mode-buttons").addEventListener("click", function(event) {
+      const btn = event.target.closest("button[data-mode]");
+      if (!btn) return;
+      periodMode = btn.dataset.mode;
+      this.querySelectorAll("button").forEach(b => b.classList.toggle("active", b === btn));
+      currentPage = 1;
+      populatePeriodSelect(false);
+      renderListing();
+    });
+
+    $("period-select").addEventListener("change", function() {
+      selectedPeriod = this.value;
+      currentPage = 1;
+      renderListing();
+    });
+
+    function wireFilterButtons(containerId, setter) {
+      $(containerId).addEventListener("click", function(event) {
+        const btn = event.target.closest("button[data-value]");
+        if (!btn) return;
+        this.querySelectorAll("button").forEach(b => b.classList.toggle("active", b === btn));
+        setter(btn.dataset.value);
+        currentPage = 1;
+        renderListing();
+      });
+    }
+
+    wireFilterButtons("level-buttons", value => selectedLevel = value);
+    wireFilterButtons("degree-buttons", value => selectedDegree = value);
+    wireFilterButtons("status-buttons", value => selectedStatus = value);
+
+    $("search-input").addEventListener("input", function() {
+      searchTerm = this.value;
+      currentPage = 1;
+      renderListing();
+    });
+
+    $("prev-page").addEventListener("click", function() {
+      if (currentPage > 1) { currentPage--; renderListing(); }
+    });
+
+    $("next-page").addEventListener("click", function() {
+      const pages = Math.max(1, Math.ceil(getFilteredFacts().length / PAGE_SIZE));
+      if (currentPage < pages) { currentPage++; renderListing(); }
+    });
+
+    $("back-button").addEventListener("click", closeFactDetail);
+    $("send-button").addEventListener("click", sendMessage);
+    $("assign-button").addEventListener("click", assignFact);
+    $("close-button").addEventListener("click", closeCurrentFact);
+    $("reopen-button").addEventListener("click", reopenCurrentFact);
+
+  </script>
+</body>
+</html>
