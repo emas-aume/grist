@@ -375,14 +375,38 @@
 
     .assignment-row {
       display: flex;
-      align-items: center;
-      gap: 9px;
-      flex-wrap: wrap;
+      align-items: flex-start;
+      gap: 24px;
       padding: 15px 20px;
       border-bottom: 1px solid var(--line);
     }
 
-    .assignment-current { margin-right: auto; }
+    .summary-current {
+      flex: 1 1 auto;
+      min-width: 0;
+    }
+
+    .summary-text {
+      font-size: 14px;
+      line-height: 1.5;
+      color: var(--text);
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+
+    .assignment-current {
+      flex: 0 0 auto;
+      min-width: 300px;
+    }
+
+    .assignment-controls {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      margin-top: 8px;
+    }
+
+    .assignment-controls select { min-width: 190px; }
 
     .timeline {
       padding: 20px;
@@ -592,26 +616,24 @@
 
         <div class="operation-meta">
           <div class="meta-item">
-            <span class="meta-label">Ville</span>
-            <span id="detail-city" class="meta-value"></span>
-          </div>
-          <div class="meta-item">
-            <span class="meta-label">Degré</span>
-            <span id="detail-degree" class="meta-value"></span>
-          </div>
-          <div class="meta-item">
             <span class="meta-label">Type de fait</span>
             <span id="detail-types" class="meta-value"></span>
           </div>
         </div>
 
         <div class="assignment-row">
+          <div class="summary-current">
+            <span class="meta-label">Résumé du fait</span>
+            <div id="detail-summary" class="summary-text">—</div>
+          </div>
           <div class="assignment-current">
             <span class="meta-label">Attribué à</span>
             <strong id="current-assignee">Non attribué</strong>
+            <div class="assignment-controls">
+              <select id="assignee-select"></select>
+              <button id="assign-button" class="btn btn-small" type="button">Attribuer</button>
+            </div>
           </div>
-          <select id="assignee-select"></select>
-          <button id="assign-button" class="btn btn-small" type="button">Attribuer</button>
         </div>
 
         <div class="timeline">
@@ -733,19 +755,27 @@
       if (value === null || value === undefined || value === "") return "";
       const raw = String(value).replace(/\u00a0/g, " ").trim();
 
-      // On extrait le nombre qui suit explicitement le libellé du fait,
-      // sans imposer de longueur au numéro. Cela fonctionne aussi bien pour
-      // « Fait n°5571234 » que pour de futurs identifiants plus longs.
-      const explicit = raw.match(/\b(?:fait|fe)(?:\s+d[’']etablissement)?\s*(?:n(?:[°ºo]|um(?:e|é)ro)?\.?)?\s*[:#-]?\s*(\d+)\b/i);
+      // Cas normal : on exige un marqueur de numéro après « Fait » / « FE ».
+      // Ainsi une année comme « 2026 » présente avant le vrai numéro ne peut
+      // jamais être prise pour l'identifiant du fait.
+      // Exemples reconnus :
+      //   Fait n°5571234
+      //   Fait n° 5571234
+      //   Fait d'établissement n°5571234
+      //   FE n°5571234
+      //   FE numéro 5571234
+      const explicit = raw.match(
+        /\b(?:fait|fe)(?:\s+d[’'](?:e|é)tablissement)?\s*(?:n\s*[°º]|n[o°º]|num(?:e|é)ro)\s*[:#-]?\s*(\d+)\b/i
+      );
       if (explicit) return explicit[1];
 
-      // Si la cellule contient uniquement le numéro, on le conserve tel quel.
+      // Si la cellule contient uniquement l'identifiant numérique, on le garde.
       if (/^\d+$/.test(raw)) return raw;
 
-      // Dernier secours : chercher un identifiant numérique suffisamment long
-      // pour ne pas confondre une année (ex. 2026) avec un numéro FE.
-      const fallback = raw.match(/(?:^|\D)(\d{5,})(?!\d)/);
-      return fallback ? fallback[1] : "";
+      // Secours pour d'éventuels formats atypiques : on ne considère que les
+      // suites d'au moins 5 chiffres, ce qui exclut notamment les années à 4 chiffres.
+      const candidates = raw.match(/\d{5,}/g) || [];
+      return candidates.length ? candidates[0] : "";
     }
 
     function parseGristDate(value) {
@@ -1277,10 +1307,10 @@
       const workflow = getWorkflowState(selectedFE._numeroFE);
 
       $("detail-title").textContent = "FE n°" + selectedFE._numeroFE + " — Niveau " + (selectedFE._niveau || "non renseigné");
-      $("detail-subtitle").textContent = formatDateFR(selectedFE._date) + " — " + (selectedFE._nom || "Établissement non renseigné");
-      $("detail-city").textContent = selectedFE._ville || "Non renseignée";
-      $("detail-degree").textContent = selectedFE._degre === "1er" ? "1er degré" : (selectedFE._degre === "2nd" ? "2nd degré" : "Non renseigné");
+      const degreeLabel = selectedFE._degre === "1er" ? "1er degré" : (selectedFE._degre === "2nd" ? "2nd degré" : "Degré non renseigné");
+      $("detail-subtitle").textContent = formatDateFR(selectedFE._date) + " — " + (selectedFE._nom || "Établissement non renseigné") + " — " + (selectedFE._ville || "Ville non renseignée") + " — " + degreeLabel;
       $("detail-types").innerHTML = factBadgesHtml(selectedFE._typeFait, selectedFE._niveau);
+      $("detail-summary").textContent = String(selectedFE[FIELD.RESUME] || "Résumé non renseigné").trim() || "Résumé non renseigné";
       $("detail-status").innerHTML = statusBadgeHtml(workflow.status);
       $("current-assignee").textContent = workflow.assigneeId ? getEquipierName(workflow.assigneeId) : "Non attribué";
 
