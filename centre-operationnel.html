@@ -702,10 +702,16 @@
     function getNumeroFE(value) {
       if (value === null || value === undefined || value === "") return "";
       const raw = String(value).trim();
-      const explicit = raw.match(/fait\s*n(?:°|º|o)?\s*["'«»]?\s*(\d{4,})/i);
-      if (explicit) return explicit[1];
-      const number = raw.match(/\b(\d{4,})\b/);
-      return number ? number[1] : raw;
+
+      // Les numéros de faits d’établissement sont des identifiants à 7 chiffres
+      // (ex. « Fait n°5571234 »). On cherche donc d’abord cet identifiant,
+      // afin de ne jamais confondre le numéro FE avec une année comme 2026.
+      const feNumber = raw.match(/(?:^|\D)(\d{7})(?!\d)/);
+      if (feNumber) return feNumber[1];
+
+      // Secours pour une éventuelle autre longueur explicitement précédée de « Fait n° ».
+      const explicit = raw.match(/fait\s*n(?:[^0-9]{0,6})?(\d{4,})/i);
+      return explicit ? explicit[1] : raw;
     }
 
     function parseGristDate(value) {
