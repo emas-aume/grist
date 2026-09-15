@@ -5283,6 +5283,18 @@
         y += headerHeight;
       }
 
+      /* Nettoie les caractères Unicode invisibles et les espaces spéciaux
+         avant le rendu jsPDF, afin d'éviter les mots artificiellement espacés. */
+      function cleanPdfText(value) {
+        return String(value ?? "")
+          .normalize("NFC")
+          .replace(/[\u00A0\u1680\u2000-\u200B\u202F\u205F\u3000]/g, " ")
+          .replace(/[\u200C-\u200F\u202A-\u202E\u2060-\u206F\uFEFF]/g, "")
+          .replace(/[\t\r\n]+/g, " ")
+          .replace(/ {2,}/g, " ")
+          .trim();
+      }
+
       function drawLevelBadge(level, x, rowY, rowHeight) {
         const isN3 = String(level) === "3";
         const badgeText = String(level || "-");
@@ -5337,7 +5349,9 @@
         degreeRecords.forEach(function(record) {
           const resume = formatValue(record[FIELD.RESUME], FIELD.RESUME);
           const timing = getFactTimingLabel(record);
-          const summaryText = resume + (timing ? " (" + timing + ")" : "");
+          const summaryText = cleanPdfText(
+            resume + (timing ? " (" + timing + ")" : "")
+          );
 
           const nom = formatValue(record[FIELD.ID_NOM], FIELD.ID_NOM);
           const ville = formatValue(record[FIELD.VILLE], FIELD.VILLE);
@@ -5351,9 +5365,11 @@
             ""
           ).trim();
 
-          const establishmentText = [pdfEstablishmentName, ville]
-            .filter(Boolean)
-            .join(" - ");
+          const establishmentText = cleanPdfText(
+            [pdfEstablishmentName, ville]
+              .filter(Boolean)
+              .join(" - ")
+          );
           /* Libellés spécifiques au PDF : pour AttPers, on affiche uniquement
              la nature des violences (sauf AttPers seul). */
           function getPdfFactLabel(type) {
@@ -5371,11 +5387,13 @@
             return labels[type] || getFullFactLabel(type);
           }
 
-          const typeText = Array.isArray(record._typeFait)
-            ? record._typeFait.map(function(type) {
-                return getPdfFactLabel(type);
-              }).join(" & ")
-            : "";
+          const typeText = cleanPdfText(
+            Array.isArray(record._typeFait)
+              ? record._typeFait.map(function(type) {
+                  return getPdfFactLabel(type);
+                }).join(" & ")
+              : ""
+          );
 
           setNormal(7.8);
           const summaryLines = doc.splitTextToSize(summaryText, colWidths[1] - 4);
