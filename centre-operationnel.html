@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -436,6 +435,8 @@
 
     .explanation-toggle[aria-expanded="false"] .chevron { transform: rotate(-90deg); }
 
+    .historical-section-header { margin-top: 22px; }
+
     .full-explanation-text {
       margin-top: 7px;
       white-space: normal;
@@ -745,6 +746,18 @@
               </button>
             </div>
             <div id="detail-full-explanation" class="summary-text full-explanation-text">—</div>
+
+            <div id="historical-followup-block" class="hidden">
+              <div class="full-explanation-header historical-section-header">
+                <span class="meta-label">Suivi établissement</span>
+              </div>
+              <div id="detail-historical-followup" class="summary-text">—</div>
+
+              <div class="full-explanation-header historical-section-header">
+                <span class="meta-label">Accompagnement EMAS</span>
+              </div>
+              <div id="detail-historical-emas" class="summary-text">—</div>
+            </div>
           </div>
         </div>
 
@@ -853,7 +866,8 @@
 
     const TABLE = Object.freeze({
       EQUIPIERS: "EQUIPIERS",
-      SUIVI: "SUIVI_FE"
+      SUIVI: "SUIVI_FE",
+      HISTORIQUE: "FE25_26"
     });
 
     const EQUIPIER_FIELD = Object.freeze({
@@ -875,6 +889,7 @@
     const PAGE_SIZE = 25;
 
     let rawFactRecords = [];
+    let historicalFactRecords = [];
     let allFacts = [];
     let equipiers = [];
     let followUps = [];
@@ -1371,57 +1386,144 @@
         .trim();
     }
 
+    const HISTORICAL_EQUIPIER_NAMES = Object.freeze({
+      "ALEXANDRE H": "Hervé",
+      "CASTEL JM": "J-M C",
+      "MERE A": "Alain",
+      "CABRERA R": "Richard",
+      "CAZE M C": "Marco",
+      "CAZE M-O": "Marco",
+      "CAZE M.C": "Marco",
+      "CAZE MO": "Marco",
+      "CHRISTOL C": "Catherine",
+      "CHRISTOL D": "David",
+      "DEMORIVALLE P": "Philippe",
+      "FEJAN L": "Luc",
+      "LALLEMAND JP": "Jean-Paul",
+      "MORELLI P": "Pascale",
+      "CHARNEAU F": "Frederic",
+      "CHARREYRE F": "François",
+      "CUVILLERS B": "Bastien",
+      "DELHOMMEAU JM": "Jean-Marc",
+      "ECHEYNNE T": "Thierry",
+      "EYCHENNE T": "Thierry",
+      "MEDINA P": "Philippe M",
+      "METAIS JL": "Jean-Luc",
+      "PALUMBO R": "Rachida",
+      "PONTANIER C": "Christophe",
+      "VITROLLES A": "Annie",
+      "CHAUDRILLIER V": "Véronique",
+      "PEREZ JL": "Jean-Louis",
+      "ROCHER J": "Jacques",
+      "SORG T": "Thierry S"
+    });
+
+    function getHistoricalEquipierName(value) {
+      const raw = String(value || "").replace(/\s+/g, " ").trim();
+      if (!raw) return "";
+      const key = raw.toUpperCase();
+      return HISTORICAL_EQUIPIER_NAMES[key] || raw;
+    }
+
+    function processCurrentFacts() {
+      return rawFactRecords.map(function(record) {
+        const date = parseGristDate(record[FIELD.DATE_SAISIE]);
+        const week = getISOWeekInfo(date);
+        const analysis = analyzeRecord(record);
+        const numero = getNumeroFE(record[FIELD.NUMERO_FE]);
+        return {
+          ...record,
+          _source: "current",
+          _anneeScolaire: "2026-2027",
+          _key: "current:" + numero,
+          _numeroFE: numero,
+          _departement: getDepartement(record),
+          _date: date,
+          _dateKey: formatDateKey(date),
+          _weekKey: week ? week.key : "",
+          _niveau: analysis.level,
+          _degre: analysis.degree,
+          _typeFait: analysis.types,
+          _nom: stripEstablishmentId(record[FIELD.ID_NOM]),
+          _ville: String(record[FIELD.VILLE] || "").trim(),
+          _writerInfo: extractWriterInfo(record),
+          _fullExplanation: extractFullExplanation(record)
+        };
+      }).filter(record => record._departement === DEPARTMENT && record._numeroFE);
+    }
+
+    function processHistoricalFacts() {
+      return historicalFactRecords.map(function(record) {
+        const numero = getNumeroFE(record.Numero_FE);
+        const date = parseGristDate(record.Date_de_saisie || record.Date_du_fait);
+        const week = getISOWeekInfo(date);
+        const analysis = analyzeRecord(record);
+        const rawDegree = normalizeText(record.Degre || "");
+        const degree = rawDegree.startsWith("1") ? "1er" : (rawDegree.startsWith("2") ? "2nd" : analysis.degree);
+        const dep = String(record.Departement || "").replace(/^0+/, "").trim();
+        return {
+          ...record,
+          _source: "historical",
+          _anneeScolaire: String(record.Annee_scolaire || "2025-2026"),
+          _key: "historical:" + numero,
+          _numeroFE: numero,
+          _departement: dep,
+          _date: date,
+          _dateKey: formatDateKey(date),
+          _weekKey: week ? week.key : "",
+          _niveau: String(record.Niveau_FE || analysis.level || "").match(/[23]/)?.[0] || "",
+          _degre: degree,
+          _typeFait: analysis.types,
+          _nom: String(record.Etablissement || "").trim(),
+          _ville: String(record.Ville || "").trim(),
+          _writerInfo: {
+            name: String(record.Redacteur || "").trim(),
+            email: String(record.Courriel_redacteur || "").trim(),
+            phone: formatFrenchPhone(record.Telephone_redacteur || "")
+          },
+          _fullExplanation: String(record.Expose_des_faits || "").trim(),
+          _historicalFollowup: String(record.Suivi_etablissement || "").trim(),
+          _historicalEmas: String(record.Accompagnement_EMAS || "").trim(),
+          _historicalEquipier: getHistoricalEquipierName(record.Equipier),
+          _historicalSummary: String(record.Resume_du_fait || "").trim()
+        };
+      }).filter(record => record._departement === DEPARTMENT && record._numeroFE);
+    }
+
     function processFacts() {
-      allFacts = rawFactRecords
-        .map(function(record) {
-          const date = parseGristDate(record[FIELD.DATE_SAISIE]);
-          const week = getISOWeekInfo(date);
-          const analysis = analyzeRecord(record);
-          return {
-            ...record,
-            _numeroFE: getNumeroFE(record[FIELD.NUMERO_FE]),
-            _departement: getDepartement(record),
-            _date: date,
-            _dateKey: formatDateKey(date),
-            _weekKey: week ? week.key : "",
-            _niveau: analysis.level,
-            _degre: analysis.degree,
-            _typeFait: analysis.types,
-            _nom: stripEstablishmentId(record[FIELD.ID_NOM]),
-            _ville: String(record[FIELD.VILLE] || "").trim(),
-            _writerInfo: extractWriterInfo(record),
-            _fullExplanation: extractFullExplanation(record)
-          };
-        })
-        .filter(record => record._departement === DEPARTMENT && record._numeroFE);
+      allFacts = [...processCurrentFacts(), ...processHistoricalFacts()];
     }
 
     async function reloadAuxiliaryTables() {
       try {
-        const [eqTable, followTable] = await Promise.all([
+        const [eqTable, followTable, historicalTable] = await Promise.all([
           grist.docApi.fetchTable(TABLE.EQUIPIERS),
-          grist.docApi.fetchTable(TABLE.SUIVI)
+          grist.docApi.fetchTable(TABLE.SUIVI),
+          grist.docApi.fetchTable(TABLE.HISTORIQUE)
         ]);
 
         equipiers = tableToRows(eqTable)
           .sort((a, b) => getRawEquipierName(a).localeCompare(getRawEquipierName(b), "fr"));
-
         followUps = tableToRows(followTable);
+        historicalFactRecords = tableToRows(historicalTable);
+        processFacts();
         rebuildFollowUpIndex();
         populateEquipierSelects();
 
         showDiagnostic(
-          allFacts.length + " fait(s) du département 34 chargé(s) — " + equipiers.length + " équipier(s).",
+          allFacts.length + " fait(s) du département 34 chargé(s), dont " + processHistoricalFacts().length + " historique(s) 2025-2026.",
           "ok"
         );
       } catch (error) {
         console.error(error);
         equipiers = [];
         followUps = [];
+        historicalFactRecords = [];
+        processFacts();
         followUpsByFE = new Map();
         populateEquipierSelects();
         showDiagnostic(
-          "Impossible de charger EQUIPIERS ou SUIVI_FE. Vérifie les IDs de tables/colonnes indiqués sous le fichier.",
+          "Impossible de charger EQUIPIERS, SUIVI_FE ou FE25_26. Vérifie les IDs de tables/colonnes.",
           "error"
         );
       }
@@ -1454,7 +1556,10 @@
       return followUpsByFE.get(getNumeroFE(feNumber)) || [];
     }
 
-    function getWorkflowState(feNumber) {
+    function getWorkflowState(feNumber, fact = null) {
+      if (fact && fact._source === "historical") {
+        return { status: "done", assigneeId: null, entries: [] };
+      }
       const entries = getFollowUpsForFE(feNumber);
       let status = "waiting";
       let assigneeId = null;
@@ -1518,7 +1623,7 @@
         if (selectedLevel !== "all" && fact._niveau !== selectedLevel) return false;
         if (selectedDegree !== "all" && fact._degre !== selectedDegree) return false;
 
-        const workflow = getWorkflowState(fact._numeroFE);
+        const workflow = getWorkflowState(fact._numeroFE, fact);
         if (selectedStatus !== "all" && workflow.status !== selectedStatus) return false;
 
         if (q) {
@@ -1529,7 +1634,10 @@
             fact._degre,
             fact._niveau,
             fact._typeFait.join(" "),
-            fact[FIELD.RESUME] || ""
+            fact._source === "historical" ? fact._historicalSummary : (fact[FIELD.RESUME] || ""),
+            fact._historicalFollowup || "",
+            fact._historicalEmas || "",
+            fact._historicalEquipier || ""
           ].join(" "));
           if (!haystack.includes(q)) return false;
         }
@@ -1580,22 +1688,25 @@
         body.innerHTML = `<tr><td colspan="7"><div class="empty-state">Aucun fait ne correspond aux filtres sélectionnés.</div></td></tr>`;
       } else {
         body.innerHTML = pageRows.map(function(fact) {
-          const workflow = getWorkflowState(fact._numeroFE);
+          const workflow = getWorkflowState(fact._numeroFE, fact);
+          const assignment = fact._source === "historical"
+            ? (fact._historicalEquipier ? `<span class="assignment-badge">${escapeHtml(fact._historicalEquipier)}</span>` : '<span class="assignment-badge unassigned">Non attribué</span>')
+            : assignmentBadgeHtml(workflow.assigneeId);
           return `
             <tr>
               <td>${fact._niveau ? `<span class="level-badge ${fact._niveau === "3" ? "level-3" : ""}">${escapeHtml(fact._niveau)}</span>` : '<span class="muted">—</span>'}</td>
               <td>${factBadgesHtml(fact._typeFait, fact._niveau)}</td>
               <td>${escapeHtml(fact._nom || "Établissement non renseigné")}</td>
               <td>${escapeHtml(fact._ville || "—")}</td>
-              <td><div class="status-assignment">${statusBadgeHtml(workflow.status)}${assignmentBadgeHtml(workflow.assigneeId)}</div></td>
+              <td><div class="status-assignment">${statusBadgeHtml(workflow.status)}${assignment}</div></td>
               <td><strong>${escapeHtml(fact._numeroFE)}</strong></td>
-              <td><button class="btn btn-small open-fe" data-fe="${escapeHtml(fact._numeroFE)}" type="button">Ouvrir</button></td>
+              <td><button class="btn btn-small open-fe" data-key="${escapeHtml(fact._key)}" type="button">Ouvrir</button></td>
             </tr>`;
         }).join("");
       }
 
       body.querySelectorAll(".open-fe").forEach(btn => {
-        btn.addEventListener("click", () => openFact(btn.dataset.fe));
+        btn.addEventListener("click", () => openFact(btn.dataset.key));
       });
 
       $("results-count").textContent = filtered.length + " fait(s) affiché(s)";
@@ -1608,8 +1719,8 @@
        FICHE FE
        ============================================================ */
 
-    function openFact(feNumber) {
-      selectedFE = allFacts.find(f => f._numeroFE === getNumeroFE(feNumber)) || null;
+    function openFact(factKey) {
+      selectedFE = allFacts.find(f => f._key === factKey) || null;
       if (!selectedFE) return;
       $("listing-view").classList.add("hidden");
       $("detail-view").classList.remove("hidden");
@@ -1626,7 +1737,8 @@
 
     function renderFactDetail() {
       if (!selectedFE) return;
-      const workflow = getWorkflowState(selectedFE._numeroFE);
+      const isHistorical = selectedFE._source === "historical";
+      const workflow = getWorkflowState(selectedFE._numeroFE, selectedFE);
 
       $("detail-title").textContent = "FE n°" + selectedFE._numeroFE + " — Niveau " + (selectedFE._niveau || "non renseigné");
       const degreeLabel = selectedFE._degre === "1er" ? "1er degré" : (selectedFE._degre === "2nd" ? "2nd degré" : "Degré non renseigné");
@@ -1638,30 +1750,70 @@
       if (writer.phone) writerParts.push(writer.phone);
       $("detail-author").textContent = writerParts.length ? writerParts.join(" — ") : "Rédacteur non renseigné";
       $("detail-types").innerHTML = factBadgesHtml(selectedFE._typeFait, selectedFE._niveau, true);
-      $("detail-summary").textContent = String(selectedFE[FIELD.RESUME] || "Résumé non renseigné").trim() || "Résumé non renseigné";
-      $("detail-full-explanation").textContent = selectedFE._fullExplanation || "Explications complètes non renseignées";
-      $("detail-full-explanation").classList.remove("hidden");
-      $("explanation-toggle").setAttribute("aria-expanded", "true");
-      $("explanation-toggle-text").textContent = "Masquer";
       $("detail-status").innerHTML = statusBadgeHtml(workflow.status);
-      if (workflow.assigneeId) {
-        $("assignee-label").textContent = "Attribué à";
-        $("current-assignee").textContent = getEquipierName(workflow.assigneeId);
+
+      if (isHistorical) {
+        $("assignee-label").textContent = selectedFE._historicalEquipier ? "Attribué à" : "Fait non attribué";
+        $("current-assignee").textContent = selectedFE._historicalEquipier || "";
+        $("assignee-select").classList.add("hidden");
+        $("assign-button").classList.add("hidden");
+
+        // Pour 2025-2026 : uniquement Exposé des faits + suivi établissement + accompagnement EMAS.
+        $("detail-summary").classList.add("hidden");
+        $("detail-summary").previousElementSibling.classList.add("hidden");
+        $("detail-full-explanation").textContent = selectedFE._fullExplanation || "Exposé des faits non renseigné";
+        const expLabel = $("explanation-toggle").closest(".full-explanation-header").querySelector(".meta-label");
+        expLabel.textContent = "Exposé des faits";
+        $("detail-full-explanation").classList.remove("hidden");
+        $("explanation-toggle").setAttribute("aria-expanded", "true");
+        $("explanation-toggle-text").textContent = "Masquer";
+
+        $("historical-followup-block").classList.remove("hidden");
+        $("detail-historical-followup").textContent = selectedFE._historicalFollowup || "Suivi établissement non renseigné";
+        $("detail-historical-emas").textContent = selectedFE._historicalEmas || "Accompagnement EMAS non renseigné";
+
+        $("timeline-content").innerHTML = "";
+        $("timeline-content").closest(".timeline").classList.add("hidden");
+        $("composer").classList.add("hidden");
+        $("closed-panel").classList.remove("hidden");
+        $("closed-panel").querySelector("span").textContent = "Fait historique 2025-2026 — clôturé définitivement.";
+        $("reopen-button").classList.add("hidden");
       } else {
-        $("assignee-label").textContent = "Fait non attribué";
-        $("current-assignee").textContent = "";
+        $("assignee-select").classList.remove("hidden");
+        $("assign-button").classList.remove("hidden");
+        if (workflow.assigneeId) {
+          $("assignee-label").textContent = "Attribué à";
+          $("current-assignee").textContent = getEquipierName(workflow.assigneeId);
+        } else {
+          $("assignee-label").textContent = "Fait non attribué";
+          $("current-assignee").textContent = "";
+        }
+        if (workflow.assigneeId && equipiers.some(e => Number(e.id) === Number(workflow.assigneeId))) {
+          $("assignee-select").value = String(workflow.assigneeId);
+        } else {
+          $("assignee-select").value = "";
+        }
+
+        $("detail-summary").previousElementSibling.classList.remove("hidden");
+        $("detail-summary").classList.remove("hidden");
+        $("detail-summary").textContent = String(selectedFE[FIELD.RESUME] || "Résumé non renseigné").trim() || "Résumé non renseigné";
+        const expLabel = $("explanation-toggle").closest(".full-explanation-header").querySelector(".meta-label");
+        expLabel.textContent = "Explications complètes";
+        $("detail-full-explanation").textContent = selectedFE._fullExplanation || "Explications complètes non renseignées";
+        $("detail-full-explanation").classList.remove("hidden");
+        $("explanation-toggle").setAttribute("aria-expanded", "true");
+        $("explanation-toggle-text").textContent = "Masquer";
+        $("historical-followup-block").classList.add("hidden");
+        $("timeline-content").closest(".timeline").classList.remove("hidden");
+        renderTimeline(workflow.entries);
+
+        const done = workflow.status === "done";
+        $("composer").classList.toggle("hidden", done);
+        $("closed-panel").classList.toggle("hidden", !done);
+        $("closed-panel").querySelector("span").textContent = "Ce fait est clôturé. Son historique reste consultable.";
+        $("reopen-button").classList.remove("hidden");
+        $("message-input").value = "";
       }
-
-      if (workflow.assigneeId && equipiers.some(e => Number(e.id) === Number(workflow.assigneeId))) {
-        $("assignee-select").value = String(workflow.assigneeId);
-      }
-
-      renderTimeline(workflow.entries);
-
-      const done = workflow.status === "done";
-      $("composer").classList.toggle("hidden", done);
-      $("closed-panel").classList.toggle("hidden", !done);
-      $("message-input").value = "";
     }
 
     function renderTimeline(entries) {
@@ -1756,7 +1908,7 @@
        ============================================================ */
 
     async function addFollowUp(type, options) {
-      if (isWriting || !selectedFE) return;
+      if (isWriting || !selectedFE || selectedFE._source === "historical") return;
       const fields = {
         [SUIVI_FIELD.NUMERO_FE]: selectedFE._numeroFE,
         [SUIVI_FIELD.TYPE_ENTREE]: type,
@@ -1791,13 +1943,14 @@
     }
 
     async function assignFact() {
+      if (!selectedFE || selectedFE._source === "historical") return;
       const assigneeId = Number($("assignee-select").value);
       if (!assigneeId) {
         appAlert("Choisis un équipier à qui attribuer ce fait.", "Attribution");
         return;
       }
 
-      const workflow = getWorkflowState(selectedFE._numeroFE);
+      const workflow = getWorkflowState(selectedFE._numeroFE, selectedFE);
       if (Number(workflow.assigneeId) === assigneeId) {
         appAlert("Ce fait est déjà attribué à " + getEquipierName(assigneeId) + ".", "Déjà attribué");
         return;
@@ -1807,11 +1960,13 @@
     }
 
     async function closeCurrentFact() {
+      if (!selectedFE || selectedFE._source === "historical") return;
       if (!(await appConfirm("La fiche restera consultable, mais aucun nouveau message ne pourra être envoyé tant qu’elle n’est pas réouverte.", { title: "Clôturer ce fait ?", confirmText: "Clôturer", danger: true }))) return;
       await addFollowUp("cloture");
     }
 
     async function reopenCurrentFact() {
+      if (!selectedFE || selectedFE._source === "historical") return;
       if (!(await appConfirm("Les messages de suivi pourront à nouveau être ajoutés à cette fiche.", { title: "Réouvrir ce fait ?", confirmText: "Réouvrir" }))) return;
       await addFollowUp("reouverture");
     }
