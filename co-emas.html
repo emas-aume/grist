@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -47,15 +48,25 @@ function norm(v){return String(v??"").normalize("NFD").replace(/[\u0300-\u036f]/
 function date(v){if(!v)return null;if(typeof v==="number")return new Date(v*1000);let d=new Date(v);return isNaN(d)?null:d}
 function dateFR(v){let d=date(v);return d?new Intl.DateTimeFormat("fr-FR").format(d):"—"}
 function notice(s,type=""){let n=$("notice");n.textContent=s;n.className="notice "+type}
-function flatten(r,source){return {id:r.id,...r.fields,_source:source}}
-async function api(table,{filter=null,sort=null,limit=null}={}){if(!tokenInfo)tokenInfo=await grist.docApi.getAccessToken({readOnly:true});let u=new URL(tokenInfo.baseUrl+"/tables/"+encodeURIComponent(table)+"/records");if(filter)u.searchParams.set("filter",JSON.stringify(filter));if(sort)u.searchParams.set("sort",sort);if(limit)u.searchParams.set("limit",String(limit));let res=await fetch(u,{headers:{Authorization:"Bearer "+tokenInfo.token}});if(!res.ok)throw new Error(table+" : "+res.status+" "+await res.text());let j=await res.json();return (j.records||[]).map(x=>flatten(x,table))}
+function tableRows(table,source){if(!table||!Array.isArray(table.id))return[];return table.id.map((id,i)=>{let r={id,_source:source};Object.keys(table).forEach(k=>{if(Array.isArray(table[k]))r[k]=table[k][i]});return r})}
+const tableCache=new Map();
+function sameValue(a,b){if(a===b)return true;if(a==null||b==null)return false;return String(a)===String(b)}
+function applyLocalFilter(data,filter){if(!filter)return data;return data.filter(r=>Object.entries(filter).every(([k,vals])=>{let wanted=Array.isArray(vals)?vals:[vals];return wanted.some(v=>sameValue(r[k],v))}))}
+function applyLocalSort(data,sort){if(!sort)return data;let keys=String(sort).split(',').map(x=>x.trim()).filter(Boolean);return [...data].sort((a,b)=>{for(let key of keys){let desc=key.startsWith('-');if(desc)key=key.slice(1);let av=a[key],bv=b[key];let ad=date(av),bd=date(bv);if(ad&&bd){av=ad.getTime();bv=bd.getTime()}if(av==null)av='';if(bv==null)bv='';let c=typeof av==='number'&&typeof bv==='number'?av-bv:String(av).localeCompare(String(bv),'fr',{numeric:true});if(c)return desc?-c:c}return 0})}
+async function api(table,{filter=null,sort=null,limit=null,fresh=false}={}){
+  // Custom Widget : on passe exclusivement par docApi. Cela évite les appels
+  // HTTP directs qui peuvent échouer (CORS/authentification) depuis GitHub Pages.
+  // FE25_26 n'est jamais chargé au démarrage : il ne l'est qu'à la demande.
+  let data;if(!fresh&&tableCache.has(table)){data=tableCache.get(table)}else{let raw=await grist.docApi.fetchTable(table);data=tableRows(raw,table);if(table!==T.SUIVI)tableCache.set(table,data)}
+  data=applyLocalFilter(data,filter);data=applyLocalSort(data,sort);if(limit)data=data.slice(0,limit);return data
+}
 function eqName(v){if(!v)return "Non attribué";return eqMap.get(Number(v))?.Nom||"Équipier #"+v}
 function etabUai(ref){return etabMap.get(Number(ref))?.UAI||""}
 function statusOf(f){let s=suiviMap.get(f.id);return f._source===T.OLD?"Terminé":(s?.Statut||"Non attribué")}
 function badgeStatus(s){let c=s==="Terminé"?"done":s==="En cours"?"progress":"waiting";return `<span class="badge ${c}">${esc(s)}</span>`}
 function factType(v){return String(v||"—").replace(/\s*;\s*/g," · ")}
 async function loadSmallTables(){let [eqs,ets]=await Promise.all([api(T.EQ,{limit:500}),api(T.ETAB,{limit:5000})]);eqMap=new Map(eqs.map(x=>[x.id,x]));etabMap=new Map(ets.map(x=>[x.id,x]));let opts='<option value="">Non attribué</option>'+eqs.sort((a,b)=>String(a.Nom||"").localeCompare(String(b.Nom||""),"fr")).map(e=>`<option value="${e.id}">${esc(e.Nom||e.Email||e.id)}</option>`).join("");$("equipier").innerHTML=opts}
-async function loadCurrent(){notice("Chargement des faits récents…");currentRows=await api(T.CUR,{sort:"-Date_de_saisie,-Numero_FE",limit:INITIAL_LIMIT});await loadSuiviFor(currentRows);rows=[...currentRows];notice(`${currentRows.length} faits récents chargés. Les archives ne sont interrogées qu’à la demande.`,"ok");page=1;render()}
+async function loadCurrent(){notice("Chargement des faits récents…");currentRows=await api(T.CUR,{sort:"-Date_de_saisie,-Numero_FE",limit:INITIAL_LIMIT,fresh:true});await loadSuiviFor(currentRows);rows=[...currentRows];notice(`${currentRows.length} faits récents chargés. Les archives ne sont interrogées qu’à la demande.`,"ok");page=1;render()}
 async function loadSuiviFor(facts){let ids=facts.filter(f=>f._source!==T.OLD).map(f=>f.id);if(!ids.length)return;let ss=await api(T.SUIVI,{filter:{Numero_FE:ids},limit:Math.max(ids.length*2,200)});ss.forEach(s=>suiviMap.set(Number(s.Numero_FE),s))}
 async function searchExactFE(num){notice("Recherche directe du FE n°"+num+"…");let n=Number(num);let found=await api(T.CUR,{filter:{Numero_FE:[n,String(num)]},limit:10});if(!found.length)found=await api(T.OLD,{filter:{Numero_FE:[n,String(num)]},limit:10});await loadSuiviFor(found);rows=found;page=1;render();notice(found.length?`${found.length} résultat(s) trouvé(s)${found[0]._source===T.OLD?" dans les archives 2025–2026":" en 2026–2027"}.`:`Aucun FE n°${num} trouvé en 2026–2027 ni dans les archives 2025–2026.`,found.length?"ok":"error")}
 function renderEtabMatches(q){let box=$("etabMatches");if(!q||/^\d{6,}$/.test(q)){box.classList.add("hidden");box.innerHTML="";return}let nq=norm(q);if(nq.length<3){box.classList.add("hidden");box.innerHTML="";return}let matches=[...etabMap.values()].filter(e=>norm([e.Etablissement,e.Nom_court,e.Ville,e.UAI].join(" ")).includes(nq)).slice(0,6);if(!matches.length){box.classList.add("hidden");box.innerHTML="";return}box.innerHTML=`<div class="notice"><strong>Établissement${matches.length>1?"s":""} correspondant${matches.length>1?"s":""}</strong><div class="actions" style="margin-top:8px">${matches.map(e=>`<button class="btn etab-result" data-etab="${e.id}">${esc(e.Etablissement||e.Nom_court||e.UAI)}${e.Ville?" — "+esc(e.Ville):""}</button>`).join("")}</div><div class="muted" style="margin-top:7px">Ouvrir un établissement affiche son historique toutes années par UAI.</div></div>`;box.classList.remove("hidden");box.querySelectorAll("[data-etab]").forEach(b=>b.onclick=()=>openEstablishmentById(Number(b.dataset.etab)))}
