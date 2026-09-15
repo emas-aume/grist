@@ -5094,6 +5094,33 @@
   }
 
 
+  /*
+    Nettoyage spécifique à jsPDF.
+    Les polices standard de jsPDF (Helvetica) ne gèrent pas toujours
+    correctement certains caractères typographiques Unicode, notamment
+    les tirets insécables. On les remplace uniquement dans le PDF.
+  */
+  function cleanPdfText(value) {
+    return String(value ?? "")
+      .normalize("NFC")
+      // Tirets typographiques / insécables -> tiret ASCII
+      .replace(/[\u2010\u2011\u2012\u2013\u2014\u2212]/g, "-")
+      // Apostrophes typographiques -> apostrophe simple
+      .replace(/[\u2018\u2019\u201A\u201B]/g, "'")
+      // Guillemets typographiques -> guillemets ASCII
+      .replace(/[\u201C\u201D\u201E\u201F]/g, '"')
+      // Espaces Unicode -> espace normal
+      .replace(/[\u00A0\u1680\u2000-\u200A\u202F\u205F\u3000]/g, " ")
+      // Caractères invisibles / directionnels
+      .replace(/[\u200B-\u200F\u202A-\u202E\u2060-\u206F\uFEFF]/g, "")
+      // Tabulations et retours à la ligne
+      .replace(/[\t\r\n]+/g, " ")
+      // Espaces multiples
+      .replace(/ {2,}/g, " ")
+      .trim();
+  }
+
+
   async function downloadSelectedWhiteNotePdf() {
 
     const button = document.getElementById("white-note-download");
@@ -5281,18 +5308,6 @@
           x += colWidths[index];
         });
         y += headerHeight;
-      }
-
-      /* Nettoie les caractères Unicode invisibles et les espaces spéciaux
-         avant le rendu jsPDF, afin d'éviter les mots artificiellement espacés. */
-      function cleanPdfText(value) {
-        return String(value ?? "")
-          .normalize("NFC")
-          .replace(/[\u00A0\u1680\u2000-\u200B\u202F\u205F\u3000]/g, " ")
-          .replace(/[\u200C-\u200F\u202A-\u202E\u2060-\u206F\uFEFF]/g, "")
-          .replace(/[\t\r\n]+/g, " ")
-          .replace(/ {2,}/g, " ")
-          .trim();
       }
 
       function drawLevelBadge(level, x, rowY, rowHeight) {
