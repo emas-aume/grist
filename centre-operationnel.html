@@ -904,17 +904,31 @@
     let currentPage = 1;
     let selectedFE = null;
     let isWriting = false;
+    let historicalLoaded = false;
+    let initialAuxiliaryLoadStarted = false;
 
     const $ = id => document.getElementById(id);
 
     grist.ready({ requiredAccess: "full" });
 
-    grist.onRecords(async function(records) {
+    grist.onRecords(function(records) {
+      // IMPORTANT : ne jamais bloquer onRecords sur les grosses tables annexes.
+      // Grist considère sinon le widget comme « Toujours en cours... » pendant
+      // tout le chargement de FE25_26 et peut rappeler onRecords inutilement.
       rawFactRecords = Array.isArray(records) ? records : [];
       processFacts();
-      await reloadAuxiliaryTables();
       populatePeriodFilters(true);
       renderListing();
+
+      // Les tables annexes, notamment FE25_26, ne sont chargées qu'une fois
+      // en arrière-plan au démarrage.
+      if (!initialAuxiliaryLoadStarted) {
+        initialAuxiliaryLoadStarted = true;
+        reloadAuxiliaryTables(true).then(function() {
+          populatePeriodFilters(true);
+          renderListing();
+        });
+      }
     });
 
     /* ============================================================
@@ -1452,14 +1466,44 @@
       }).filter(record => record._departement === DEPARTMENT && record._numeroFE);
     }
 
+    function getHistoricalFactTypes(value) {
+      const text = normalizeText(value || "");
+      if (!text) return [];
+      const types = [];
+      const add = type => { if (!types.includes(type)) types.push(type); };
+
+      if (text.includes("attvalrep") || text.includes("valeurs de la republique")) add("AttValRep");
+      if (text.includes("harcel")) add("Harcel");
+      if (text.includes("attbiens") || text.includes("atteinte aux biens") || text.includes("atteintes aux biens")) add("AttBiens");
+      if (text.includes("attsecu") || text.includes("atteinte a la securite") || text.includes("atteintes a la securite")) add("AttSecu");
+
+      const hasVP = /\bvp\b/.test(text) || text.includes("violence physique");
+      const hasVS = /\bvs\b/.test(text) || text.includes("violence sexuelle");
+      const hasVV = /\bvv\b/.test(text) || text.includes("violence verbale");
+      const hasPers = text.includes("attpers") || text.includes("atteinte aux personnes") || text.includes("atteintes aux personnes");
+      if (hasVP && hasVS && hasVV) add("AttPers: VP + VS + VV");
+      else if (hasVP && hasVS) add("AttPers: VP + VS");
+      else if (hasVP && hasVV) add("AttPers: VP + VV");
+      else if (hasVS && hasVV) add("AttPers: VS + VV");
+      else if (hasVP) add("AttPers: VP");
+      else if (hasVS) add("AttPers: VS");
+      else if (hasVV) add("AttPers: VV");
+      else if (hasPers) add("AttPers");
+      return types;
+    }
+
     function processHistoricalFacts() {
       return historicalFactRecords.map(function(record) {
         const numero = getNumeroFE(record.Numero_FE);
         const date = parseGristDate(record.Date_de_saisie || record.Date_du_fait);
         const week = getISOWeekInfo(date);
-        const analysis = analyzeRecord(record);
+        // FE25_26 est déjà une table normalisée : on exploite directement
+        // ses colonnes au lieu de relancer l'analyse coûteuse de toute la ligne.
         const rawDegree = normalizeText(record.Degre || "");
-        const degree = rawDegree.startsWith("1") ? "1er" : (rawDegree.startsWith("2") ? "2nd" : analysis.degree);
+        const establishmentText = normalizeText(record.Etablissement || "");
+        const fallbackDegree = /college|clg|lycee|lyc/.test(establishmentText) ? "2nd"
+          : (/ecole|circonscription/.test(establishmentText) ? "1er" : "");
+        const degree = rawDegree.startsWith("1") ? "1er" : (rawDegree.startsWith("2") ? "2nd" : fallbackDegree);
         const dep = String(record.Departement || "").replace(/^0+/, "").trim();
         return {
           ...record,
@@ -1471,9 +1515,9 @@
           _date: date,
           _dateKey: formatDateKey(date),
           _weekKey: week ? week.key : "",
-          _niveau: String(record.Niveau_FE || analysis.level || "").match(/[23]/)?.[0] || "",
+          _niveau: String(record.Niveau_FE || "").match(/[23]/)?.[0] || "",
           _degre: degree,
-          _typeFait: analysis.types,
+          _typeFait: getHistoricalFactTypes(record.Types_de_fait),
           _nom: String(record.Etablissement || "").trim(),
           _ville: String(record.Ville || "").trim(),
           _writerInfo: {
@@ -1494,18 +1538,30 @@
       allFacts = [...processCurrentFacts(), ...processHistoricalFacts()];
     }
 
-    async function reloadAuxiliaryTables() {
+    async function reloadAuxiliaryTables(includeHistorical = false) {
       try {
-        const [eqTable, followTable, historicalTable] = await Promise.all([
+        // Après le premier chargement, une écriture de suivi ne doit surtout pas
+        // re-télécharger les milliers de lignes de FE25_26.
+        const requests = [
           grist.docApi.fetchTable(TABLE.EQUIPIERS),
-          grist.docApi.fetchTable(TABLE.SUIVI),
-          grist.docApi.fetchTable(TABLE.HISTORIQUE)
-        ]);
+          grist.docApi.fetchTable(TABLE.SUIVI)
+        ];
+        if (includeHistorical && !historicalLoaded) {
+          requests.push(grist.docApi.fetchTable(TABLE.HISTORIQUE));
+        }
+
+        const tables = await Promise.all(requests);
+        const eqTable = tables[0];
+        const followTable = tables[1];
+        const historicalTable = tables[2];
 
         equipiers = tableToRows(eqTable)
           .sort((a, b) => getRawEquipierName(a).localeCompare(getRawEquipierName(b), "fr"));
         followUps = tableToRows(followTable);
-        historicalFactRecords = tableToRows(historicalTable);
+        if (historicalTable) {
+          historicalFactRecords = tableToRows(historicalTable);
+          historicalLoaded = true;
+        }
         processFacts();
         rebuildFollowUpIndex();
         populateEquipierSelects();
