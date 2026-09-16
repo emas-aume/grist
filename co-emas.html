@@ -103,10 +103,46 @@ async function restFetch(table,{filter=null,sort=null,limit=null}={},retry=true)
   if(!response.ok)throw new Error(`Grist API ${response.status} — ${await response.text()}`);
   return restRows(await response.json(),table);
 }
+async function getTokenInfo(){
+  const now=Date.now();
+  if(tokenInfo && tokenInfo._expiresAt && now < tokenInfo._expiresAt-30000){
+    return tokenInfo;
+  }
+  const t=await grist.docApi.getAccessToken({readOnly:false});
+  tokenInfo={...t,_expiresAt:now+(t.ttlMsecs||240000)};
+  return tokenInfo;
+}
+
+function restRecordsToRows(payload,source){
+  const records=Array.isArray(payload?.records)?payload.records:[];
+  return records.map(r=>({id:r.id,_source:source,...(r.fields||{})}));
+}
+
 async function api(table,{filter=null,sort=null,limit=null,fresh=false}={}){
-  // Requêtes ciblées côté serveur : Grist ne renvoie que les lignes utiles.
-  // Cela évite de télécharger FE25_26/FE26_27 en entier dans le navigateur.
-  return restFetch(table,{filter,sort,limit});
+  /*
+    API REST Grist : filter / sort / limit sont exécutés côté Grist.
+    Contrairement à fetchTable(), une demande de 150 FE ne télécharge donc
+    pas toute la table annuelle.
+  */
+  try{
+    const t=await getTokenInfo();
+    const params=new URLSearchParams();
+    params.set("auth",t.token);
+    if(filter)params.set("filter",JSON.stringify(filter));
+    if(sort)params.set("sort",sort);
+    if(limit!=null)params.set("limit",String(limit));
+
+    const url=t.baseUrl+"/tables/"+encodeURIComponent(table)+"/records?"+params.toString();
+    const response=await fetch(url,{method:"GET",credentials:"omit"});
+    if(!response.ok){
+      const detail=await response.text().catch(()=>response.statusText);
+      throw new Error("HTTP "+response.status+" — "+detail.slice(0,240));
+    }
+    return restRecordsToRows(await response.json(),table);
+  }catch(e){
+    const detail=(e&&e.message)?e.message:String(e);
+    throw new Error("Table "+table+" : "+detail);
+  }
 }
 function eqName(v){if(!v)return "N/A";return eqMap.get(Number(v))?.Nom||"Équipier #"+v}
 function etabUai(ref){return etabMap.get(Number(ref))?.UAI||""}
@@ -128,8 +164,8 @@ function equipierBadge(name){let n=String(name||"N/A");let empty=!name||n==="Non
 function isCurrentSchoolYear(f){let d=date(f.Date_de_saisie);if(!d)return false;let start=new Date(2026,8,1), end=new Date(2027,7,31,23,59,59);return d>=start&&d<=end}
 async function loadSmallTables(){let [eqs,ets]=await Promise.all([api(T.EQ,{limit:500}),api(T.ETAB,{limit:5000})]);eqMap=new Map(eqs.map(x=>[x.id,x]));etabMap=new Map(ets.map(x=>[x.id,x]));let opts='<option value="">Non attribué</option>'+eqs.sort((a,b)=>String(a.Nom||"").localeCompare(String(b.Nom||""),"fr")).map(e=>`<option value="${e.id}">${esc(e.Nom||e.Email||e.id)}</option>`).join("");$("equipier").innerHTML=opts}
 async function loadCurrent(){notice("Chargement des faits récents…");let loaded=await api(T.CUR,{sort:"-Date_de_saisie,-Numero_FE",limit:250,fresh:true});currentRows=loaded.filter(isCurrentSchoolYear).sort((a,b)=>(date(b.Date_de_saisie)?.getTime()||0)-(date(a.Date_de_saisie)?.getTime()||0)||Number(b.Numero_FE||0)-Number(a.Numero_FE||0)).slice(0,INITIAL_LIMIT);await loadSuiviFor(currentRows);rows=[...currentRows];notice(`${currentRows.length} faits 2026–2027 récents chargés. Les archives ne sont interrogées qu’à la demande.`,"ok");page=1;render()}
-async function loadSuiviFor(facts){let ids=facts.filter(f=>f._source!==T.OLD).map(f=>f.id);if(!ids.length)return;let ss=await api(T.SUIVI,{filter:{Numero_FE:ids},limit:Math.max(ids.length*2,200)});ss.forEach(s=>suiviMap.set(Number(s.Numero_FE),s))}
-async function searchExactFE(num){notice("Recherche directe du FE n°"+num+"…");let n=Number(num);let found=await api(T.CUR,{filter:{Numero_FE:[n,String(num)]},limit:10});if(!found.length)found=await api(T.OLD,{filter:{Numero_FE:[n,String(num)]},limit:10});await loadSuiviFor(found);rows=found;page=1;render();notice(found.length?`${found.length} résultat(s) trouvé(s)${found[0]._source===T.OLD?" dans les archives 2025–2026":" en 2026–2027"}.`:`Aucun FE n°${num} trouvé en 2026–2027 ni dans les archives 2025–2026.`,found.length?"ok":"error")}
+async function loadSuiviFor(facts){let ids=facts.filter(f=>f._source!==T.OLD).map(f=>Number(f.Numero_FE)).filter(Boolean);if(!ids.length)return;let ss=await api(T.SUIVI,{filter:{Numero_FE:ids},limit:Math.max(ids.length*2,200)});ss.forEach(s=>suiviMap.set(Number(s.Numero_FE),s))}
+async function searchExactFE(num){notice("Recherche directe du FE n°"+num+"…");let n=Number(num);let found=await api(T.CUR,{filter:{Numero_FE:[n]},limit:10});if(!found.length)found=await api(T.OLD,{filter:{Numero_FE:[n]},limit:10});await loadSuiviFor(found);rows=found;page=1;render();notice(found.length?`${found.length} résultat(s) trouvé(s)${found[0]._source===T.OLD?" dans les archives 2025–2026":" en 2026–2027"}.`:`Aucun FE n°${num} trouvé en 2026–2027 ni dans les archives 2025–2026.`,found.length?"ok":"error")}
 function renderEtabMatches(q){let box=$("etabMatches");if(!q||/^\d{6,}$/.test(q)){box.classList.add("hidden");box.innerHTML="";return}let nq=norm(q);if(nq.length<3){box.classList.add("hidden");box.innerHTML="";return}let matches=[...etabMap.values()].filter(e=>norm([e.Etablissement,e.Nom_court,e.Ville,e.UAI].join(" ")).includes(nq)).slice(0,6);if(!matches.length){box.classList.add("hidden");box.innerHTML="";return}box.innerHTML=`<div class="notice"><strong>Établissement${matches.length>1?"s":""} correspondant${matches.length>1?"s":""}</strong><div class="actions" style="margin-top:8px">${matches.map(e=>`<button class="btn etab-result" data-etab="${e.id}">${esc(e.Etablissement||e.Nom_court||e.UAI)}${e.Ville?" — "+esc(e.Ville):""}</button>`).join("")}</div><div class="muted" style="margin-top:7px">Ouvrir un établissement affiche son historique toutes années par UAI.</div></div>`;box.classList.remove("hidden");box.querySelectorAll("[data-etab]").forEach(b=>b.onclick=()=>openEstablishmentById(Number(b.dataset.etab)))}
 function depCode(v){let x=norm(v);if(!x)return "";if(/^0*11$/.test(x)||x.includes("aude"))return "11";if(/^0*30$/.test(x)||x.includes("gard"))return "30";if(/^0*34$/.test(x)||x.includes("herault"))return "34";if(/^0*48$/.test(x)||x.includes("lozere"))return "48";if(/^0*66$/.test(x)||x.includes("pyrenees orientales")||x.includes("pyrenees-orientales"))return "66";let m=x.match(/(?:^|\D)(11|30|34|48|66)(?:\D|$)/);return m?m[1]:String(v??"").trim()}
 function filtered(){let q=norm($("q").value),dep=$("dep").value,deg=$("degree").value,lev=$("level").value,st=$("status").value;return rows.filter(f=>{if(dep!=="all"&&depCode(f.Departement)!==dep)return false;if(deg!=="all"&&String(f.Degre)!==deg)return false;if(lev!=="all"&&String(f.Niveau)!==lev)return false;if(st!=="all"&&statusOf(f)!==st)return false;if(q&&!norm([f.Numero_FE,f.Etablissement,f.Ville,f.Types_de_fait,f.Resume_du_fait].join(" ")).includes(q))return false;return true}).sort((a,b)=>(date(b.Date_de_saisie)?.getTime()||0)-(date(a.Date_de_saisie)?.getTime()||0)||Number(b.Numero_FE||0)-Number(a.Numero_FE||0))}
@@ -137,12 +173,12 @@ function render(){let a=filtered(),pages=Math.max(1,Math.ceil(a.length/PAGE));pa
 function openEstablishmentFromFact(key){let [source,id]=key.split(":");let f=rows.find(x=>x._source===source&&x.id===Number(id));if(!f)return;selected=f;let ref=Number(f.UAI);let e=etabMap.get(ref);if(!e){notice("Établissement introuvable dans ETABLISSEMENTS.","error");return}selectedEtab=e;$("listView").classList.add("hidden");$("detailView").classList.add("hidden");openEstablishment(e,ref)}
 function info(label,val,cls=""){return `<div class="info ${cls}"><span class="label">${esc(label)}</span><div class="value">${esc(val||"—")}</div></div>`}
 async function openFact(key){let [source,id]=key.split(":");selected=rows.find(x=>x._source===source&&x.id===Number(id));if(!selected){let got=await api(source,{filter:{Numero_FE:[Number(key)]},limit:1});selected=got[0]}if(!selected)return;$("listView").classList.add("hidden");$("etabView").classList.add("hidden");$("detailView").classList.remove("hidden");$("title").textContent=`FE n°${selected.Numero_FE} — Niveau ${selected.Niveau||"—"}`;$("subtitle").textContent=`${dateFR(selected.Date_de_saisie)} — ${selected.Etablissement||"Établissement non renseigné"} — ${selected.Ville||""} — ${selected.Departement||""}`;let authorParts=[];if(selected.Redacteur)authorParts.push(String(selected.Redacteur).trim());if(selected.Courriel_redacteur)authorParts.push(String(selected.Courriel_redacteur).trim());let tel=String(selected.Telephone_redacteur||"").trim();$("detailAuthor").textContent=authorParts.length?`Rédigé par ${authorParts.join(", ")}${tel?" - "+tel:""}`:(tel?`Rédigé par - ${tel}`:"Rédacteur non renseigné");$("detailStatus").innerHTML=badgeStatus(statusOf(selected));$("sourceGrid").innerHTML=[`<div class="info span4"><span class="label">Type de fait</span><div class="detail-type-wrap">${factTypeBadges(selected.Types_de_fait,selected.Niveau)}</div></div>`,info("Résumé du fait",selected.Resume_du_fait,"span4"),info("Exposé des faits",selected.Expose_des_faits,"span4")].join("");if(source===T.OLD){$("opsCard").classList.remove("hidden");$("opsCard").innerHTML=`<div class="sectiontitle"><h2>Suivi archivé</h2>${badgeStatus("Terminé")}</div><div class="grid">${info("Équipier",selected.Equipier||"—")}${info("Date traitement EMAS",dateFR(selected.Date_traitement_EMS))}${info("Suivi établissement",selected.Suivi_etablissement||"Suivi non renseigné","span2")}${info("Accompagnement EMAS",selected.Accompagnement_EMAS||"Accompagnement non renseigné","span2")}</div>`;return}await loadSingleSuivi(selected);renderOps()}
-async function loadSingleSuivi(f){let ss=await api(T.SUIVI,{filter:{Numero_FE:[f.id]},limit:5});selectedSuivi=ss[0]||null;if(selectedSuivi)suiviMap.set(f.id,selectedSuivi)}
+async function loadSingleSuivi(f){let ss=await api(T.SUIVI,{filter:{Numero_FE:[Number(f.Numero_FE)]},limit:5});selectedSuivi=ss[0]||null;if(selectedSuivi)suiviMap.set(f.id,selectedSuivi)}
 function renderOps(){if(!document.getElementById("save")){location.reload();return}let s=selectedSuivi||{};$("equipier").value=s.Equipier?String(s.Equipier):"";$("editStatus").value=s.Statut||"Non attribué";$("suivi").value=s.Suivi_etablissement||"";$("emas").value=s.Accompagnement_EMAS||"";$("notes").value=s.Notes_informations||"";$("saveMeta").textContent=s.Derniere_modification?`Dernière modification : ${dateFR(s.Derniere_modification)}${s.Modifie_par?" — "+s.Modifie_par:""}`:"Aucun suivi enregistré"}
 async function saveOps(){if(!selected||selected._source===T.OLD)return;let eq=$("equipier").value?Number($("equipier").value):null,st=$("editStatus").value;if(eq&&st==="Non attribué")st="En cours";let fields={Equipier:eq,Statut:st,Suivi_etablissement:$("suivi").value.trim(),Accompagnement_EMAS:$("emas").value.trim(),Notes_informations:$("notes").value.trim(),Date_traitement_EMS:st==="Terminé"?Math.floor(Date.now()/1000):null,Derniere_modification:Math.floor(Date.now()/1000)};$("save").disabled=true;try{if(selectedSuivi){await grist.docApi.applyUserActions([["UpdateRecord",T.SUIVI,selectedSuivi.id,fields]])}else{fields.Numero_FE=selected.id;await grist.docApi.applyUserActions([["AddRecord",T.SUIVI,null,fields]])}await loadSingleSuivi(selected);renderOps();$("detailStatus").innerHTML=badgeStatus(statusOf(selected));render()}catch(e){alert("Enregistrement impossible : "+e.message)}finally{$("save").disabled=false}}
 async function showEstablishment(){if(!selected)return;let ref=Number(selected.UAI),e=etabMap.get(ref);return openEstablishment(e,ref)}
 async function openEstablishmentById(ref){let e=etabMap.get(Number(ref));if(!e)return;selectedEtab=e;$("listView").classList.add("hidden");$("detailView").classList.add("hidden");return openEstablishment(e,Number(ref))}
 async function openEstablishment(e,ref){$("detailView").classList.add("hidden");$("etabView").classList.remove("hidden");$("etabTitle").textContent=e?.Etablissement||selected.Etablissement||"Établissement";$("etabSub").textContent=[e?.UAI,e?.Ville,e?.Departement].filter(Boolean).join(" — ");$("etabGrid").innerHTML=[info("UAI",e?.UAI),info("Degré",e?.Degre),info("Ville",e?.Ville),info("Département",e?.Departement),info("Bassin",e?.Bassin),info("Type",e?.Type_etablissement),info("Secteur",e?.Secteur),info("Code postal",e?.Code_postal)].join("");$("history").innerHTML='<div class="loading">Chargement de l’historique par UAI…</div>';try{let [cur,old]=await Promise.all([api(T.CUR,{filter:{UAI:[ref]},sort:"-Date_de_saisie",limit:500}),api(T.OLD,{filter:{UAI:[ref]},sort:"-Date_de_saisie",limit:500})]);let all=[...cur,...old].sort((a,b)=>(date(b.Date_de_saisie)?.getTime()||0)-(date(a.Date_de_saisie)?.getTime()||0));await loadSuiviFor(cur);$("history").innerHTML=all.length?all.map(f=>`<div class="event"><div class="event-title">FE n°${esc(f.Numero_FE)} — Niveau ${esc(f.Niveau||"—")}</div><div class="event-meta">${dateFR(f.Date_de_saisie)} — ${esc(f.Annee_scolaire||"")} — ${esc(f.Types_de_fait||"")}</div><div>${esc(f.Resume_du_fait||"Résumé non renseigné")}</div><button class="btn" style="margin-top:7px" data-hist="${f._source}:${f.id}">Ouvrir la fiche</button></div>`).join(""):'<div class="muted">Aucun fait trouvé pour cet UAI.</div>';all.forEach(f=>{if(!rows.some(r=>r._source===f._source&&r.id===f.id))rows.push(f)});document.querySelectorAll("[data-hist]").forEach(b=>b.onclick=()=>openFact(b.dataset.hist))}catch(e){$("history").innerHTML='<div class="notice error">Impossible de charger l’historique : '+esc(e.message)+'</div>'}}
 let timer=null;$("q").oninput=()=>{clearTimeout(timer);timer=setTimeout(async()=>{let raw=$("q").value.trim();renderEtabMatches(raw);if(/^\d{6,}$/.test(raw)){await searchExactFE(raw)}else{rows=[...currentRows];page=1;render()}},300)};["dep","degree","level","status"].forEach(id=>$(id).onchange=()=>{page=1;render()});$("prev").onclick=()=>{page--;render()};$("next").onclick=()=>{page++;render()};$("back").onclick=()=>{$("detailView").classList.add("hidden");$("listView").classList.remove("hidden");render()};$("openEtab").onclick=showEstablishment;$("etabBack").onclick=()=>{$("etabView").classList.add("hidden");if(selected){$("detailView").classList.remove("hidden")}else{$("listView").classList.remove("hidden");render()}};$("save").onclick=saveOps;
-(async()=>{try{await loadSmallTables();await loadCurrent()}catch(e){console.error(e);notice("Erreur de connexion Grist : "+e.message,"error");$("body").innerHTML='<tr><td colspan="10" class="loading">Impossible de charger les données.</td></tr>'}})();
+(async()=>{try{await loadSmallTables();await loadCurrent()}catch(e){console.error(e);notice("Erreur Grist : "+e.message,"error");$("body").innerHTML='<tr><td colspan="10" class="loading">Impossible de charger les données.</td></tr>'}})();
 </script></body></html>
