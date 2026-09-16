@@ -65,7 +65,7 @@ function ensureRisWeekSelector(){
   return select.value || (weeks[0]?.key || "");
 }
 
-function renderNiveau3(){
+function renderPreparationRIS(){
   const host=document.getElementById("niveau3Content");
   if(!host) return;
 
@@ -136,7 +136,7 @@ function renderNiveau3(){
 document.addEventListener("change",function(e){
   if(e.target && e.target.id==="risWeekSelect"){
     ensureRisWeekSelector();
-      renderNiveau3();
+      renderPreparationRIS();
   }
 });
 
@@ -1032,6 +1032,25 @@ document.addEventListener("change",function(e){
 .ris-week-control label{font-weight:700;color:#475569}
 .ris-week-control select{border:1px solid #dbe2ea;border-radius:10px;padding:9px 34px 9px 12px;background:#fff;font:inherit}
 
+
+.preparation-ris{
+  width:calc(100% - 56px) !important;
+  max-width:1100px !important;
+  margin:28px auto !important;
+  padding:28px !important;
+  box-sizing:border-box !important;
+  background:#fff !important;
+  border:1px solid #dfe5ec !important;
+  border-radius:14px !important;
+}
+.preparation-ris .section-header{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:20px;
+  flex-wrap:wrap;
+}
+
 </style>
 
 </head>
@@ -1052,10 +1071,7 @@ document.addEventListener("change",function(e){
 
     <h2>Recherche des faits d’établissement</h2>
 
-    <p>
-      Recherche par semaine, date, département, niveau, degré, établissement,
-      ville ou numéro de fait.
-    </p>
+    
 
     <div
       id="diagnostic"
@@ -1541,7 +1557,7 @@ document.addEventListener("change",function(e){
       renderTable();
       renderWhiteNote();
       renderBRQ();
-      renderNiveau3();
+      renderPreparationRIS();
 
       showDiagnostic(
         "Connexion réussie : " + allRecords.length +
@@ -2747,7 +2763,7 @@ document.addEventListener("change",function(e){
   function setBrqPeriod(value) {
     selectedBrqPeriod = value;
     renderBRQ();
-    renderNiveau3();
+    renderPreparationRIS();
   }
 
   function getSelectedBrqRecords() {
@@ -5790,7 +5806,7 @@ document.addEventListener("change",function(e){
 </script>
 
 
-<section id="niveau3View" class="section-card preparation-ris">
+<section id="niveau3View" class="n3-dept preparation-ris">
   <div class="section-header">
     <div>
       <h2 id="risTitle">Préparation RIS</h2>
