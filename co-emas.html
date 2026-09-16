@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -19,12 +18,12 @@ select{background-color:#fff!important;color-scheme:light!important;}
 #listView .tablewrap table{table-layout:fixed;min-width:1120px}
 #listView th:nth-child(1),#listView td:nth-child(1){width:88px}
 #listView th:nth-child(2),#listView td:nth-child(2){width:72px;text-align:center}
-#listView th:nth-child(3),#listView td:nth-child(3){width:160px}
-#listView th:nth-child(4),#listView td:nth-child(4){width:245px}
+#listView th:nth-child(3),#listView td:nth-child(3){width:270px}
+#listView th:nth-child(4),#listView td:nth-child(4){width:175px}
 #listView th:nth-child(5),#listView td:nth-child(5){width:125px}
 #listView th:nth-child(6),#listView td:nth-child(6){width:110px}
-#listView th:nth-child(7),#listView td:nth-child(7){width:125px;white-space:nowrap}
-#listView th:nth-child(8),#listView td:nth-child(8){width:125px;white-space:nowrap}
+#listView th:nth-child(7),#listView td:nth-child(7){width:105px;white-space:nowrap}
+#listView th:nth-child(8),#listView td:nth-child(8){width:105px;white-space:nowrap}
 #listView th:nth-child(9),#listView td:nth-child(9){width:80px}
 #listView th:nth-child(10),#listView td:nth-child(10){width:85px}
 #listView td:nth-child(1){font-size:12.5px;white-space:nowrap}
@@ -68,25 +67,46 @@ select{background-color:#fff!important;color-scheme:light!important;}
 </main>
 <script>
 "use strict";
-const T={CUR:"FE26_27",OLD:"FE25_26",SUIVI:"SUIVI_FE26_27",EQ:"EQUIPIERS",ETAB:"ETABLISSEMENTS"};
+const T={CUR:"FE26_27_2",OLD:"FE25_26",SUIVI:"SUIVI_FE26_27",EQ:"EQUIPIERS",ETAB:"ETABLISSEMENTS"};
 const PAGE=25, INITIAL_LIMIT=150; let tokenInfo=null,currentRows=[],rows=[],suiviMap=new Map(),eqMap=new Map(),etabMap=new Map(),page=1,selected=null,selectedSuivi=null,selectedEtab=null;
 const $=id=>document.getElementById(id); grist.ready({requiredAccess:"full"});
 function esc(v){return String(v??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;")}
 function norm(v){return String(v??"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/\s+/g," ").trim()}
 function date(v){if(!v)return null;if(typeof v==="number")return new Date(v*1000);let d=new Date(v);return isNaN(d)?null:d}
 function dateFR(v){let d=date(v);return d?new Intl.DateTimeFormat("fr-FR").format(d):"—"}
-function notice(s,type=""){let n=$("notice");if(!n)return;n.textContent=s;n.className="hidden"}
+function notice(s,type=""){let n=$("notice");if(!n)return;n.textContent=s;n.className="notice"+(type?" "+type:"")}
 function tableRows(table,source){if(!table||!Array.isArray(table.id))return[];return table.id.map((id,i)=>{let r={id,_source:source};Object.keys(table).forEach(k=>{if(Array.isArray(table[k]))r[k]=table[k][i]});return r})}
 const tableCache=new Map();
 function sameValue(a,b){if(a===b)return true;if(a==null||b==null)return false;return String(a)===String(b)}
 function applyLocalFilter(data,filter){if(!filter)return data;return data.filter(r=>Object.entries(filter).every(([k,vals])=>{let wanted=Array.isArray(vals)?vals:[vals];return wanted.some(v=>sameValue(r[k],v))}))}
 function applyLocalSort(data,sort){if(!sort)return data;let keys=String(sort).split(',').map(x=>x.trim()).filter(Boolean);return [...data].sort((a,b)=>{for(let key of keys){let desc=key.startsWith('-');if(desc)key=key.slice(1);let av=a[key],bv=b[key];let ad=date(av),bd=date(bv);if(ad&&bd){av=ad.getTime();bv=bd.getTime()}if(av==null)av='';if(bv==null)bv='';let c=typeof av==='number'&&typeof bv==='number'?av-bv:String(av).localeCompare(String(bv),'fr',{numeric:true});if(c)return desc?-c:c}return 0})}
+async function getRestToken(force=false){
+  if(tokenInfo && !force)return tokenInfo;
+  tokenInfo=await grist.docApi.getAccessToken({readOnly:true});
+  return tokenInfo;
+}
+function restRows(payload,source){
+  const list=Array.isArray(payload?.records)?payload.records:[];
+  return list.map(rec=>({id:rec.id,_source:source,...(rec.fields||{})}));
+}
+async function restFetch(table,{filter=null,sort=null,limit=null}={},retry=true){
+  const auth=await getRestToken(false);
+  const base=String(auth.baseUrl||'').replace(/\/$/,'');
+  const params=new URLSearchParams();
+  if(filter)params.set('filter',JSON.stringify(filter));
+  if(sort)params.set('sort',sort);
+  if(limit!=null)params.set('limit',String(limit));
+  params.set('cellFormat','normal');
+  const url=`${base}/tables/${encodeURIComponent(table)}/records?${params.toString()}`;
+  const response=await fetch(url,{headers:{Authorization:`Bearer ${auth.token}`}});
+  if(response.status===401&&retry){tokenInfo=null;await getRestToken(true);return restFetch(table,{filter,sort,limit},false)}
+  if(!response.ok)throw new Error(`Grist API ${response.status} — ${await response.text()}`);
+  return restRows(await response.json(),table);
+}
 async function api(table,{filter=null,sort=null,limit=null,fresh=false}={}){
-  // Custom Widget : on passe exclusivement par docApi. Cela évite les appels
-  // HTTP directs qui peuvent échouer (CORS/authentification) depuis GitHub Pages.
-  // FE25_26 n'est jamais chargé au démarrage : il ne l'est qu'à la demande.
-  let data;if(!fresh&&tableCache.has(table)){data=tableCache.get(table)}else{let raw=await grist.docApi.fetchTable(table);data=tableRows(raw,table);if(table!==T.SUIVI)tableCache.set(table,data)}
-  data=applyLocalFilter(data,filter);data=applyLocalSort(data,sort);if(limit)data=data.slice(0,limit);return data
+  // Requêtes ciblées côté serveur : Grist ne renvoie que les lignes utiles.
+  // Cela évite de télécharger FE25_26/FE26_27 en entier dans le navigateur.
+  return restFetch(table,{filter,sort,limit});
 }
 function eqName(v){if(!v)return "N/A";return eqMap.get(Number(v))?.Nom||"Équipier #"+v}
 function etabUai(ref){return etabMap.get(Number(ref))?.UAI||""}
@@ -107,7 +127,7 @@ function factTypeBadges(v,level){
 function equipierBadge(name){let n=String(name||"N/A");let empty=!name||n==="Non attribué"||n==="N/A";if(empty)n="N/A";return `<span class="equipier-badge ${empty?"unassigned":""}">${esc(n)}</span>`}
 function isCurrentSchoolYear(f){let d=date(f.Date_de_saisie);if(!d)return false;let start=new Date(2026,8,1), end=new Date(2027,7,31,23,59,59);return d>=start&&d<=end}
 async function loadSmallTables(){let [eqs,ets]=await Promise.all([api(T.EQ,{limit:500}),api(T.ETAB,{limit:5000})]);eqMap=new Map(eqs.map(x=>[x.id,x]));etabMap=new Map(ets.map(x=>[x.id,x]));let opts='<option value="">Non attribué</option>'+eqs.sort((a,b)=>String(a.Nom||"").localeCompare(String(b.Nom||""),"fr")).map(e=>`<option value="${e.id}">${esc(e.Nom||e.Email||e.id)}</option>`).join("");$("equipier").innerHTML=opts}
-async function loadCurrent(){notice("Chargement des faits récents…");let loaded=await api(T.CUR,{sort:"-Date_de_saisie,-Numero_FE",limit:null,fresh:true});currentRows=loaded.filter(isCurrentSchoolYear).sort((a,b)=>(date(b.Date_de_saisie)?.getTime()||0)-(date(a.Date_de_saisie)?.getTime()||0)||Number(b.Numero_FE||0)-Number(a.Numero_FE||0)).slice(0,INITIAL_LIMIT);await loadSuiviFor(currentRows);rows=[...currentRows];notice(`${currentRows.length} faits 2026–2027 récents chargés. Les archives ne sont interrogées qu’à la demande.`,"ok");page=1;render()}
+async function loadCurrent(){notice("Chargement des faits récents…");let loaded=await api(T.CUR,{sort:"-Date_de_saisie,-Numero_FE",limit:250,fresh:true});currentRows=loaded.filter(isCurrentSchoolYear).sort((a,b)=>(date(b.Date_de_saisie)?.getTime()||0)-(date(a.Date_de_saisie)?.getTime()||0)||Number(b.Numero_FE||0)-Number(a.Numero_FE||0)).slice(0,INITIAL_LIMIT);await loadSuiviFor(currentRows);rows=[...currentRows];notice(`${currentRows.length} faits 2026–2027 récents chargés. Les archives ne sont interrogées qu’à la demande.`,"ok");page=1;render()}
 async function loadSuiviFor(facts){let ids=facts.filter(f=>f._source!==T.OLD).map(f=>f.id);if(!ids.length)return;let ss=await api(T.SUIVI,{filter:{Numero_FE:ids},limit:Math.max(ids.length*2,200)});ss.forEach(s=>suiviMap.set(Number(s.Numero_FE),s))}
 async function searchExactFE(num){notice("Recherche directe du FE n°"+num+"…");let n=Number(num);let found=await api(T.CUR,{filter:{Numero_FE:[n,String(num)]},limit:10});if(!found.length)found=await api(T.OLD,{filter:{Numero_FE:[n,String(num)]},limit:10});await loadSuiviFor(found);rows=found;page=1;render();notice(found.length?`${found.length} résultat(s) trouvé(s)${found[0]._source===T.OLD?" dans les archives 2025–2026":" en 2026–2027"}.`:`Aucun FE n°${num} trouvé en 2026–2027 ni dans les archives 2025–2026.`,found.length?"ok":"error")}
 function renderEtabMatches(q){let box=$("etabMatches");if(!q||/^\d{6,}$/.test(q)){box.classList.add("hidden");box.innerHTML="";return}let nq=norm(q);if(nq.length<3){box.classList.add("hidden");box.innerHTML="";return}let matches=[...etabMap.values()].filter(e=>norm([e.Etablissement,e.Nom_court,e.Ville,e.UAI].join(" ")).includes(nq)).slice(0,6);if(!matches.length){box.classList.add("hidden");box.innerHTML="";return}box.innerHTML=`<div class="notice"><strong>Établissement${matches.length>1?"s":""} correspondant${matches.length>1?"s":""}</strong><div class="actions" style="margin-top:8px">${matches.map(e=>`<button class="btn etab-result" data-etab="${e.id}">${esc(e.Etablissement||e.Nom_court||e.UAI)}${e.Ville?" — "+esc(e.Ville):""}</button>`).join("")}</div><div class="muted" style="margin-top:7px">Ouvrir un établissement affiche son historique toutes années par UAI.</div></div>`;box.classList.remove("hidden");box.querySelectorAll("[data-etab]").forEach(b=>b.onclick=()=>openEstablishmentById(Number(b.dataset.etab)))}
