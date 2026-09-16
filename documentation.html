@@ -13,7 +13,134 @@
 
   <title>Documentation EMAS</title>
 
-  <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
+  <script src="https://docs.getgrist.com/grist-plugin-api.js">
+function escapeN3(value){
+  return String(value ?? "")
+    .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+    .replace(/"/g,"&quot;").replace(/'/g,"&#039;");
+}
+
+function n3Field(record, names){
+  for(const name of names){
+    if(record[name] !== undefined && record[name] !== null && String(record[name]).trim() !== ""){
+      return String(record[name]).trim();
+    }
+  }
+  return "";
+}
+
+function n3Date(record){
+  const raw = record.Date_du_fait || record._dateDuFait || record.Date_de_saisie || "";
+  const d = parseGristDate(raw);
+  return d ? formatDocumentationDateFR(d) : String(raw || "");
+}
+
+function getRisWeeks(){
+  const map=new Map();
+  for(const r of (processedRecords || [])){
+    if(String(r._niveau || r.Niveau || "").trim()!=="3") continue;
+    if(!r._weekKey) continue;
+    if(!map.has(r._weekKey)){
+      map.set(r._weekKey,{
+        key:r._weekKey,
+        year:r._weekYear || "",
+        week:Number(r._weekNumber || String(r._weekKey).match(/(\d+)$/)?.[1] || 0)
+      });
+    }
+  }
+  return [...map.values()].sort((a,b)=>
+    Number(b.year)-Number(a.year) || Number(b.week)-Number(a.week)
+  );
+}
+
+function ensureRisWeekSelector(){
+  const select=document.getElementById("risWeekSelect");
+  if(!select) return null;
+  const weeks=getRisWeeks();
+  const previous=select.value;
+  select.innerHTML=weeks.map(w =>
+    `<option value="${escapeN3(w.key)}">S${w.week} — ${w.year}</option>`
+  ).join("");
+  if(previous && weeks.some(w=>w.key===previous)) select.value=previous;
+  return select.value || (weeks[0]?.key || "");
+}
+
+function renderNiveau3(){
+  const host=document.getElementById("niveau3Content");
+  if(!host) return;
+
+  const select=document.getElementById("risWeekSelect");
+  let selectedWeek=select?.value || ensureRisWeekSelector();
+  let rows=(processedRecords || []).filter(r => String(r._niveau || r.Niveau || "").trim()==="3");
+
+  if(selectedWeek){
+    rows=rows.filter(r => r._weekKey===selectedWeek);
+  }
+
+  const selectedInfo=getRisWeeks().find(w=>w.key===selectedWeek);
+  const title=document.getElementById("risTitle");
+  if(title) title.textContent=selectedInfo ? `Préparation RIS S${selectedInfo.week}` : "Préparation RIS";
+
+  const order=[
+    ["48","LOZÈRE"],
+    ["30","GARD"],
+    ["34","HÉRAULT"],
+    ["11","AUDE"],
+    ["66","PYRÉNÉES-ORIENTALES"]
+  ];
+
+  let output="";
+  for(const [code,label] of order){
+    const deptRows=rows.filter(r=>String(r._departement||"")===code);
+    output+=`<div class="n3-dept">${label}</div>`;
+
+    for(const degree of ["1er","2nd"]){
+      output+=`<div class="n3-degree">${degree} degré</div>`;
+      const degreeRows=deptRows
+        .filter(r=>String(r._degre||"").toLowerCase().startsWith(degree==="1er"?"1":"2"))
+        .sort((a,b)=>{
+          const da=parseGristDate(a.Date_du_fait||a.Date_de_saisie)?.getTime()||0;
+          const db=parseGristDate(b.Date_du_fait||b.Date_de_saisie)?.getTime()||0;
+          return db-da;
+        });
+
+      if(!degreeRows.length){
+        output+=`<div class="n3-empty">Aucun fait de niveau 3.</div>`;
+        continue;
+      }
+
+      for(const r of degreeRows){
+        const etab=n3Field(r,["Etablissement"]) || "Établissement non renseigné";
+        const ville=n3Field(r,["Ville"]) || "Ville non renseignée";
+        const numero=n3Field(r,["Numero_FE"]) || "";
+        const fait=n3Field(r,["Resume_du_fait","Résumé_du_fait","Resume"]);
+        const suite=n3Field(r,["Suivi_etablissement","Suite_etablissement"]);
+        const emas=n3Field(r,["Accompagnement_EMAS","Traitement_EMAS","Traitement_emas"]);
+
+        output+=`
+          <article class="n3-fact">
+            <h3>${escapeN3(etab)} – ${escapeN3(ville)} – ${escapeN3(n3Date(r))} – FE n°${escapeN3(numero)}</h3>
+            <p><strong>Fait :</strong> ${escapeN3(fait || "Non renseigné")}</p>
+            <p><strong>Suite établissement :</strong> ${escapeN3(suite || "Non renseignée")}</p>
+            <p><strong>Traitement EMAS :</strong> ${escapeN3(emas || "Non renseigné")}</p>
+          </article>`;
+      }
+    }
+  }
+  host.innerHTML=output || '<div class="n3-empty">Aucun fait de niveau 3 pour cette semaine.</div>';
+}
+
+
+
+
+document.addEventListener("change",function(e){
+  if(e.target && e.target.id==="risWeekSelect"){
+    ensureRisWeekSelector();
+      renderNiveau3();
+  }
+});
+
+</script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
@@ -887,7 +1014,25 @@
     }
 
 
-  </style>
+  
+    #diagnostic.success, .diagnostic.success, .notice.success { display:none !important; }
+
+
+.niveau3-content{margin-top:18px}
+.n3-dept{margin:30px 0 12px;font-size:22px;font-weight:800;text-transform:uppercase}
+.n3-degree{margin:22px 0 12px;font-size:18px;font-weight:800}
+.n3-fact{padding:0 0 22px;margin:0 0 22px;border-bottom:1px solid #e5e7eb}
+.n3-fact h3{font-size:16px;line-height:1.45;margin:0 0 12px}
+.n3-fact p{margin:7px 0;line-height:1.55;white-space:pre-wrap}
+.n3-empty{color:#64748b;font-style:italic;margin:8px 0 18px}
+.n3-help{color:#64748b;margin-top:4px}
+
+
+.ris-week-control{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.ris-week-control label{font-weight:700;color:#475569}
+.ris-week-control select{border:1px solid #dbe2ea;border-radius:10px;padding:9px 34px 9px 12px;background:#fff;font:inherit}
+
+</style>
 
 </head>
 
@@ -898,21 +1043,7 @@
 
   <!-- EN-TÊTE -->
 
-  <section class="hero">
-
-    <h1>Documentation EMAS</h1>
-
-    <p>
-      Recherche des faits d’établissement, génération des Notes Blanches
-      et consultation des BRQ de l’année scolaire 2026-2027.
-    </p>
-
-    <p class="muted">
-      Cette page est indépendante du centre opérationnel et lit directement
-      la table normalisée FE26_27 afin de limiter le temps de chargement.
-    </p>
-
-  </section>
+  
 
 
   <!-- PREMIER TABLEAU -->
@@ -1243,6 +1374,7 @@
 
   const DATA_TABLE = "FE26_27_2";
   const ETAB_TABLE = "ETABLISSEMENTS";
+  let processedRecords = [];
   let dataLoadStarted = false;
 
   function gristTableToRows(table) {
@@ -1344,7 +1476,7 @@
       const records = gristTableToRows(table);
       const etabRows = gristTableToRows(etabTable);
       const etabMap = new Map(etabRows.map(row => [Number(row.id), row]));
-      const processedRecords = [];
+      processedRecords = [];
 
       for (let i = 0; i < records.length; i++) {
         const rawSource = records[i] || {};
@@ -1409,6 +1541,7 @@
       renderTable();
       renderWhiteNote();
       renderBRQ();
+      renderNiveau3();
 
       showDiagnostic(
         "Connexion réussie : " + allRecords.length +
@@ -2614,6 +2747,7 @@
   function setBrqPeriod(value) {
     selectedBrqPeriod = value;
     renderBRQ();
+    renderNiveau3();
   }
 
   function getSelectedBrqRecords() {
@@ -5654,6 +5788,21 @@
   loadDocumentationData();
 
 </script>
+
+
+<section id="niveau3View" class="section-card preparation-ris">
+  <div class="section-header">
+    <div>
+      <h2 id="risTitle">Préparation RIS</h2>
+      <p class="n3-help">Vue des faits d’établissement de niveau 3 sur l’ensemble de la semaine sélectionnée, pour préparer le RIS de la semaine suivante.</p>
+    </div>
+    <div class="ris-week-control">
+      <label for="risWeekSelect">Semaine</label>
+      <select id="risWeekSelect"></select>
+    </div>
+  </div>
+  <div id="niveau3Content" class="niveau3-content"></div>
+</section>
 
 </body>
 
