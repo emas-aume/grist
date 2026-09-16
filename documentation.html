@@ -1242,6 +1242,7 @@
   */
 
   const DATA_TABLE = "FE26_27_2";
+  const ETAB_TABLE = "ETABLISSEMENTS";
   let dataLoadStarted = false;
 
   function gristTableToRows(table) {
@@ -1265,11 +1266,35 @@
     }).format(d);
   }
 
+  const EMAS_DEPARTMENTS = new Set(["11", "30", "34", "48", "66"]);
+
   function normalizeDepartment(value, uai) {
-    const direct = String(value ?? "").match(/\d{1,3}/);
-    if (direct) return String(Number(direct[0]));
-    const uaiMatch = String(uai ?? "").trim().match(/^(\d{3})/);
-    return uaiMatch ? String(Number(uaiMatch[1])) : "";
+    const text = normalizeText(value || "");
+    const names = {
+      "aude": "11",
+      "gard": "30",
+      "herault": "34",
+      "lozere": "48",
+      "pyrenees orientales": "66",
+      "pyrenees-orientales": "66"
+    };
+
+    for (const [name, code] of Object.entries(names)) {
+      if (text.includes(name)) return code;
+    }
+
+    const direct = String(value ?? "").trim().match(/^(11|30|34|48|66)$/);
+    if (direct) return direct[1];
+
+    /* Un vrai UAI commence par le code département sur 3 chiffres :
+       011..., 030..., 034..., 048..., 066... */
+    const uaiMatch = String(uai ?? "").trim().match(/^(011|030|034|048|066)/);
+    if (uaiMatch) {
+      const code = String(Number(uaiMatch[1]));
+      return EMAS_DEPARTMENTS.has(code) ? code : "";
+    }
+
+    return "";
   }
 
   function buildIdEtNom(record) {
@@ -1277,6 +1302,21 @@
     const nom = String(record[FIELD.ETABLISSEMENT] ?? "").trim();
     if (uai && nom) return uai + " - " + nom;
     return nom || uai || "Établissement non renseigné";
+  }
+
+  function resolveEstablishment(source, etabMap) {
+    const ref = Number(source[FIELD.UAI]);
+    const etab = Number.isFinite(ref) ? etabMap.get(ref) : null;
+    if (!etab) return { ...source };
+
+    return {
+      ...source,
+      [FIELD.UAI]: etab.UAI ?? source[FIELD.UAI],
+      [FIELD.ETABLISSEMENT]:
+        etab.Etablissement ?? etab.Nom_court ?? source[FIELD.ETABLISSEMENT],
+      [FIELD.VILLE]: etab.Ville ?? source[FIELD.VILLE],
+      [FIELD.DEPARTEMENT]: etab.Departement ?? source[FIELD.DEPARTEMENT]
+    };
   }
 
   function normalizeDegree(value) {
@@ -1294,15 +1334,21 @@
   async function loadDocumentationData() {
     if (dataLoadStarted) return;
     dataLoadStarted = true;
-    showDiagnostic("Connexion à FE26_27…", "");
+    showDiagnostic("Chargement des faits et du référentiel établissements…", "");
 
     try {
-      const table = await grist.docApi.fetchTable(DATA_TABLE);
+      const [table, etabTable] = await Promise.all([
+        grist.docApi.fetchTable(DATA_TABLE),
+        grist.docApi.fetchTable(ETAB_TABLE)
+      ]);
       const records = gristTableToRows(table);
+      const etabRows = gristTableToRows(etabTable);
+      const etabMap = new Map(etabRows.map(row => [Number(row.id), row]));
       const processedRecords = [];
 
       for (let i = 0; i < records.length; i++) {
-        const source = records[i] || {};
+        const rawSource = records[i] || {};
+        const source = resolveEstablishment(rawSource, etabMap);
         if (!getNumeroFE(source[FIELD.NUMERO_FE])) continue;
 
         const dateSaisie = parseGristDate(source[FIELD.DATE_SAISIE]);
@@ -4131,10 +4177,7 @@
             FIELD.VILLE
           );
 
-          value =
-            ville && record._departement
-              ? `${ville} (${record._departement})`
-              : ville;
+          value = ville;
         }
 
         else {
