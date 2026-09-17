@@ -394,10 +394,10 @@ async function syncActivity(f,s){
     [["Gravite","Gravité"],f.Gravite??null],
     [["UAI_Etab","UAI Etab","UAI_Etablissement"],e.UAI||f.UAI||""],
     [["Etablissement","Établissement"],f.Etablissement||e.Etablissement||e.Nom_court||""],
-    [["Degre","Degré"],f.Degre||e.Degre||""],
+    [["Degre","Degré"],table===T.ACT_D1?1:2],
     [["Commune","Ville"],f.Ville||e.Ville||""],
     [["Bassin"],e.Bassin||""],
-    [["Departement","Département"],factDept(f)||f.Departement||e.Departement||""],
+    [["Departement","Département"],f.Departement||e.Departement||factDept(f)||""],
     [["Resume_FE","Résumé_FE","Résumé FE"],f.Resume_du_fait||""],
     [["Suivi_etablissement","Suivi_établissement","Suivi établissement"],s.Suivi_etablissement||""],
     [["Accompagnement_EMAS","Accompagnement EMAS"],s.Accompagnement_EMAS||""],
@@ -407,11 +407,11 @@ async function syncActivity(f,s){
     [["Date_traitement_EMS","Date traitement EMS"],s.Date_traitement_EMS||null],
     [["Delai","Délai"],activityDelay(f.Date_de_saisie,s.Date_traitement_EMS)],
     [["Equipier","Équipier"],s.Equipier||null],
-    [["Securisation","Sécurisation"],gristChoiceList(choiceValues(s.Securisation))],
-    [["Prevention","Prévention"],gristChoiceList(choiceValues(s.Prevention))],
-    [["Accompagnement"],gristChoiceList(choiceValues(s.Accompagnement))],
-    [["Formation"],gristChoiceList(choiceValues(s.Formation))],
-    [["Representation_Partenariat","Représentation Partenariat","Representation Partenariat"],gristChoiceList(choiceValues(s.Representation_Partenariat))]
+    [["Securisation","Sécurisation"],gristChoiceList(getChoiceBox("Securisation"))],
+    [["Prevention","Prévention"],gristChoiceList(getChoiceBox("Prevention"))],
+    [["Accompagnement"],gristChoiceList(getChoiceBox("Accompagnement"))],
+    [["Formation"],gristChoiceList(getChoiceBox("Formation"))],
+    [["Representation_Partenariat","Représentation Partenariat","Representation Partenariat"],gristChoiceList(getChoiceBox("Representation_Partenariat"))]
   ];
   const fields={};
   for(const [aliases,value] of values){const col=activityCol(cols,...aliases);if(col)fields[col]=value}
