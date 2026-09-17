@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Centre opérationnel EMAS</title>
-<!-- BUILD: 2026-09-17-suivi-qualification -->
+<!-- BUILD: 2026-09-17-suivi-qualification-v12 -->
 <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
 <style>
 :root{--bg:#f5f7fa;--card:#fff;--text:#172033;--muted:#667085;--line:#e4e7ec;--blue:#2563eb;--blue2:#1d4ed8;--green:#067647;--greenbg:#ecfdf3;--amber:#b54708;--amberbg:#fffaeb;--red:#b42318;--redbg:#fef3f2;--gray:#f2f4f7;--r:14px}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:14px Inter,"Segoe UI",Arial,sans-serif}button,input,select,textarea{font:inherit}.page{max-width:1450px;margin:auto;padding:24px}.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:20px;margin-bottom:16px}.hidden{display:none!important}.muted{color:var(--muted)}h1{font-size:27px;margin:0 0 5px}h2{font-size:21px;margin:0}h3{font-size:16px;margin:0 0 12px}.top{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;flex-wrap:wrap}.pill{display:inline-flex;padding:6px 9px;border-radius:999px;background:#eef4ff;color:#175cd3;font-weight:700;font-size:12px}.periodbar{display:flex;gap:10px;align-items:end;flex-wrap:wrap;margin-top:18px}.periodbar .field{min-width:190px}.periodbar input,.periodbar select{width:100%;border:1px solid var(--line);border-radius:9px;background:#fff;padding:9px 11px;min-height:40px}.toolbar{display:grid;grid-template-columns:minmax(240px,1fr) repeat(5,minmax(125px,auto));gap:10px;margin-top:18px}.toolbar input,.toolbar select,.field input,.field select,.field textarea{width:100%;border:1px solid var(--line);border-radius:9px;background:#fff;padding:9px 11px;min-height:40px}.btn{border:1px solid var(--line);background:#fff;color:var(--text);border-radius:9px;padding:9px 13px;cursor:pointer}.btn:hover{background:#f8fafc}.btn.primary{background:var(--blue);border-color:var(--blue);color:#fff}.btn.primary:hover{background:var(--blue2)}.btn.finish{background:var(--green);border-color:var(--green);color:#fff}.btn.finish:hover{filter:brightness(.95)}.btn:disabled{opacity:.45;cursor:not-allowed}.actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.notice{padding:10px 12px;border-radius:9px;background:#f8fafc;color:var(--muted);margin-top:12px}.notice.error{background:var(--redbg);color:var(--red)}.notice.ok{background:var(--greenbg);color:var(--green)}.tablewrap{overflow:auto;border:1px solid var(--line);border-radius:11px}table{width:100%;border-collapse:collapse;min-width:1050px}th{background:#f8fafc;color:#475467;text-transform:uppercase;font-size:11px;letter-spacing:.03em;text-align:left;padding:11px;border-bottom:1px solid var(--line)}td{padding:11px;border-bottom:1px solid #eef0f3;vertical-align:middle}tbody tr:hover{background:#fafbfc}.badge{display:inline-flex;border-radius:999px;padding:6px 8px;font-size:12px;font-weight:700;background:var(--gray);color:#475467}.type-badges{display:flex;gap:5px;flex-wrap:wrap}.type-badge{display:inline-flex;border-radius:999px;padding:5px 7px;font-size:11px;font-weight:700;background:#f2f4f7;color:#344054}.type-badge.level3{background:#fff7ed;color:#b54708}.equipier-badge{display:inline-flex;border-radius:999px;padding:6px 9px;font-size:12px;font-weight:700;background:#eef4ff;color:#175cd3}.equipier-badge.unassigned{background:#f2f4f7;color:#667085;font-weight:600}.b3{background:#fff7ed;color:#b54708}.done{background:var(--greenbg);color:var(--green)}.progress{background:var(--amberbg);color:var(--amber)}.waiting{background:var(--gray);color:#475467}.pagination{display:flex;justify-content:space-between;gap:10px;align-items:center;margin-top:13px;flex-wrap:wrap}.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}.info{background:#f8fafc;border-radius:10px;padding:11px}.info .label,.field label{display:block;color:var(--muted);font-size:11px;font-weight:800;text-transform:uppercase;margin-bottom:6px}.info .value{white-space:pre-wrap;overflow-wrap:anywhere}.span2{grid-column:span 2}.span4{grid-column:span 4}.sectiontitle{display:flex;justify-content:space-between;align-items:center;gap:10px;margin:18px 0 10px}.editgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.field textarea{min-height:120px;resize:vertical}.choicebox{border:1px solid var(--line);border-radius:10px;background:#fff;padding:10px 12px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 12px;min-height:44px}.field label.choiceitem{display:flex;gap:10px;align-items:flex-start;line-height:1.3;margin-bottom:0;text-transform:none;font-size:13px;font-weight:400;color:var(--text)}.choiceitem input{width:auto!important;min-height:0!important;margin:2px 0 0}.qualification-title{margin:18px 0 10px;font-size:15px}.treatment-date{font-size:12px;color:var(--muted);margin-top:8px}.etab-link{border:0;background:none;padding:0;color:var(--text);cursor:pointer;text-align:left;font-weight:400}.etab-link:hover{text-decoration:underline}.open-btn{color:var(--text)!important;background:#fff!important}.timeline{border-left:2px solid var(--line);margin-left:8px;padding-left:18px}.event{position:relative;padding:0 0 17px}.event:before{content:"";position:absolute;left:-23px;top:5px;width:8px;height:8px;border-radius:50%;background:var(--blue)}.event-title{font-weight:700}.event-meta{color:var(--muted);font-size:12px;margin:3px 0}.detail-author{color:var(--muted);font-size:14px;margin-top:5px;line-height:1.45}.detail-type-wrap{display:flex;gap:6px;flex-wrap:wrap}.structured-types{display:flex;flex-direction:column;gap:8px;align-items:flex-start}.structured-type-group{display:flex;gap:6px;flex-wrap:wrap;width:100%}.structured-type-badge{display:inline-flex;max-width:100%;border-radius:999px;padding:6px 9px;font-size:12px;font-weight:700;background:#eef4ff;color:#175cd3;white-space:normal;line-height:1.35}.loading{padding:35px;text-align:center;color:var(--muted)}@media(max-width:900px){.toolbar{grid-template-columns:1fr 1fr}.grid,.editgrid{grid-template-columns:1fr 1fr}.span4{grid-column:span 2}}@media(max-width:600px){.page{padding:12px}.toolbar,.grid,.editgrid{grid-template-columns:1fr}.span2,.span4{grid-column:span 1}}
@@ -285,6 +285,49 @@ async function renderEtabMatches(q){
   box.innerHTML=`<div class="notice"><strong>Établissement${matches.length>1?"s":""} correspondant${matches.length>1?"s":""}</strong><div class="actions" style="margin-top:8px">${matches.map(e=>`<button class="btn etab-result" data-etab="${e.id}">${esc(e.Etablissement||e.Nom_court||e.UAI)}${e.Ville?" — "+esc(e.Ville):""}</button>`).join("")}</div><div class="muted" style="margin-top:7px">Seuls les établissements ayant au moins un FE en 2025-2026 ou 2026-2027 sont proposés.</div></div>`;
   box.classList.remove("hidden");
   box.querySelectorAll("[data-etab]").forEach(b=>b.onclick=()=>openEstablishmentById(Number(b.dataset.etab)));
+}
+function filtered(){
+  const q=norm($("q").value.trim());
+  const dep=$("dep").value;
+  const degree=$("degree").value;
+  const level=$("level").value;
+  const status=$("status").value;
+  const equipier=$("equipierFilter").value;
+
+  return rows.filter(f=>{
+    // Le listing du centre opérationnel reste strictement limité aux 34 et 48.
+    const d=factDept(f);
+    if(!["34","48"].includes(d))return false;
+    if(dep!=="all"&&d!==dep)return false;
+
+    if(degree!=="all"){
+      const dg=norm(f.Degre);
+      if(degree==="1er"&&!dg.includes("1"))return false;
+      if(degree==="2nd"&&!dg.includes("2"))return false;
+    }
+    if(level!=="all"&&String(f.Niveau??"").trim()!==level)return false;
+
+    const su=suiviMap.get(Number(f.Numero_FE));
+    const st=statusOf(f);
+    if(status!=="all"&&st!==status)return false;
+
+    if(equipier!=="all"){
+      const ref=su?.Equipier?String(su.Equipier):"";
+      if(equipier==="unassigned"){if(ref)return false}
+      else if(ref!==equipier)return false;
+    }
+
+    if(q){
+      const e=etabMap.get(Number(f.UAI));
+      const hay=norm([
+        f.Numero_FE,f.Etablissement,e?.Etablissement,e?.Nom_court,
+        f.Ville,e?.Ville,f.Types_de_fait,f.Types_de_fait_structure,
+        f.Resume_du_fait,f.UAI,e?.UAI
+      ].filter(Boolean).join(" "));
+      if(!hay.includes(q))return false;
+    }
+    return true;
+  });
 }
 function render(){let a=filtered(),pages=Math.max(1,Math.ceil(a.length/PAGE));page=Math.min(page,pages);let slice=a.slice((page-1)*PAGE,page*PAGE);$("body").innerHTML=slice.length?slice.map(f=>{let su=suiviMap.get(Number(f.Numero_FE));let eq=f._source===T.OLD?(f.Equipier||"N/A"):eqName(su?.Equipier);return `<tr><td>${dateFR(f.Date_de_saisie)}</td><td><span class="badge ${String(f.Niveau)==="3"?"b3":""}">${esc(f.Niveau||"—")}</span></td><td>${factTypeBadges(f.Types_de_fait,f.Niveau)}</td><td><button class="etab-link" data-etab-from-fe="${f._source}:${f.id}">${esc(f.Etablissement||"—")}</button></td><td>${esc(f.Ville||"—")}</td><td>${esc(f.Departement||"—")}</td><td>${badgeStatus(statusOf(f))}</td><td>${equipierBadge(eq)}</td><td>${esc(f.Numero_FE)}</td><td><button class="btn open-btn" data-open="${f._source}:${f.id}">Ouvrir</button></td></tr>`}).join(""):'<tr><td colspan="10" class="loading">Aucun résultat.</td></tr>';document.querySelectorAll("[data-open]").forEach(b=>b.onclick=()=>openFact(b.dataset.open));document.querySelectorAll("[data-etab-from-fe]").forEach(b=>b.onclick=()=>openEstablishmentFromFact(b.dataset.etabFromFe));$("count").textContent=a.length+" résultat(s) dans les données actuellement chargées";$("pageInfo").textContent=`Page ${page} / ${pages}`;$("prev").disabled=page<=1;$("next").disabled=page>=pages}
 function openEstablishmentFromFact(key){let [source,id]=key.split(":");let f=rows.find(x=>x._source===source&&x.id===Number(id));if(!f)return;selected=f;let ref=Number(f.UAI);let e=etabMap.get(ref);if(!e){notice("Établissement introuvable dans ETABLISSEMENTS.","error");return}selectedEtab=e;$("listView").classList.add("hidden");$("detailView").classList.add("hidden");openEstablishment(e,ref)}
