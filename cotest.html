@@ -47,7 +47,7 @@ select{background-color:#fff!important;color-scheme:light!important;}
   <select id="dep"><option value="all">Tous départements</option><option>34</option><option>48</option></select>
   <select id="degree"><option value="all">Tous degrés</option><option value="1er">1er degré</option><option value="2nd">2nd degré</option></select>
   <select id="level"><option value="all">Tous niveaux</option><option value="2">Niveau 2</option><option value="3">Niveau 3</option></select>
-  <select id="status"><option value="all">Tous statuts</option><option value="Non attribué">Non attribué</option><option value="En cours">En cours</option><option value="Terminé">Terminé</option></select>
+  <select id="status"><option value="all">Tous statuts</option><option value="Non attribué">Non attribué</option><option value="En cours">En cours</option></select>
   <select id="equipierFilter"><option value="all">Tous équipiers</option></select>
  </div>
  <div id="etabMatches" class="hidden" style="margin-top:10px"></div>
@@ -87,6 +87,7 @@ select{background-color:#fff!important;color-scheme:light!important;}
 </section>
 </main>
 <div id="appModal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="appModalTitle"><div id="appModalBox" class="modal-box"><div id="appModalTitle" class="modal-title"></div><div id="appModalMessage" class="modal-message"></div><div id="appModalActions" class="modal-actions"></div></div></div>
+<!-- CO-EMAS V26 — production candidate: REST unifié, comportement V25 conservé -->
 <script>
 "use strict";
 const T={CUR:"FE26_27_2",OLD:"FE25_26",SUIVI:"SUIVI_FE26_27",EQ:"EQUIPIERS",ETAB:"ETABLISSEMENTS",ACT_D1:"ACTIVITE_D1_EMS34_48",ACT_D2:"ACTIVITE_D2_EMS34_48"};
@@ -108,21 +109,25 @@ function restRecordsToRows(payload,source){
   const records=Array.isArray(payload?.records)?payload.records:[];
   return records.map(r=>({id:r.id,_source:source,...(r.fields||{})}));
 }
-async function api(table,{filter=null,sort=null,limit=null,offset=null}={},retry=true){
+async function gristGet(path,params=null,retry=true){
+  const t=await getTokenInfo(false);
+  const qs=new URLSearchParams(params||{});
+  qs.set("auth",t.token);
+  const url=t.baseUrl+path+(qs.size?"?"+qs.toString():"");
+  const response=await fetch(url,{method:"GET",credentials:"omit"});
+  if(response.status===401&&retry){tokenInfo=null;await getTokenInfo(true);return gristGet(path,params,false)}
+  if(!response.ok){const detail=await response.text().catch(()=>response.statusText);throw new Error("HTTP "+response.status+" — "+detail.slice(0,240))}
+  return response.json();
+}
+async function api(table,{filter=null,sort=null,limit=null,offset=null}={}){
   try{
-    const t=await getTokenInfo(false);
-    const params=new URLSearchParams();
-    if(filter)params.set("filter",JSON.stringify(filter));
-    if(sort)params.set("sort",sort);
-    if(limit!=null)params.set("limit",String(limit));
-    if(offset!=null)params.set("offset",String(offset));
-    params.set("cellFormat","normal");
-    params.set("auth",t.token);
-    const url=t.baseUrl+"/tables/"+encodeURIComponent(table)+"/records?"+params.toString();
-    const response=await fetch(url,{method:"GET",credentials:"omit"});
-    if(response.status===401&&retry){tokenInfo=null;await getTokenInfo(true);return api(table,{filter,sort,limit,offset},false)}
-    if(!response.ok){const detail=await response.text().catch(()=>response.statusText);throw new Error("HTTP "+response.status+" — "+detail.slice(0,240))}
-    return restRecordsToRows(await response.json(),table);
+    const params={cellFormat:"normal"};
+    if(filter)params.filter=JSON.stringify(filter);
+    if(sort)params.sort=sort;
+    if(limit!=null)params.limit=String(limit);
+    if(offset!=null)params.offset=String(offset);
+    const payload=await gristGet("/tables/"+encodeURIComponent(table)+"/records",params);
+    return restRecordsToRows(payload,table);
   }catch(e){
     const detail=(e&&e.message)?e.message:String(e);
     throw new Error("Table "+table+" : "+detail);
@@ -363,13 +368,11 @@ function activityDelay(dateSaisie,dateTraitement){
 const activityColumnCache=new Map();
 async function activityColumns(table){
   if(activityColumnCache.has(table))return activityColumnCache.get(table);
-  const t=await getTokenInfo();
-  const url=t.baseUrl+"/tables/"+encodeURIComponent(table)+"/columns?auth="+encodeURIComponent(t.token);
-  const response=await fetch(url,{method:"GET",credentials:"omit"});
-  if(!response.ok)throw new Error("Impossible de lire les colonnes de "+table+" (HTTP "+response.status+")");
-  const payload=await response.json();
-  const cols=(payload.columns||[]).map(c=>({id:c.id,label:c.fields?.label||c.id,type:c.fields?.type||"Any"}));
-  activityColumnCache.set(table,cols);return cols;
+  try{
+    const payload=await gristGet("/tables/"+encodeURIComponent(table)+"/columns");
+    const cols=(payload.columns||[]).map(c=>({id:c.id,label:c.fields?.label||c.id,type:c.fields?.type||"Any"}));
+    activityColumnCache.set(table,cols);return cols;
+  }catch(e){throw new Error("Impossible de lire les colonnes de "+table+" : "+e.message)}
 }
 function activityCol(cols,...names){
   const wanted=names.map(norm);
@@ -399,7 +402,7 @@ async function syncActivity(f,s){
   const cols=await activityColumns(table);
   const keyCol=activityCol(cols,"Nmr_FE_ou_Initiative","Nmr FE ou Initiative","N° FE ou Initiative","Numero_FE","Numéro FE");
   if(!keyCol)throw new Error("Colonne Nmr_FE_ou_Initiative introuvable dans "+table+".");
-  const existing=await api(table,{filter:{[keyCol]:[numero,String(numero)]},limit:5,fresh:true});
+  const existing=await api(table,{filter:{[keyCol]:[numero,String(numero)]},limit:5});
   const values=[
     [["Gravite","Gravité"],f.Gravite??null],
     [["UAI_Etab","UAI Etab","UAI_Etablissement"],e.UAI||f.UAI||""],
@@ -430,7 +433,7 @@ async function syncActivity(f,s){
     await grist.docApi.applyUserActions([["UpdateRecord",table,existing[0].id,fields]]);
   }else{
     // Relecture juste avant création pour réduire le risque de doublon en accès simultané.
-    const recheck=await api(table,{filter:{[keyCol]:[numero,String(numero)]},limit:2,fresh:true});
+    const recheck=await api(table,{filter:{[keyCol]:[numero,String(numero)]},limit:2});
     if(recheck.length){await grist.docApi.applyUserActions([["UpdateRecord",table,recheck[0].id,fields]]);return;}
     fields[keyCol]=numero;
     await grist.docApi.applyUserActions([["AddRecord",table,null,fields]]);
@@ -450,7 +453,7 @@ async function removeActivityForFact(f){
   const table=degreeActivityTable(f);if(!table)return 0;
   const cols=await activityColumns(table);const keyCol=activityCol(cols,"Nmr_FE_ou_Initiative","Nmr FE ou Initiative","N° FE ou Initiative","Numero_FE","Numéro FE");
   if(!keyCol)throw new Error("Colonne numéro FE introuvable dans "+table+".");
-  const numero=Number(f.Numero_FE);const matches=await api(table,{filter:{[keyCol]:[numero,String(numero)]},limit:50,fresh:true});
+  const numero=Number(f.Numero_FE);const matches=await api(table,{filter:{[keyCol]:[numero,String(numero)]},limit:50});
   if(matches.length)await grist.docApi.applyUserActions(matches.map(r=>["RemoveRecord",table,r.id]));
   return matches.length;
 }
@@ -461,7 +464,7 @@ async function resetFollowup(){
   if(!ok)return;
   const btn=$("resetFollowup");btn.disabled=true;$("save").disabled=true;$("toggleDone").disabled=true;
   try{
-    const suivis=await api(T.SUIVI,{filter:{Numero_FE:[numero]},limit:50,fresh:true});
+    const suivis=await api(T.SUIVI,{filter:{Numero_FE:[numero]},limit:50});
     if(suivis.length)await grist.docApi.applyUserActions(suivis.map(r=>["RemoveRecord",T.SUIVI,r.id]));
     let removedActivity=0;try{removedActivity=await removeActivityForFact(selected)}catch(e){await showModal({title:"Réinitialisation partielle",message:`Le suivi a été supprimé, mais la ligne Activité n'a pas pu être retirée : ${e.message}`,type:"error"})}
     selectedSuivi=null;suiviMap.delete(numero);renderOps();$("detailStatus").innerHTML=badgeStatus("Non attribué");render();
@@ -481,7 +484,7 @@ async function persistOps(forcedStatus=null){
   let suiviSaved=false;
   try{
     // Concurrence optimiste : relire le suivi avant toute écriture.
-    const live=await api(T.SUIVI,{filter:{Numero_FE:[numero]},limit:3,fresh:true});
+    const live=await api(T.SUIVI,{filter:{Numero_FE:[numero]},limit:3});
     if(live.length>1)throw new Error(`Doublon SUIVI détecté pour le FE ${numero}. Enregistrement bloqué.`);
     const liveRow=live[0]||null;
     if(selectedSuivi&&liveRow){
@@ -494,7 +497,7 @@ async function persistOps(forcedStatus=null){
       fields.Numero_FE=numero;
       fields.Date_traitement_EMS=now;
       // Dernière relecture avant AddRecord pour limiter une double création simultanée.
-      const recheck=await api(T.SUIVI,{filter:{Numero_FE:[numero]},limit:2,fresh:true});
+      const recheck=await api(T.SUIVI,{filter:{Numero_FE:[numero]},limit:2});
       if(recheck.length)throw new Error("Ce FE vient d’être pris en charge par un autre utilisateur. Rechargez la fiche.");
       await grist.docApi.applyUserActions([["AddRecord",T.SUIVI,null,fields]]);
     }else{
