@@ -137,23 +137,6 @@ async function apiAllPaged(table,{filter=null,sort=null,pageSize=2000,maxRows=50
   }
   return out;
 }
-let actorCache={value:"",expires:0};
-async function currentActor(){
-  if(actorCache.value && Date.now()<actorCache.expires)return actorCache.value;
-  try{
-    const t=await getTokenInfo(false);
-    const origin=new URL(t.baseUrl).origin;
-    // Le widget GitHub est cross-origin : les cookies de session Grist ne sont pas fiables ici.
-    // On réutilise donc le jeton temporaire Grist pour demander le profil de l'utilisateur courant.
-    const r=await fetch(origin+"/api/profile/user?auth="+encodeURIComponent(t.token),{method:"GET",credentials:"omit",headers:{Accept:"application/json"}});
-    if(r.ok){
-      const j=await r.json();
-      const name=String(j?.name||j?.user?.name||"").trim();
-      if(name){actorCache={value:name,expires:Date.now()+300000};return name}
-    }
-  }catch(_){ }
-  return "";
-}
 function dateTimeFR(v){let d=date(v);return d?new Intl.DateTimeFormat("fr-FR",{dateStyle:"short",timeStyle:"short"}).format(d):"—"}
 function eqName(v){if(!v)return "N/A";return eqMap.get(Number(v))?.Nom||"Équipier #"+v}
 function etabUai(ref){return etabMap.get(Number(ref))?.UAI||""}
@@ -507,8 +490,7 @@ async function persistOps(forcedStatus=null){
   let st=forcedStatus||$("editStatus").value;if(!forcedStatus&&st!=="Terminé")st="En cours";
   let now=Math.floor(Date.now()/1000);
   await ensureChoiceListColumns(T.SUIVI);
-  const actor=await currentActor();
-  let fields={Equipier:eq,Statut:st,Suivi_etablissement:$("suivi").value.trim(),Accompagnement_EMAS:$("emas").value.trim(),Notes_informations:$("notes").value.trim(),Eleve_suivi:$("eleveSuivi").value.trim(),Securisation:gristChoiceList(getChoiceBox("Securisation")),Prevention:gristChoiceList(getChoiceBox("Prevention")),Accompagnement:gristChoiceList(getChoiceBox("Accompagnement")),Formation:gristChoiceList(getChoiceBox("Formation")),Representation_Partenariat:gristChoiceList(getChoiceBox("Representation_Partenariat")),Derniere_modification:now,...(actor?{Modifie_par:actor}:{})};
+  let fields={Equipier:eq,Statut:st,Suivi_etablissement:$("suivi").value.trim(),Accompagnement_EMAS:$("emas").value.trim(),Notes_informations:$("notes").value.trim(),Eleve_suivi:$("eleveSuivi").value.trim(),Securisation:gristChoiceList(getChoiceBox("Securisation")),Prevention:gristChoiceList(getChoiceBox("Prevention")),Accompagnement:gristChoiceList(getChoiceBox("Accompagnement")),Formation:gristChoiceList(getChoiceBox("Formation")),Representation_Partenariat:gristChoiceList(getChoiceBox("Representation_Partenariat")),Derniere_modification:now};
   $("save").disabled=true;$("toggleDone").disabled=true;
   let suiviSaved=false;
   try{
