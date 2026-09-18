@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Centre opérationnel EMAS</title>
+<!-- BUILD: 2026-09-17-consolidation-v18-production-hardening -->
+<script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
+<style>
+:root{--bg:#f5f7fa;--card:#fff;--text:#172033;--muted:#667085;--line:#e4e7ec;--blue:#2563eb;--blue2:#1d4ed8;--green:#067647;--greenbg:#ecfdf3;--amber:#b54708;--amberbg:#fffaeb;--red:#b42318;--redbg:#fef3f2;--gray:#f2f4f7;--r:14px}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:14px Inter,"Segoe UI",Arial,sans-serif}button,input,select,textarea{font:inherit}.page{max-width:1450px;margin:auto;padding:24px}.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:20px;margin-bottom:16px}.hidden{display:none!important}.muted{color:var(--muted)}h1{font-size:27px;margin:0 0 5px}h2{font-size:21px;margin:0}h3{font-size:16px;margin:0 0 12px}.top{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;flex-wrap:wrap}.pill{display:inline-flex;padding:6px 9px;border-radius:999px;background:#eef4ff;color:#175cd3;font-weight:700;font-size:12px}.periodbar{display:flex;gap:10px;align-items:end;flex-wrap:wrap;margin-top:18px}.periodbar .field{min-width:190px}.periodbar input,.periodbar select{width:100%;border:1px solid var(--line);border-radius:9px;background:#fff;padding:9px 11px;min-height:40px}.toolbar{display:grid;grid-template-columns:minmax(240px,1fr) repeat(5,minmax(125px,auto));gap:10px;margin-top:18px}.toolbar input,.toolbar select,.field input,.field select,.field textarea{width:100%;border:1px solid var(--line);border-radius:9px;background:#fff;padding:9px 11px;min-height:40px}.btn{border:1px solid var(--line);background:#fff;color:var(--text);border-radius:9px;padding:9px 13px;cursor:pointer}.btn:hover{background:#f8fafc}.btn.primary{background:var(--blue);border-color:var(--blue);color:#fff}.btn.primary:hover{background:var(--blue2)}.btn.finish{background:var(--green);border-color:var(--green);color:#fff}.btn.finish:hover{filter:brightness(.95)}.btn:disabled{opacity:.45;cursor:not-allowed}.actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.notice{padding:10px 12px;border-radius:9px;background:#f8fafc;color:var(--muted);margin-top:12px}.notice.error{background:var(--redbg);color:var(--red)}.notice.ok{background:var(--greenbg);color:var(--green)}.tablewrap{overflow:auto;border:1px solid var(--line);border-radius:11px}table{width:100%;border-collapse:collapse;min-width:1050px}th{background:#f8fafc;color:#475467;text-transform:uppercase;font-size:11px;letter-spacing:.03em;text-align:left;padding:11px;border-bottom:1px solid var(--line)}td{padding:11px;border-bottom:1px solid #eef0f3;vertical-align:middle}tbody tr:hover{background:#fafbfc}.badge{display:inline-flex;border-radius:999px;padding:6px 8px;font-size:12px;font-weight:700;background:var(--gray);color:#475467}.type-badges{display:flex;gap:5px;flex-wrap:wrap}.type-badge{display:inline-flex;border-radius:999px;padding:5px 7px;font-size:11px;font-weight:700;background:#f2f4f7;color:#344054}.type-badge.level3{background:#fff7ed;color:#b54708}.equipier-badge{display:inline-flex;border-radius:999px;padding:6px 9px;font-size:12px;font-weight:700;background:#eef4ff;color:#175cd3}.equipier-badge.unassigned{background:#f2f4f7;color:#667085;font-weight:600}.b3{background:#fff7ed;color:#b54708}.done{background:var(--greenbg);color:var(--green)}.progress{background:var(--amberbg);color:var(--amber)}.waiting{background:var(--gray);color:#475467}.pagination{display:flex;justify-content:space-between;gap:10px;align-items:center;margin-top:13px;flex-wrap:wrap}.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}.info{background:#f8fafc;border-radius:10px;padding:11px}.info .label,.field label{display:block;color:var(--muted);font-size:11px;font-weight:800;text-transform:uppercase;margin-bottom:6px}.info .value{white-space:pre-wrap;overflow-wrap:anywhere}.span2{grid-column:span 2}.span4{grid-column:span 4}.sectiontitle{display:flex;justify-content:space-between;align-items:center;gap:10px;margin:18px 0 10px}.editgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.field textarea{min-height:120px;resize:vertical}.choicebox{border:1px solid var(--line);border-radius:10px;background:#fff;padding:10px 12px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 12px;min-height:44px}.field label.choiceitem{display:flex;gap:10px;align-items:flex-start;line-height:1.3;margin-bottom:0;text-transform:none;font-size:13px;font-weight:400;color:var(--text)}.choiceitem input{width:auto!important;min-height:0!important;margin:2px 0 0}.qualification-title{margin:18px 0 10px;font-size:15px}.treatment-date{font-size:12px;color:var(--muted);margin-top:8px}.etab-link{border:0;background:none;padding:0;color:var(--text);cursor:pointer;text-align:left;font-weight:400}.etab-link:hover{text-decoration:underline}.open-btn{color:var(--text)!important;background:#fff!important}.timeline{border-left:2px solid var(--line);margin-left:8px;padding-left:18px}.event{position:relative;padding:0 0 17px}.event:before{content:"";position:absolute;left:-23px;top:5px;width:8px;height:8px;border-radius:50%;background:var(--blue)}.event.old-school-year:before{background:#14532d}.event-title{font-weight:700}.level-warning{display:inline-flex;align-items:center;margin-left:5px;color:#b54708;font-size:15px;line-height:1;vertical-align:-1px}.event-meta{color:var(--muted);font-size:12px;margin:3px 0}.detail-author{color:var(--muted);font-size:14px;margin-top:5px;line-height:1.45}.detail-type-wrap{display:flex;gap:6px;flex-wrap:wrap}.structured-types{display:flex;flex-direction:column;gap:8px;align-items:flex-start}.structured-type-group{display:flex;gap:6px;flex-wrap:wrap;width:100%}.structured-type-badge{display:inline-flex;max-width:100%;border-radius:999px;padding:6px 9px;font-size:12px;font-weight:700;background:#eef4ff;color:#175cd3;white-space:normal;line-height:1.35}.loading{padding:35px;text-align:center;color:var(--muted)}@media(max-width:900px){.toolbar{grid-template-columns:1fr 1fr}.grid,.editgrid{grid-template-columns:1fr 1fr}.span4{grid-column:span 2}}@media(max-width:600px){.page{padding:12px}.toolbar,.grid,.editgrid{grid-template-columns:1fr}.span2,.span4{grid-column:span 1}}
+/* Grist/iframe: force visible form-control text regardless of host theme */
+input,select,textarea,option{color:#172033!important;-webkit-text-fill-color:#172033!important;opacity:1!important;}
+input::placeholder,textarea::placeholder{color:#667085!important;-webkit-text-fill-color:#667085!important;opacity:1!important;}
+select{background-color:#fff!important;color-scheme:light!important;}
+.field input,.field select,.field textarea,.toolbar input,.toolbar select{color:#172033!important;-webkit-text-fill-color:#172033!important;background:#fff!important;}
+.btn:not(.primary){color:#172033!important;-webkit-text-fill-color:#172033!important;background:#fff!important;}
+
+/* Ajustements du listing */
+#listView .tablewrap table{table-layout:fixed;min-width:1120px}
+#listView th:nth-child(1),#listView td:nth-child(1){width:88px}
+#listView th:nth-child(2),#listView td:nth-child(2){width:72px;text-align:center}
+#listView th:nth-child(3),#listView td:nth-child(3){width:270px}
+#listView th:nth-child(4),#listView td:nth-child(4){width:175px}
+#listView th:nth-child(5),#listView td:nth-child(5){width:125px}
+#listView th:nth-child(6),#listView td:nth-child(6){width:110px}
+#listView th:nth-child(7),#listView td:nth-child(7){width:105px;white-space:nowrap}
+#listView th:nth-child(8),#listView td:nth-child(8){width:105px;white-space:nowrap}
+#listView th:nth-child(9),#listView td:nth-child(9){width:80px}
+#listView th:nth-child(10),#listView td:nth-child(10){width:85px}
+#listView td:nth-child(1){font-size:12.5px;white-space:nowrap}
+#listView td:nth-child(4),#listView td:nth-child(4) .etab-link{font-size:12.5px;line-height:1.25;font-weight:400;color:var(--text)!important}
+#listView td:nth-child(2) .badge{justify-content:center;min-width:30px}
+#listView .status-badge,#listView .equipier-badge{white-space:nowrap}
+#listView td:nth-child(7),#listView td:nth-child(8){white-space:nowrap}
+#listView td:nth-child(9){font-weight:400}
+#listView .open-btn{white-space:nowrap}
+
+</style>
+</head><body><main class="page">
+<section id="listView" class="card">
+ <div class="top"><div><h1>Centre opérationnel — EMAS</h1><div class="muted">Consultation et suivi des faits d’établissement — 11 · 30 · 34 · 48 · 66</div></div></div>
+ <div class="periodbar">
+  <div class="field"><label>Jour</label><select id="daySelect"><option value="">Choisir un jour</option></select></div>
+  <div class="field"><label>Semaine</label><select id="weekSelect"><option value="">Choisir une semaine</option></select></div>
+ </div>
+ <div class="toolbar">
+  <input id="q" type="search" placeholder="N° FE ou établissement… puis Entrée">
+  <select id="dep"><option value="all">Tous départements</option><option>34</option><option>48</option></select>
+  <select id="degree"><option value="all">Tous degrés</option><option value="1er">1er degré</option><option value="2nd">2nd degré</option></select>
+  <select id="level"><option value="all">Tous niveaux</option><option value="2">Niveau 2</option><option value="3">Niveau 3</option></select>
+  <select id="status"><option value="all">Tous statuts</option><option value="Non attribué">Non attribué</option><option value="En cours">En cours</option><option value="Terminé">Terminé</option></select>
+  <select id="equipierFilter"><option value="all">Tous équipiers</option></select>
+ </div>
+ <div id="etabMatches" class="hidden" style="margin-top:10px"></div>
+ <div id="notice" class="hidden" aria-live="polite"></div>
+ <div class="tablewrap" style="margin-top:14px"><table><thead><tr><th>Date</th><th>Niveau</th><th>Type de fait</th><th>Établissement</th><th>Ville</th><th>Département</th><th>Statut</th><th>Équipier</th><th>N° FE</th><th></th></tr></thead><tbody id="body"><tr><td colspan="10" class="loading">Chargement…</td></tr></tbody></table></div>
+ <div class="pagination"><span id="count" class="muted"></span><div class="actions"><button id="prev" class="btn">Précédent</button><span id="pageInfo" class="muted"></span><button id="next" class="btn">Suivant</button></div></div>
+</section>
+<section id="detailView" class="hidden">
+ <div class="card"><div class="top"><div class="actions"><button id="back" class="btn">← Retour</button><button id="openEtab" class="btn">Voir l’établissement</button></div><div id="detailStatus"></div></div>
+ <div class="sectiontitle"><div><h2 id="title"></h2><div id="subtitle" class="muted"></div><div id="detailAuthor" class="detail-author"></div></div></div>
+ <div id="sourceGrid" class="grid"></div>
+ </div>
+ <div id="opsCard" class="card"><div class="sectiontitle"><h2>Suivi opérationnel</h2><span id="saveMeta" class="muted"></span></div>
+  <div class="editgrid">
+   <div class="field"><label>Équipier</label><select id="equipier"></select></div>
+   <div class="field"><label>Statut</label><select id="editStatus"><option>Non attribué</option><option>En cours</option><option>Terminé</option></select></div>
+   <div class="field"><label>Suivi établissement</label><textarea id="suivi"></textarea></div>
+   <div class="field"><label>Traitement / accompagnement EMAS</label><textarea id="emas"></textarea></div>
+   <div class="field span2"><label>Notes et informations internes</label><textarea id="notes"></textarea></div>
+   <div class="field span2"><label>Élève suivi</label><input id="eleveSuivi" type="text" placeholder="Saisie libre"></div>
+  </div>
+  <h3 class="qualification-title">Qualification de l’activité EMAS</h3>
+  <div class="editgrid">
+   <div class="field"><label>Sécurisation</label><div id="securisationChoices" class="choicebox"></div></div>
+   <div class="field"><label>Prévention</label><div id="preventionChoices" class="choicebox"></div></div>
+   <div class="field"><label>Accompagnement</label><div id="accompagnementChoices" class="choicebox"></div></div>
+   <div class="field"><label>Formation</label><div id="formationChoices" class="choicebox"></div></div>
+   <div class="field span2"><label>Représentation / Partenariat</label><div id="representationChoices" class="choicebox"></div></div>
+  </div>
+  <div id="treatmentDate" class="treatment-date"></div>
+  <div class="actions" style="justify-content:flex-end;margin-top:12px"><button id="save" class="btn primary">Enregistrer</button><button id="toggleDone" class="btn finish">Terminé</button></div>
+ </div>
+</section>
+<section id="etabView" class="hidden">
+ <div class="card"><div class="actions"><button id="etabBack" class="btn">← Retour à la fiche</button></div><div class="sectiontitle"><div><h2 id="etabTitle">Établissement</h2><div id="etabSub" class="muted"></div></div></div><div id="etabGrid" class="grid"></div></div>
+ <div class="card"><h2>Historique des faits</h2><div id="history" class="timeline" style="margin-top:16px"></div></div>
+</section>
+</main>
+<script>
+"use strict";
+const T={CUR:"FE26_27_2",OLD:"FE25_26",SUIVI:"SUIVI_FE26_27",EQ:"EQUIPIERS",ETAB:"ETABLISSEMENTS",ACT_D1:"ACTIVITE_D1_EMS34_48",ACT_D2:"ACTIVITE_D2_EMS34_48"};
+const PAGE=25; let tokenInfo=null,currentRows=[],rows=[],suiviMap=new Map(),eqMap=new Map(),etabMap=new Map(),page=1,selected=null,selectedSuivi=null,selectedEtab=null;
+const $=id=>document.getElementById(id); grist.ready({requiredAccess:"full"});
+function esc(v){return String(v??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;")}
+function norm(v){return String(v??"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/\s+/g," ").trim()}
+function date(v){if(!v)return null;if(typeof v==="number")return new Date(v*1000);let d=new Date(v);return isNaN(d)?null:d}
+function dateFR(v){let d=date(v);return d?new Intl.DateTimeFormat("fr-FR").format(d):"—"}
+function notice(s,type=""){let n=$("notice");if(!n)return;n.textContent=s;n.className="notice"+(type?" "+type:"")}
+function tableRows(table,source){if(!table||!Array.isArray(table.id))return[];return table.id.map((id,i)=>{let r={id,_source:source};Object.keys(table).forEach(k=>{if(Array.isArray(table[k]))r[k]=table[k][i]});return r})}
+const tableCache=new Map();
+function sameValue(a,b){if(a===b)return true;if(a==null||b==null)return false;return String(a)===String(b)}
+function applyLocalFilter(data,filter){if(!filter)return data;return data.filter(r=>Object.entries(filter).every(([k,vals])=>{let wanted=Array.isArray(vals)?vals:[vals];return wanted.some(v=>sameValue(r[k],v))}))}
+function applyLocalSort(data,sort){if(!sort)return data;let keys=String(sort).split(',').map(x=>x.trim()).filter(Boolean);return [...data].sort((a,b)=>{for(let key of keys){let desc=key.startsWith('-');if(desc)key=key.slice(1);let av=a[key],bv=b[key];let ad=date(av),bd=date(bv);if(ad&&bd){av=ad.getTime();bv=bd.getTime()}if(av==null)av='';if(bv==null)bv='';let c=typeof av==='number'&&typeof bv==='number'?av-bv:String(av).localeCompare(String(bv),'fr',{numeric:true});if(c)return desc?-c:c}return 0})}
+async function getRestToken(force=false){
+  if(tokenInfo && !force)return tokenInfo;
+  tokenInfo=await grist.docApi.getAccessToken({readOnly:true});
+  return tokenInfo;
+}
+function restRows(payload,source){
+  const list=Array.isArray(payload?.records)?payload.records:[];
+  return list.map(rec=>({id:rec.id,_source:source,...(rec.fields||{})}));
+}
+async function restFetch(table,{filter=null,sort=null,limit=null}={},retry=true){
+  const auth=await getRestToken(false);
+  const base=String(auth.baseUrl||'').replace(/\/$/,'');
+  const params=new URLSearchParams();
+  if(filter)params.set('filter',JSON.stringify(filter));
+  if(sort)params.set('sort',sort);
+  if(limit!=null)params.set('limit',String(limit));
+  params.set('cellFormat','normal');
+  const url=`${base}/tables/${encodeURIComponent(table)}/records?${params.toString()}`;
+  const response=await fetch(url,{headers:{Authorization:`Bearer ${auth.token}`}});
+  if(response.status===401&&retry){tokenInfo=null;await getRestToken(true);return restFetch(table,{filter,sort,limit},false)}
+  if(!response.ok)throw new Error(`Grist API ${response.status} — ${await response.text()}`);
+  return restRows(await response.json(),table);
+}
+async function getTokenInfo(){
+  const now=Date.now();
+  if(tokenInfo && tokenInfo._expiresAt && now < tokenInfo._expiresAt-30000){
+    return tokenInfo;
+  }
+  const t=await grist.docApi.getAccessToken({readOnly:false});
+  tokenInfo={...t,_expiresAt:now+(t.ttlMsecs||240000)};
+  return tokenInfo;
+}
+
+function restRecordsToRows(payload,source){
+  const records=Array.isArray(payload?.records)?payload.records:[];
+  return records.map(r=>({id:r.id,_source:source,...(r.fields||{})}));
+}
+
+async function api(table,{filter=null,sort=null,limit=null,offset=null,fresh=false}={}){
+  /*
+    API REST Grist : filter / sort / limit sont exécutés côté Grist.
+    Contrairement à fetchTable(), une demande de 150 FE ne télécharge donc
+    pas toute la table annuelle.
+  */
+  try{
+    const t=await getTokenInfo();
+    const params=new URLSearchParams();
+    params.set("auth",t.token);
+    if(filter)params.set("filter",JSON.stringify(filter));
+    if(sort)params.set("sort",sort);
+    if(limit!=null)params.set("limit",String(limit));
+    if(offset!=null)params.set("offset",String(offset));
+
+    const url=t.baseUrl+"/tables/"+encodeURIComponent(table)+"/records?"+params.toString();
+    const response=await fetch(url,{method:"GET",credentials:"omit"});
+    if(!response.ok){
+      const detail=await response.text().catch(()=>response.statusText);
+      throw new Error("HTTP "+response.status+" — "+detail.slice(0,240));
+    }
+    return restRecordsToRows(await response.json(),table);
+  }catch(e){
+    const detail=(e&&e.message)?e.message:String(e);
+    throw new Error("Table "+table+" : "+detail);
+  }
+}
+async function apiAllPaged(table,{filter=null,sort=null,pageSize=2000,maxRows=50000}={}){
+  const out=[];
+  for(let offset=0;offset<maxRows;offset+=pageSize){
+    const batch=await api(table,{filter,sort,limit:pageSize,offset,fresh:true});
+    out.push(...batch);
+    if(batch.length<pageSize)break;
+  }
+  return out;
+}
+function eqName(v){if(!v)return "N/A";return eqMap.get(Number(v))?.Nom||"Équipier #"+v}
+function etabUai(ref){return etabMap.get(Number(ref))?.UAI||""}
+function statusOf(f){let s=suiviMap.get(Number(f.Numero_FE));return f._source===T.OLD?"Terminé":(s?.Statut||"Non attribué")}
+function badgeStatus(s){let c=s==="Terminé"?"done":s==="En cours"?"progress":"waiting",label=(!s||s==="Non attribué")?"N/A":s;return `<span class="badge ${c} status-badge">${esc(label)}</span>`}
+function factTypeBadges(v,level){
+  const t=norm(v); if(!t)return '<span class="muted">—</span>'; const out=[]; const add=x=>{if(!out.includes(x))out.push(x)};
+  if(t.includes("valeur")&&t.includes("republique")||t.includes("valrep"))add("ValRep");
+  if(t.includes("harcel"))add("Harcel");
+  if(t.includes("atteinte")&&t.includes("bien"))add("AttBiens");
+  if(t.includes("securite")||t.includes("climat scolaire"))add("AttSecu");
+  const vp=t.includes("violence physique"), vv=t.includes("violence verbale")||t.includes("menace orale"), vs=t.includes("violence sexuelle");
+  if(vp||vv||vs){let x=[];if(vp)x.push("VP");if(vs)x.push("VS");if(vv)x.push("VV");add("AttPers: "+x.join(" + "))}
+  else if(t.includes("atteinte")&&t.includes("personne"))add("AttPers");
+  if(!out.length)add(String(v).split(/[;,]/)[0].trim().slice(0,24)||"Autre");
+  return '<div class="type-badges">'+out.map(x=>`<span class="type-badge ${String(level)==="3"?"level3":""}">${esc(x)}</span>`).join("")+'</div>'
+}
+function structuredTypeBadges(v){
+  if(v===null||v===undefined||String(v).trim()==="")return '<span class="muted">—</span>';
+  let raw=String(v).trim();
+  // Grist ChoiceList peut arriver sous la forme ["L", ...].
+  let items=[];
+  try{
+    const parsed=JSON.parse(raw);
+    if(Array.isArray(parsed))items=parsed.filter((x,i)=>!(i===0&&x==="L")).map(String);
+  }catch(_){ }
+  if(!items.length){
+    // Les chemins structurés sont normalement séparés par retours à la ligne / ; / ||.
+    items=raw.split(/\r?\n|\s*\|+\s*|\s*;\s*/).map(x=>x.trim()).filter(Boolean);
+  }
+  const groups=[];
+  for(const item of items){
+    const clean=item.replace(/^[-•]\s*/,"").trim();
+    if(!clean)continue;
+    const root=clean.split(/\s*>\s*/)[0].trim();
+    let g=groups.find(x=>x.root===root);
+    if(!g){g={root,items:[]};groups.push(g)}
+    if(!g.items.includes(clean))g.items.push(clean);
+  }
+  return '<div class="structured-types">'+groups.map(g=>'<div class="structured-type-group">'+g.items.map(x=>`<span class="structured-type-badge">${esc(x)}</span>`).join('')+'</div>').join('')+'</div>';
+}
+function equipierBadge(name){let n=String(name||"N/A");let empty=!name||n==="Non attribué"||n==="N/A";if(empty)n="N/A";return `<span class="equipier-badge ${empty?"unassigned":""}">${esc(n)}</span>`}
+function schoolYearBounds(now=new Date()){
+  const y=now.getFullYear(),m=now.getMonth();
+  const startYear=m>=8?y:y-1;
+  return {start:new Date(startYear,8,1,0,0,0),end:new Date(startYear+1,7,31,23,59,59),label:`${startYear}-${startYear+1}`};
+}
+function isCurrentSchoolYear(f){let d=date(f.Date_de_saisie);if(!d)return false;let {start,end}=schoolYearBounds();return d>=start&&d<=end}
+async function loadSmallTables(){let [eqs,ets]=await Promise.all([api(T.EQ,{limit:500}),api(T.ETAB,{limit:5000})]);eqMap=new Map(eqs.map(x=>[x.id,x]));etabMap=new Map(ets.map(x=>[x.id,x]));let sortedEqs=eqs.sort((a,b)=>String(a.Nom||"").localeCompare(String(b.Nom||""),"fr"));let opts='<option value="">Non attribué</option>'+sortedEqs.map(e=>`<option value="${e.id}">${esc(e.Nom||e.Email||e.id)}</option>`).join("");$("equipier").innerHTML=opts;$("equipierFilter").innerHTML='<option value="all">Tous équipiers</option><option value="unassigned">Non attribué</option>'+sortedEqs.map(e=>`<option value="${e.id}">${esc(e.Nom||e.Email||e.id)}</option>`).join("")}
+function isoWeekInfo(d=new Date()){let x=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));let day=x.getUTCDay()||7;x.setUTCDate(x.getUTCDate()+4-day);let year=x.getUTCFullYear();let y0=new Date(Date.UTC(year,0,1));let week=Math.ceil((((x-y0)/86400000)+1)/7);return{year,week}}
+function isoWeekStart(year,week){let jan4=new Date(Date.UTC(year,0,4));let day=jan4.getUTCDay()||7;let monday=new Date(jan4);monday.setUTCDate(jan4.getUTCDate()-day+1+(week-1)*7);return monday}
+function ymdUTC(d){return `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,"0")}-${String(d.getUTCDate()).padStart(2,"0")}`}
+function dateEpochUTC(ymd){let m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(ymd||"");return m?Date.UTC(+m[1],+m[2]-1,+m[3])/1000:null}
+function frShortUTC(d){return `${String(d.getUTCDate()).padStart(2,"0")}/${String(d.getUTCMonth()+1).padStart(2,"0")}`}
+function depCode(v){let x=norm(v);if(!x)return "";if(/^0*11$/.test(x)||x.includes("aude"))return "11";if(/^0*30$/.test(x)||x.includes("gard"))return "30";if(/^0*34$/.test(x)||x.includes("herault"))return "34";if(/^0*48$/.test(x)||x.includes("lozere"))return "48";if(/^0*66$/.test(x)||x.includes("pyrenees orientales")||x.includes("pyrenees-orientales"))return "66";let m=x.match(/(?:^|\D)(11|30|34|48|66)(?:\D|$)/);return m?m[1]:String(v??"").trim()}
+let availableDays=new Map(),availableWeeks=new Map();
+function factDept(f){let d=depCode(f.Departement);if(!d){let e=etabMap.get(Number(f.UAI));d=depCode(e?.Departement)}return d}
+async function loadPeriodOptions(){
+  // Grist ne fournit pas de DISTINCT sur les dates via cet endpoint : on construit
+  // une fois l'index des périodes à partir de FE26_27_2, puis les FE affichés sont
+  // toujours rechargés à la demande pour la période choisie.
+  let all=await apiAllPaged(T.CUR,{sort:"-Date_de_saisie",pageSize:2000,maxRows:50000});
+  all=all.filter(f=>isCurrentSchoolYear(f)&&["34","48"].includes(factDept(f)));
+  availableDays.clear();availableWeeks.clear();
+  for(const f of all){
+    let d=date(f.Date_de_saisie);if(!d)continue;
+    let du=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));
+    let ymd=ymdUTC(du);availableDays.set(ymd,(availableDays.get(ymd)||0)+1);
+    let wi=isoWeekInfo(du),key=`${wi.year}-W${String(wi.week).padStart(2,"0")}`;
+    let rec=availableWeeks.get(key)||{year:wi.year,week:wi.week,count:0};rec.count++;availableWeeks.set(key,rec);
+  }
+  let dayKeys=[...availableDays.keys()].sort().reverse();
+  $("daySelect").innerHTML='<option value="">Choisir un jour</option>'+dayKeys.map(k=>{let [y,m,d]=k.split("-");return `<option value="${k}">${d}/${m}/${y}</option>`}).join("");
+  let weeks=[...availableWeeks.entries()].sort((a,b)=>b[0].localeCompare(a[0]));
+  $("weekSelect").innerHTML='<option value="">Choisir une semaine</option>'+weeks.map(([key,w])=>{let st=isoWeekStart(w.year,w.week),en=new Date(st.getTime()+6*86400000);return `<option value="${key}">S${String(w.week).padStart(2,"0")} — ${frShortUTC(st)} à ${frShortUTC(en)}</option>`}).join("");
+  // Par défaut : semaine courante si elle contient des FE, sinon dernière semaine disponible.
+  let now=isoWeekInfo(new Date()),cur=`${now.year}-W${String(now.week).padStart(2,"0")}`;
+  $("weekSelect").value=availableWeeks.has(cur)?cur:(weeks[0]?.[0]||"");
+  $("daySelect").value="";
+}
+function periodSpec(){
+  let day=$("daySelect").value,week=$("weekSelect").value;
+  if(day)return{label:new Intl.DateTimeFormat("fr-FR",{timeZone:"UTC"}).format(new Date(day+"T00:00:00Z")),dates:[dateEpochUTC(day)]};
+  if(week){let m=/^(\d{4})-W(\d{2})$/.exec(week);if(!m)return null;let year=+m[1],wk=+m[2],start=isoWeekStart(year,wk),dates=[];for(let i=0;i<7;i++){let d=new Date(start);d.setUTCDate(start.getUTCDate()+i);dates.push(d.getTime()/1000)}let en=new Date(start.getTime()+6*86400000);return{label:`S${String(wk).padStart(2,"0")} — ${frShortUTC(start)} à ${frShortUTC(en)}`,dates}}
+  return null;
+}
+async function loadCurrent(){let spec=periodSpec();if(!spec){notice("Choisissez une période valide.","error");return}notice(`Chargement des faits ${spec.label} — départements 34 et 48…`);let loaded=await apiAllPaged(T.CUR,{filter:{Date_de_saisie:spec.dates},sort:"-Date_de_saisie,-Numero_FE",pageSize:1000,maxRows:10000});currentRows=loaded.filter(f=>{if(!isCurrentSchoolYear(f))return false;let d=depCode(f.Departement);if(!d){let e=etabMap.get(Number(f.UAI));d=depCode(e?.Departement)}return ["34","48"].includes(d)}).sort((a,b)=>(date(b.Date_de_saisie)?.getTime()||0)-(date(a.Date_de_saisie)?.getTime()||0)||Number(b.Numero_FE||0)-Number(a.Numero_FE||0));await loadSuiviFor(currentRows);rows=[...currentRows];notice(`${currentRows.length} fait(s) des départements 34 et 48 chargé(s) pour ${spec.label}. Les autres départements restent accessibles uniquement par la recherche d’établissement.`,"ok");page=1;render()}
+async function loadSuiviFor(facts){let ids=facts.filter(f=>f._source!==T.OLD).map(f=>Number(f.Numero_FE)).filter(Boolean);if(!ids.length)return;let ss=await api(T.SUIVI,{filter:{Numero_FE:ids},limit:Math.max(ids.length*2,200)});ss.forEach(s=>suiviMap.set(Number(s.Numero_FE),s))}
+async function searchExactFE(num){notice("Recherche directe du FE n°"+num+"…");let n=Number(num);let found=await api(T.CUR,{filter:{Numero_FE:[n]},limit:10});if(!found.length)found=await api(T.OLD,{filter:{Numero_FE:[n]},limit:10});found=found.filter(f=>["34","48"].includes(depCode(f.Departement)));await loadSuiviFor(found);rows=found;page=1;render();notice(found.length?`${found.length} résultat(s) trouvé(s)${found[0]._source===T.OLD?" dans les archives 2025–2026":" en 2026–2027"}.`:`Aucun FE n°${num} trouvé dans les départements 34 ou 48. Pour les autres départements, recherchez l’établissement par son nom.`,found.length?"ok":"error")}
+async function renderEtabMatches(q){
+  let box=$("etabMatches");
+  if(!q||/^\d{6,}$/.test(q)){box.classList.add("hidden");box.innerHTML="";return}
+  let nq=norm(q);
+  if(nq.length<3){box.classList.add("hidden");box.innerHTML="";return}
+
+  // On prend davantage de candidats, puis on ne garde que les établissements
+  // ayant au moins un FE dans FE26_27_2 ou FE25_26.
+  let candidates=[...etabMap.values()].filter(e=>{
+    const nom=norm(e.Etablissement||e.Nom_court||"");
+    if(nom.startsWith("section enseignement general et technologique")) return false;
+    return norm([e.Etablissement,e.Nom_court,e.Ville,e.UAI].join(" ")).includes(nq);
+  }).slice(0,20);
+
+  if(!candidates.length){box.classList.add("hidden");box.innerHTML="";return}
+  box.innerHTML='<div class="notice"><strong>Recherche des établissements ayant des FE…</strong></div>';
+  box.classList.remove("hidden");
+
+  const checked=await Promise.all(candidates.map(async e=>{
+    const ref=Number(e.id);
+    try{
+      const [cur,old]=await Promise.all([
+        api(T.CUR,{filter:{UAI:[ref]},limit:1}),
+        api(T.OLD,{filter:{UAI:[ref]},limit:1})
+      ]);
+      return (cur.length||old.length)?e:null;
+    }catch(err){return null}
+  }));
+
+  // La saisie a pu changer pendant les requêtes : ne pas afficher un ancien résultat.
+  if(norm($("q").value.trim())!==nq) return;
+  let matches=checked.filter(Boolean).slice(0,6);
+  if(!matches.length){box.classList.add("hidden");box.innerHTML="";return}
+
+  box.innerHTML=`<div class="notice"><strong>Établissement${matches.length>1?"s":""} correspondant${matches.length>1?"s":""}</strong><div class="actions" style="margin-top:8px">${matches.map(e=>`<button class="btn etab-result" data-etab="${e.id}">${esc(e.Etablissement||e.Nom_court||e.UAI)}${e.Ville?" — "+esc(e.Ville):""}</button>`).join("")}</div><div class="muted" style="margin-top:7px">Seuls les établissements ayant au moins un FE en 2025-2026 ou 2026-2027 sont proposés.</div></div>`;
+  box.classList.remove("hidden");
+  box.querySelectorAll("[data-etab]").forEach(b=>b.onclick=()=>openEstablishmentById(Number(b.dataset.etab)));
+}
+function filtered(){
+  const q=norm($("q").value.trim());
+  const dep=$("dep").value;
+  const degree=$("degree").value;
+  const level=$("level").value;
+  const status=$("status").value;
+  const equipier=$("equipierFilter").value;
+
+  return rows.filter(f=>{
+    // Le listing du centre opérationnel reste strictement limité aux 34 et 48.
+    const d=factDept(f);
+    if(!["34","48"].includes(d))return false;
+    if(dep!=="all"&&d!==dep)return false;
+
+    if(degree!=="all"){
+      const dg=norm(f.Degre);
+      if(degree==="1er"&&!dg.includes("1"))return false;
+      if(degree==="2nd"&&!dg.includes("2"))return false;
+    }
+    if(level!=="all"&&String(f.Niveau??"").trim()!==level)return false;
+
+    const su=suiviMap.get(Number(f.Numero_FE));
+    const st=statusOf(f);
+    if(status!=="all"&&st!==status)return false;
+
+    if(equipier!=="all"){
+      const ref=su?.Equipier?String(su.Equipier):"";
+      if(equipier==="unassigned"){if(ref)return false}
+      else if(ref!==equipier)return false;
+    }
+
+    if(q){
+      const e=etabMap.get(Number(f.UAI));
+      const hay=norm([
+        f.Numero_FE,f.Etablissement,e?.Etablissement,e?.Nom_court,
+        f.Ville,e?.Ville,f.Types_de_fait,f.Types_de_fait_structure,
+        f.Resume_du_fait,f.UAI,e?.UAI
+      ].filter(Boolean).join(" "));
+      if(!hay.includes(q))return false;
+    }
+    return true;
+  });
+}
+function render(){let a=filtered(),pages=Math.max(1,Math.ceil(a.length/PAGE));page=Math.min(page,pages);let slice=a.slice((page-1)*PAGE,page*PAGE);$("body").innerHTML=slice.length?slice.map(f=>{let su=suiviMap.get(Number(f.Numero_FE));let eq=f._source===T.OLD?(f.Equipier||"N/A"):eqName(su?.Equipier);return `<tr><td>${dateFR(f.Date_de_saisie)}</td><td><span class="badge ${String(f.Niveau)==="3"?"b3":""}">${esc(f.Niveau||"—")}</span></td><td>${factTypeBadges(f.Types_de_fait,f.Niveau)}</td><td><button class="etab-link" data-etab-from-fe="${f._source}:${f.id}">${esc(f.Etablissement||"—")}</button></td><td>${esc(f.Ville||"—")}</td><td>${esc(f.Departement||"—")}</td><td>${badgeStatus(statusOf(f))}</td><td>${equipierBadge(eq)}</td><td>${esc(f.Numero_FE)}</td><td><button class="btn open-btn" data-open="${f._source}:${f.id}">Ouvrir</button></td></tr>`}).join(""):'<tr><td colspan="10" class="loading">Aucun résultat.</td></tr>';document.querySelectorAll("[data-open]").forEach(b=>b.onclick=()=>openFact(b.dataset.open));document.querySelectorAll("[data-etab-from-fe]").forEach(b=>b.onclick=()=>openEstablishmentFromFact(b.dataset.etabFromFe));$("count").textContent=a.length+" résultat(s) dans les données actuellement chargées";$("pageInfo").textContent=`Page ${page} / ${pages}`;$("prev").disabled=page<=1;$("next").disabled=page>=pages}
+function openEstablishmentFromFact(key){let [source,id]=key.split(":");let f=rows.find(x=>x._source===source&&x.id===Number(id));if(!f)return;selected=f;let ref=Number(f.UAI);let e=etabMap.get(ref);if(!e){notice("Établissement introuvable dans ETABLISSEMENTS.","error");return}selectedEtab=e;$("listView").classList.add("hidden");$("detailView").classList.add("hidden");openEstablishment(e,ref)}
+function info(label,val,cls=""){return `<div class="info ${cls}"><span class="label">${esc(label)}</span><div class="value">${esc(val||"—")}</div></div>`}
+async function openFact(key){let [source,id]=key.split(":");selected=rows.find(x=>x._source===source&&x.id===Number(id));if(!selected){let got=await api(source,{filter:{Numero_FE:[Number(key)]},limit:1});selected=got[0]}if(!selected)return;$("listView").classList.add("hidden");$("etabView").classList.add("hidden");$("detailView").classList.remove("hidden");$("title").textContent=`FE n°${selected.Numero_FE} — Niveau ${selected.Niveau||"—"}`;$("subtitle").textContent=`${dateFR(selected.Date_de_saisie)} — ${selected.Etablissement||"Établissement non renseigné"} — ${selected.Ville||""} — ${selected.Departement||""}`;let authorParts=[];if(selected.Redacteur)authorParts.push(String(selected.Redacteur).trim());if(selected.Courriel_redacteur)authorParts.push(String(selected.Courriel_redacteur).trim());let tel=String(selected.Telephone_redacteur||"").trim();$("detailAuthor").textContent=authorParts.length?`Rédigé par ${authorParts.join(", ")}${tel?" - "+tel:""}`:(tel?`Rédigé par - ${tel}`:"Rédacteur non renseigné");$("detailStatus").innerHTML=badgeStatus(statusOf(selected));$("sourceGrid").innerHTML=[`<div class="info span4"><span class="label">Types de fait détaillés</span><div class="detail-type-wrap">${structuredTypeBadges(selected.Types_de_fait_structure||selected.Types_de_fait)}</div></div>`,info("Résumé du fait",selected.Resume_du_fait,"span4"),info("Exposé des faits",selected.Expose_des_faits,"span4")].join("");if(source===T.OLD){$("opsCard").classList.remove("hidden");$("opsCard").innerHTML=`<div class="sectiontitle"><h2>Suivi archivé</h2>${badgeStatus("Terminé")}</div><div class="grid">${info("Équipier",selected.Equipier||"—")}${info("Date traitement EMAS",dateFR(selected.Date_traitement_EMS))}${info("Suivi établissement",selected.Suivi_etablissement||"Suivi non renseigné","span2")}${info("Accompagnement EMAS",selected.Accompagnement_EMAS||"Accompagnement non renseigné","span2")}</div>`;return}await loadSingleSuivi(selected);renderOps()}
+async function loadSingleSuivi(f){let ss=await api(T.SUIVI,{filter:{Numero_FE:[Number(f.Numero_FE)]},limit:5});selectedSuivi=ss[0]||null;if(selectedSuivi)suiviMap.set(Number(f.Numero_FE),selectedSuivi)}
+const ACTIVITY_CHOICES={
+ Securisation:["Situation de crise","Élèves perturbateurs","Conseil de discipline","Abords (EPLE, écoles, DSDEN...)"],
+ Prevention:["Suivi DS","Intervention classe","CESC","Autres (enquêtes de victimisation...)"],
+ Accompagnement:["Téléphonique","Téléphonique, courriel","Accompagnement équipes (visite EPLE rencontre CPE /chef,IEN,directeur)","Accompagnements victimes, élèves, personnels, parents"],
+ Formation:["Harcèlement","Gestion de crise","PPMS","Autres"],
+ Representation_Partenariat:["Police/Gendarmerie","CLSPD - GLTD - cellule de veille","État-major de sécurité","Collectivités territoriales","Autres"]
+};
+function choiceValues(v){
+  if(v===null||v===undefined||v==="")return[];
+  if(Array.isArray(v))return (v[0]==="L"?v.slice(1):v).map(x=>String(x).trim()).filter(Boolean);
+  let raw=String(v).trim();
+  // Selon le chemin de lecture Grist, une Choice List peut revenir sous forme
+  // de tableau réel, de JSON texte ["L",...], ou de représentation ['...', '...'].
+  try{
+    const parsed=JSON.parse(raw);
+    if(Array.isArray(parsed))return (parsed[0]==="L"?parsed.slice(1):parsed).map(x=>String(x).trim()).filter(Boolean);
+  }catch(_){ }
+  if(/^\[.*\]$/.test(raw)){
+    let inner=raw.slice(1,-1).trim();
+    if(!inner)return[];
+    let vals=inner.split(/\s*,\s*/).map(x=>x.trim().replace(/^['\"]|['\"]$/g,"")).filter(Boolean);
+    if(vals[0]==="L")vals.shift();
+    return vals;
+  }
+  return [raw];
+}
+function gristChoiceList(values){return ["L",...values]}
+function buildChoiceBox(id,field){let box=$(id);if(!box)return;box.innerHTML=ACTIVITY_CHOICES[field].map((v,i)=>`<label class="choiceitem"><input type="checkbox" data-choice-field="${field}" value="${esc(v)}"><span>${esc(v)}</span></label>`).join("")}
+function setChoiceBox(field,value){let selectedVals=new Set(choiceValues(value));document.querySelectorAll(`[data-choice-field="${field}"]`).forEach(cb=>cb.checked=selectedVals.has(cb.value))}
+function getChoiceBox(field){return [...document.querySelectorAll(`[data-choice-field="${field}"]:checked`)].map(cb=>cb.value)}
+function initActivityFields(){buildChoiceBox("securisationChoices","Securisation");buildChoiceBox("preventionChoices","Prevention");buildChoiceBox("accompagnementChoices","Accompagnement");buildChoiceBox("formationChoices","Formation");buildChoiceBox("representationChoices","Representation_Partenariat")}
+function renderOps(){if(!document.getElementById("save")){location.reload();return}let s=selectedSuivi||{};$("equipier").value=s.Equipier?String(s.Equipier):"";$("editStatus").value=s.Statut||"Non attribué";$("suivi").value=s.Suivi_etablissement||"";$("emas").value=s.Accompagnement_EMAS||"";$("notes").value=s.Notes_informations||"";$("eleveSuivi").value=s.Eleve_suivi||"";setChoiceBox("Securisation",s.Securisation);setChoiceBox("Prevention",s.Prevention);setChoiceBox("Accompagnement",s.Accompagnement);setChoiceBox("Formation",s.Formation);setChoiceBox("Representation_Partenariat",s.Representation_Partenariat);$("treatmentDate").textContent=s.Date_traitement_EMS?`Première prise en charge EMAS : ${dateFR(s.Date_traitement_EMS)}`:"La date de première prise en charge sera enregistrée automatiquement au premier enregistrement.";$("saveMeta").textContent=s.Derniere_modification?`Dernière modification : ${dateFR(s.Derniere_modification)}${s.Modifie_par?" — "+s.Modifie_par:""}`:"Aucun suivi enregistré";let done=(s.Statut||"Non attribué")==="Terminé";$("toggleDone").textContent=done?"Réouvrir — En cours":"Terminé";$("toggleDone").classList.toggle("finish",!done)}
+function degreeActivityTable(f){
+  const dg=norm(f?.Degre);
+  if(dg.includes("1"))return T.ACT_D1;
+  if(dg.includes("2"))return T.ACT_D2;
+  const e=etabMap.get(Number(f?.UAI));
+  const ed=norm(e?.Degre);
+  if(ed.includes("1"))return T.ACT_D1;
+  if(ed.includes("2"))return T.ACT_D2;
+  return null;
+}
+function activityDelay(dateSaisie,dateTraitement){
+  const a=date(dateSaisie),b=date(dateTraitement);if(!a||!b)return null;
+  const ua=Date.UTC(a.getFullYear(),a.getMonth(),a.getDate());
+  const ub=Date.UTC(b.getFullYear(),b.getMonth(),b.getDate());
+  return Math.max(0,Math.round((ub-ua)/86400000));
+}
+const activityColumnCache=new Map();
+async function activityColumns(table){
+  if(activityColumnCache.has(table))return activityColumnCache.get(table);
+  const t=await getTokenInfo();
+  const url=t.baseUrl+"/tables/"+encodeURIComponent(table)+"/columns?auth="+encodeURIComponent(t.token);
+  const response=await fetch(url,{method:"GET",credentials:"omit"});
+  if(!response.ok)throw new Error("Impossible de lire les colonnes de "+table+" (HTTP "+response.status+")");
+  const payload=await response.json();
+  const cols=(payload.columns||[]).map(c=>({id:c.id,label:c.fields?.label||c.id}));
+  activityColumnCache.set(table,cols);return cols;
+}
+function activityCol(cols,...names){
+  const wanted=names.map(norm);
+  let c=cols.find(x=>wanted.includes(norm(x.id)));
+  if(!c)c=cols.find(x=>wanted.includes(norm(x.label)));
+  return c?.id||null;
+}
+async function syncActivity(f,s){
+  if(!f||!s)return;
+  const table=degreeActivityTable(f);if(!table)throw new Error("Degré du FE non identifiable : synchronisation Activité impossible.");
+  const e=etabMap.get(Number(f.UAI))||{};
+  const numero=Number(f.Numero_FE);
+  const cols=await activityColumns(table);
+  const keyCol=activityCol(cols,"Nmr_FE_ou_Initiative","Nmr FE ou Initiative","N° FE ou Initiative","Numero_FE","Numéro FE");
+  if(!keyCol)throw new Error("Colonne Nmr_FE_ou_Initiative introuvable dans "+table+".");
+  const existing=await api(table,{filter:{[keyCol]:[numero,String(numero)]},limit:5,fresh:true});
+  const values=[
+    [["Gravite","Gravité"],f.Gravite??null],
+    [["UAI_Etab","UAI Etab","UAI_Etablissement"],e.UAI||f.UAI||""],
+    [["Etablissement","Établissement"],f.Etablissement||e.Etablissement||e.Nom_court||""],
+    [["Degre","Degré"],table===T.ACT_D1?1:2],
+    [["Commune","Ville"],f.Ville||e.Ville||""],
+    [["Bassin"],e.Bassin||""],
+    [["Departement","Département"],f.Departement||e.Departement||factDept(f)||""],
+    [["Resume_FE","Résumé_FE","Résumé FE"],f.Resume_du_fait||""],
+    [["Suivi_etablissement","Suivi_établissement","Suivi établissement"],s.Suivi_etablissement||""],
+    [["Accompagnement_EMAS","Accompagnement EMAS"],s.Accompagnement_EMAS||""],
+    [["Eleve_suivi","Élève suivi","Eleve suivi"],s.Eleve_suivi||""],
+    [["DATE_Faits","Date faits","Date_Faits"],f.Date_du_fait||null],
+    [["Date_saisie_FE_Etab","Date saisie FE Etab"],f.Date_de_saisie||null],
+    [["Date_traitement_EMS","Date traitement EMS"],s.Date_traitement_EMS||null],
+    [["Delai","Délai"],activityDelay(f.Date_de_saisie,s.Date_traitement_EMS)],
+    [["Equipier","Équipier"],s.Equipier||null],
+    [["Securisation","Sécurisation"],gristChoiceList(getChoiceBox("Securisation"))],
+    [["Prevention","Prévention"],gristChoiceList(getChoiceBox("Prevention"))],
+    [["Accompagnement"],gristChoiceList(getChoiceBox("Accompagnement"))],
+    [["Formation"],gristChoiceList(getChoiceBox("Formation"))],
+    [["Representation_Partenariat","Représentation Partenariat","Representation Partenariat"],gristChoiceList(getChoiceBox("Representation_Partenariat"))]
+  ];
+  const fields={};
+  for(const [aliases,value] of values){const col=activityCol(cols,...aliases);if(col)fields[col]=value}
+  if(existing.length>1)throw new Error(`Doublon détecté dans ${table} pour le FE ${numero}. Synchronisation bloquée.`);
+  if(existing.length){
+    await grist.docApi.applyUserActions([["UpdateRecord",table,existing[0].id,fields]]);
+  }else{
+    // Relecture juste avant création pour réduire le risque de doublon en accès simultané.
+    const recheck=await api(table,{filter:{[keyCol]:[numero,String(numero)]},limit:2,fresh:true});
+    if(recheck.length){await grist.docApi.applyUserActions([["UpdateRecord",table,recheck[0].id,fields]]);return;}
+    fields[keyCol]=numero;
+    await grist.docApi.applyUserActions([["AddRecord",table,null,fields]]);
+  }
+}
+async function persistOps(forcedStatus=null){
+  if(!selected||selected._source===T.OLD)return;
+  const numero=Number(selected.Numero_FE);
+  let eq=$("equipier").value?Number($("equipier").value):null;
+  let st=forcedStatus||$("editStatus").value;if(!forcedStatus&&st!=="Terminé")st="En cours";
+  let now=Math.floor(Date.now()/1000);
+  let fields={Equipier:eq,Statut:st,Suivi_etablissement:$("suivi").value.trim(),Accompagnement_EMAS:$("emas").value.trim(),Notes_informations:$("notes").value.trim(),Eleve_suivi:$("eleveSuivi").value.trim(),Securisation:gristChoiceList(getChoiceBox("Securisation")),Prevention:gristChoiceList(getChoiceBox("Prevention")),Accompagnement:gristChoiceList(getChoiceBox("Accompagnement")),Formation:gristChoiceList(getChoiceBox("Formation")),Representation_Partenariat:gristChoiceList(getChoiceBox("Representation_Partenariat")),Derniere_modification:now};
+  $("save").disabled=true;$("toggleDone").disabled=true;
+  let suiviSaved=false;
+  try{
+    // Concurrence optimiste : relire le suivi avant toute écriture.
+    const live=await api(T.SUIVI,{filter:{Numero_FE:[numero]},limit:3,fresh:true});
+    if(live.length>1)throw new Error(`Doublon SUIVI détecté pour le FE ${numero}. Enregistrement bloqué.`);
+    const liveRow=live[0]||null;
+    if(selectedSuivi&&liveRow){
+      const opened=Number(selectedSuivi.Derniere_modification||0),current=Number(liveRow.Derniere_modification||0);
+      if(opened&&current&&opened!==current){
+        throw new Error("Ce FE a été modifié par un autre utilisateur depuis son ouverture. Rechargez la fiche avant d’enregistrer.");
+      }
+    }
+    if(!liveRow){
+      fields.Numero_FE=numero;
+      fields.Date_traitement_EMS=now;
+      // Dernière relecture avant AddRecord pour limiter une double création simultanée.
+      const recheck=await api(T.SUIVI,{filter:{Numero_FE:[numero]},limit:2,fresh:true});
+      if(recheck.length)throw new Error("Ce FE vient d’être pris en charge par un autre utilisateur. Rechargez la fiche.");
+      await grist.docApi.applyUserActions([["AddRecord",T.SUIVI,null,fields]]);
+    }else{
+      if(!liveRow.Date_traitement_EMS)fields.Date_traitement_EMS=now;
+      await grist.docApi.applyUserActions([["UpdateRecord",T.SUIVI,liveRow.id,fields]]);
+    }
+    suiviSaved=true;
+    await loadSingleSuivi(selected);
+    try{
+      await syncActivity(selected,selectedSuivi);
+    }catch(syncErr){
+      renderOps();$("detailStatus").innerHTML=badgeStatus(statusOf(selected));render();
+      alert("Le suivi du FE a bien été enregistré, mais la synchronisation du tableau Activité a échoué : "+syncErr.message+"\n\nVous pouvez recliquer sur Enregistrer après correction : la même ligne sera resynchronisée.");
+      return;
+    }
+    renderOps();$("detailStatus").innerHTML=badgeStatus(statusOf(selected));render();
+  }catch(e){
+    alert((suiviSaved?"Synchronisation incomplète : ":"Enregistrement impossible : ")+e.message);
+  }finally{$("save").disabled=false;$("toggleDone").disabled=false}
+}
+async function saveOps(){return persistOps(null)}
+async function toggleDone(){let current=selectedSuivi?.Statut||"Non attribué";return persistOps(current==="Terminé"?"En cours":"Terminé")}
+async function showEstablishment(){if(!selected)return;let ref=Number(selected.UAI),e=etabMap.get(ref);return openEstablishment(e,ref)}
+async function openEstablishmentById(ref){let e=etabMap.get(Number(ref));if(!e)return;selectedEtab=e;$("listView").classList.add("hidden");$("detailView").classList.add("hidden");return openEstablishment(e,Number(ref))}
+async function openEstablishment(e,ref){$("detailView").classList.add("hidden");$("etabView").classList.remove("hidden");$("etabTitle").textContent=e?.Etablissement||selected.Etablissement||"Établissement";$("etabSub").textContent=[e?.UAI,e?.Ville,e?.Departement].filter(Boolean).join(" — ");$("etabGrid").innerHTML=[info("UAI",e?.UAI),info("Degré",e?.Degre),info("Ville",e?.Ville),info("Département",e?.Departement),info("Bassin",e?.Bassin),info("Type",e?.Type_etablissement),info("Secteur",e?.Secteur),info("Code postal",e?.Code_postal)].join("");$("history").innerHTML='<div class="loading">Chargement de l’historique par UAI…</div>';try{let [cur,old]=await Promise.all([api(T.CUR,{filter:{UAI:[ref]},sort:"-Date_de_saisie",limit:500}),api(T.OLD,{filter:{UAI:[ref]},sort:"-Date_de_saisie",limit:500})]);let all=[...cur,...old].sort((a,b)=>(date(b.Date_de_saisie)?.getTime()||0)-(date(a.Date_de_saisie)?.getTime()||0));await loadSuiviFor(cur);$("history").innerHTML=all.length?all.map(f=>{const rawLevel=String(f.Niveau??"");const level=/\b3\b/.test(rawLevel)||norm(rawLevel).includes("niveau 3")?"3":/\b2\b/.test(rawLevel)||norm(rawLevel).includes("niveau 2")?"2":rawLevel.replace(/^niveau\s*/i,"").split(":")[0].trim()||"—";const warning=level==="3"?'<span class="level-warning" title="Fait de niveau 3" aria-label="Fait de niveau 3">⚠</span>':"";const oldYear=f._source===T.OLD;return `<div class="event ${oldYear?"old-school-year":""}"><div class="event-title">FE n°${esc(f.Numero_FE)} — Niveau ${esc(level)} ${warning}</div><div class="event-meta">${dateFR(f.Date_de_saisie)} — ${esc(f.Annee_scolaire||"")} — ${esc(f.Types_de_fait||"")}</div><div>${esc(f.Resume_du_fait||"Résumé non renseigné")}</div><button class="btn" style="margin-top:7px" data-hist="${f._source}:${f.id}">Ouvrir la fiche</button></div>`}).join(""):'<div class="muted">Aucun fait trouvé pour cet UAI.</div>';all.forEach(f=>{if(!rows.some(r=>r._source===f._source&&r.id===f.id))rows.push(f)});document.querySelectorAll("[data-hist]").forEach(b=>b.onclick=()=>openFact(b.dataset.hist))}catch(e){$("history").innerHTML='<div class="notice error">Impossible de charger l’historique : '+esc(e.message)+'</div>'}}
+$("q").oninput=()=>{const raw=$("q").value.trim();if(!raw){$("etabMatches").classList.add("hidden");$("etabMatches").innerHTML="";rows=[...currentRows];page=1;render();}};
+$("q").onkeydown=async e=>{if(e.key!=="Enter")return;e.preventDefault();let raw=$("q").value.trim();if(!raw){rows=[...currentRows];page=1;render();return}if(/^\d{6,}$/.test(raw)){await searchExactFE(raw)}else{rows=[...currentRows];page=1;render();await renderEtabMatches(raw)}};
+["dep","degree","level","status","equipierFilter"].forEach(id=>$(id).onchange=()=>{page=1;render()});$("daySelect").onchange=()=>{if($("daySelect").value)$("weekSelect").value="";loadCurrent()};$("weekSelect").onchange=()=>{if($("weekSelect").value)$("daySelect").value="";loadCurrent()};$("prev").onclick=()=>{page--;render()};$("next").onclick=()=>{page++;render()};$("back").onclick=()=>{$("detailView").classList.add("hidden");$("listView").classList.remove("hidden");render()};$("openEtab").onclick=showEstablishment;$("etabBack").onclick=()=>{$("etabView").classList.add("hidden");if(selected){$("detailView").classList.remove("hidden")}else{$("listView").classList.remove("hidden");render()}};$("save").onclick=saveOps;$("toggleDone").onclick=toggleDone;
+(async()=>{try{initActivityFields();await loadSmallTables();await loadPeriodOptions();await loadCurrent()}catch(e){console.error(e);notice("Erreur Grist : "+e.message,"error");$("body").innerHTML='<tr><td colspan="10" class="loading">Impossible de charger les données.</td></tr>'}})();
+</script></body></html>
