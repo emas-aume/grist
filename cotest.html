@@ -117,8 +117,9 @@ async function api(table,{filter=null,sort=null,limit=null,offset=null}={},retry
     if(limit!=null)params.set("limit",String(limit));
     if(offset!=null)params.set("offset",String(offset));
     params.set("cellFormat","normal");
+    params.set("auth",t.token);
     const url=t.baseUrl+"/tables/"+encodeURIComponent(table)+"/records?"+params.toString();
-    const response=await fetch(url,{method:"GET",credentials:"omit",headers:{Authorization:`Bearer ${t.token}`}});
+    const response=await fetch(url,{method:"GET",credentials:"omit"});
     if(response.status===401&&retry){tokenInfo=null;await getTokenInfo(true);return api(table,{filter,sort,limit,offset},false)}
     if(!response.ok){const detail=await response.text().catch(()=>response.statusText);throw new Error("HTTP "+response.status+" — "+detail.slice(0,240))}
     return restRecordsToRows(await response.json(),table);
