@@ -143,10 +143,12 @@ async function currentActor(){
   try{
     const t=await getTokenInfo(false);
     const origin=new URL(t.baseUrl).origin;
-    const r=await fetch(origin+"/api/session/access/active",{method:"GET",credentials:"include",headers:{Accept:"application/json"}});
+    // Le widget GitHub est cross-origin : les cookies de session Grist ne sont pas fiables ici.
+    // On réutilise donc le jeton temporaire Grist pour demander le profil de l'utilisateur courant.
+    const r=await fetch(origin+"/api/profile/user?auth="+encodeURIComponent(t.token),{method:"GET",credentials:"omit",headers:{Accept:"application/json"}});
     if(r.ok){
       const j=await r.json();
-      const name=String(j?.user?.name||"").trim();
+      const name=String(j?.name||j?.user?.name||"").trim();
       if(name){actorCache={value:name,expires:Date.now()+300000};return name}
     }
   }catch(_){ }
@@ -383,7 +385,7 @@ async function activityColumns(table){
   const response=await fetch(url,{method:"GET",credentials:"omit"});
   if(!response.ok)throw new Error("Impossible de lire les colonnes de "+table+" (HTTP "+response.status+")");
   const payload=await response.json();
-  const cols=(payload.columns||[]).map(c=>({id:c.id,label:c.fields?.label||c.id}));
+  const cols=(payload.columns||[]).map(c=>({id:c.id,label:c.fields?.label||c.id,type:c.fields?.type||"Any"}));
   activityColumnCache.set(table,cols);return cols;
 }
 function activityCol(cols,...names){
@@ -392,11 +394,25 @@ function activityCol(cols,...names){
   if(!c)c=cols.find(x=>wanted.includes(norm(x.label)));
   return c?.id||null;
 }
+async function ensureChoiceListColumns(table){
+  const wanted=["Securisation","Prevention","Accompagnement","Formation","Representation_Partenariat"];
+  let cols=await activityColumns(table);
+  const fixes=[];
+  for(const id of wanted){
+    const c=cols.find(x=>x.id===id);
+    if(c && c.type!=="ChoiceList")fixes.push(["ModifyColumn",table,id,{type:"ChoiceList"}]);
+  }
+  if(fixes.length){
+    await grist.docApi.applyUserActions(fixes);
+    activityColumnCache.delete(table);
+  }
+}
 async function syncActivity(f,s){
   if(!f||!s)return;
   const table=degreeActivityTable(f);if(!table)throw new Error("Degré du FE non identifiable : synchronisation Activité impossible.");
   const e=etabMap.get(Number(f.UAI))||{};
   const numero=Number(f.Numero_FE);
+  await ensureChoiceListColumns(table);
   const cols=await activityColumns(table);
   const keyCol=activityCol(cols,"Nmr_FE_ou_Initiative","Nmr FE ou Initiative","N° FE ou Initiative","Numero_FE","Numéro FE");
   if(!keyCol)throw new Error("Colonne Nmr_FE_ou_Initiative introuvable dans "+table+".");
@@ -490,6 +506,7 @@ async function persistOps(forcedStatus=null){
   let eq=$("equipier").value?Number($("equipier").value):null;
   let st=forcedStatus||$("editStatus").value;if(!forcedStatus&&st!=="Terminé")st="En cours";
   let now=Math.floor(Date.now()/1000);
+  await ensureChoiceListColumns(T.SUIVI);
   const actor=await currentActor();
   let fields={Equipier:eq,Statut:st,Suivi_etablissement:$("suivi").value.trim(),Accompagnement_EMAS:$("emas").value.trim(),Notes_informations:$("notes").value.trim(),Eleve_suivi:$("eleveSuivi").value.trim(),Securisation:gristChoiceList(getChoiceBox("Securisation")),Prevention:gristChoiceList(getChoiceBox("Prevention")),Accompagnement:gristChoiceList(getChoiceBox("Accompagnement")),Formation:gristChoiceList(getChoiceBox("Formation")),Representation_Partenariat:gristChoiceList(getChoiceBox("Representation_Partenariat")),Derniere_modification:now,...(actor?{Modifie_par:actor}:{})};
   $("save").disabled=true;$("toggleDone").disabled=true;
