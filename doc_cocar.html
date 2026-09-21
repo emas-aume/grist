@@ -1,5 +1,6 @@
 
 
+
 <!DOCTYPE html>
 <html lang="fr">
 
@@ -888,7 +889,25 @@
 
 
   
-    /* PRÉPARATION RIS */
+    #diagnostic.success, .diagnostic.success, .notice.success { display:none !important; }
+
+
+.niveau3-content{margin-top:18px}
+.n3-dept{margin:30px 0 12px;font-size:22px;font-weight:800;text-transform:uppercase}
+.n3-degree{margin:22px 0 12px;font-size:18px;font-weight:800}
+.n3-fact{padding:0 0 22px;margin:0 0 22px;border-bottom:1px solid #e5e7eb}
+.n3-fact h3{font-size:16px;line-height:1.45;margin:0 0 12px}
+.n3-fact p{margin:7px 0;line-height:1.55;white-space:pre-wrap}
+.n3-empty{color:#64748b;font-style:italic;margin:8px 0 18px}
+.n3-help{color:#64748b;margin-top:4px}
+
+
+
+
+
+
+
+
     .niveau3-content { margin-top: 8px; }
     .n3-dept { margin: 28px 0 12px; font-size: 18px; font-weight: 800; }
     .n3-degree { margin: 20px 0 12px; font-size: 16px; font-weight: 800; }
@@ -909,21 +928,7 @@
 
   <!-- EN-TÊTE -->
 
-  <section class="hero">
-
-    <h1>Documentation EMAS</h1>
-
-    <p>
-      Recherche des faits d’établissement, génération des Notes Blanches
-      et consultation des BRQ de l’année scolaire 2026-2027.
-    </p>
-
-    <p class="muted">
-      Cette page est indépendante du centre opérationnel et lit directement
-      la table normalisée FElignes afin de limiter le temps de chargement.
-    </p>
-
-  </section>
+  
 
 
   <!-- PREMIER TABLEAU -->
@@ -932,10 +937,7 @@
 
     <h2>Recherche des faits d’établissement</h2>
 
-    <p>
-      Recherche par semaine, date, département, niveau, degré, établissement,
-      ville ou numéro de fait.
-    </p>
+    
 
     <div
       id="diagnostic"
@@ -1147,7 +1149,6 @@
   </section>
 
 
-
   <!-- PRÉPARATION RIS -->
   <section class="section" id="niveau3View">
 
@@ -1277,6 +1278,8 @@
   */
 
   const DATA_TABLE = "FElignes";
+  const ETAB_TABLE = "ETABLISSEMENTS";
+  let processedRecords = [];
   let dataLoadStarted = false;
 
   function gristTableToRows(table) {
@@ -1290,11 +1293,45 @@
     });
   }
 
+  function formatDocumentationDateFR(value) {
+    const d = value instanceof Date ? value : parseGristDate(value);
+    if (!d || Number.isNaN(d.getTime())) return "";
+    return new Intl.DateTimeFormat("fr-FR", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric"
+    }).format(d);
+  }
+
+  const EMAS_DEPARTMENTS = new Set(["11", "30", "34", "48", "66"]);
+
   function normalizeDepartment(value, uai) {
-    const direct = String(value ?? "").match(/\d{1,3}/);
-    if (direct) return String(Number(direct[0]));
-    const uaiMatch = String(uai ?? "").trim().match(/^(\d{3})/);
-    return uaiMatch ? String(Number(uaiMatch[1])) : "";
+    const text = normalizeText(value || "");
+    const names = {
+      "aude": "11",
+      "gard": "30",
+      "herault": "34",
+      "lozere": "48",
+      "pyrenees orientales": "66",
+      "pyrenees-orientales": "66"
+    };
+
+    for (const [name, code] of Object.entries(names)) {
+      if (text.includes(name)) return code;
+    }
+
+    const direct = String(value ?? "").trim().match(/^(11|30|34|48|66)$/);
+    if (direct) return direct[1];
+
+    /* Un vrai UAI commence par le code département sur 3 chiffres :
+       011..., 030..., 034..., 048..., 066... */
+    const uaiMatch = String(uai ?? "").trim().match(/^(011|030|034|048|066)/);
+    if (uaiMatch) {
+      const code = String(Number(uaiMatch[1]));
+      return EMAS_DEPARTMENTS.has(code) ? code : "";
+    }
+
+    return "";
   }
 
   function buildIdEtNom(record) {
@@ -1302,6 +1339,21 @@
     const nom = String(record[FIELD.ETABLISSEMENT] ?? "").trim();
     if (uai && nom) return uai + " - " + nom;
     return nom || uai || "Établissement non renseigné";
+  }
+
+  function resolveEstablishment(source, etabMap) {
+    const ref = Number(source[FIELD.UAI]);
+    const etab = Number.isFinite(ref) ? etabMap.get(ref) : null;
+    if (!etab) return { ...source };
+
+    return {
+      ...source,
+      [FIELD.UAI]: etab.UAI ?? source[FIELD.UAI],
+      [FIELD.ETABLISSEMENT]:
+        etab.Etablissement ?? etab.Nom_court ?? source[FIELD.ETABLISSEMENT],
+      [FIELD.VILLE]: etab.Ville ?? source[FIELD.VILLE],
+      [FIELD.DEPARTEMENT]: etab.Departement ?? source[FIELD.DEPARTEMENT]
+    };
   }
 
   function normalizeDegree(value) {
@@ -1319,15 +1371,21 @@
   async function loadDocumentationData() {
     if (dataLoadStarted) return;
     dataLoadStarted = true;
-    showDiagnostic("Connexion à FElignes…", "");
+    showDiagnostic("Chargement des faits et du référentiel établissements…", "");
 
     try {
-      const table = await grist.docApi.fetchTable(DATA_TABLE);
+      const [table, etabTable] = await Promise.all([
+        grist.docApi.fetchTable(DATA_TABLE),
+        grist.docApi.fetchTable(ETAB_TABLE)
+      ]);
       const records = gristTableToRows(table);
-      const processedRecords = [];
+      const etabRows = gristTableToRows(etabTable);
+      const etabMap = new Map(etabRows.map(row => [Number(row.id), row]));
+      processedRecords = [];
 
       for (let i = 0; i < records.length; i++) {
-        const source = records[i] || {};
+        const rawSource = records[i] || {};
+        const source = resolveEstablishment(rawSource, etabMap);
         if (!getNumeroFE(source[FIELD.NUMERO_FE])) continue;
 
         const dateSaisie = parseGristDate(source[FIELD.DATE_SAISIE]);
@@ -1367,7 +1425,7 @@
           _degre: normalizeDegree(source[FIELD.DEGRE]) || typeAnalysis.degree,
           _typeFait: typeAnalysis.types,
           _dateDuFait: dateFait
-            ? formatDateFR(dateFait)
+            ? formatDocumentationDateFR(dateFait)
             : (typeAnalysis.dateDuFait || "")
         });
       }
@@ -1388,7 +1446,6 @@
       renderTable();
       renderWhiteNote();
       renderBRQ();
-      ensureRisWeekSelector();
       renderPreparationRIS();
 
       showDiagnostic(
@@ -2595,6 +2652,7 @@
   function setBrqPeriod(value) {
     selectedBrqPeriod = value;
     renderBRQ();
+    renderPreparationRIS();
   }
 
   function getSelectedBrqRecords() {
@@ -4158,10 +4216,7 @@
             FIELD.VILLE
           );
 
-          value =
-            ville && record._departement
-              ? `${ville} (${record._departement})`
-              : ville;
+          value = ville;
         }
 
         else {
@@ -5654,118 +5709,56 @@ function n3Field(record, names){
 function n3Date(record){
   const raw = record.Date_du_fait || record._dateDuFait || record.Date_de_saisie || "";
   const d = parseGristDate(raw);
-  return d ? formatDateFR(d) : String(raw || "");
-}
-
-function risLevel(record){
-  return normalizeLevel(record?._niveau || record?.Niveau || record?.[FIELD.NIVEAU]);
-}
-
-function risWeekInfo(record){
-  const date = record?._date instanceof Date
-    ? record._date
-    : parseGristDate(record?.Date_de_saisie || record?.[FIELD.DATE_SAISIE]);
-
-  return date ? getISOWeekInfo(date) : null;
-}
-
-function risDepartment(record){
-  return String(
-    record?._departement ||
-    normalizeDepartment(
-      record?.Departement || record?.[FIELD.DEPARTEMENT],
-      record?.UAI || record?.[FIELD.UAI]
-    ) ||
-    ""
-  );
-}
-
-function risDegree(record){
-  return normalizeDegree(
-    record?._degre || record?.Degre || record?.[FIELD.DEGRE]
-  );
+  return d ? formatDocumentationDateFR(d) : String(raw || "");
 }
 
 function getRisWeeks(){
-  const map = new Map();
-
-  for(const r of (allRecords || [])){
-    if(risLevel(r) !== "3") continue;
-
-    const info = risWeekInfo(r);
-    if(!info?.key) continue;
-
-    if(!map.has(info.key)){
-      map.set(info.key,{
-        key: info.key,
-        year: info.year,
-        week: Number(info.week || 0)
+  const map=new Map();
+  for(const r of (processedRecords || [])){
+    if(String(r._niveau || r.Niveau || "").trim()!=="3") continue;
+    if(!r._weekKey) continue;
+    if(!map.has(r._weekKey)){
+      map.set(r._weekKey,{
+        key:r._weekKey,
+        year:r._weekYear || "",
+        week:Number(r._weekNumber || String(r._weekKey).match(/(\d+)$/)?.[1] || 0)
       });
     }
   }
-
-  return [...map.values()].sort((a,b) =>
-    Number(b.year) - Number(a.year) || Number(b.week) - Number(a.week)
+  return [...map.values()].sort((a,b)=>
+    Number(b.year)-Number(a.year) || Number(b.week)-Number(a.week)
   );
 }
 
 function ensureRisWeekSelector(){
-  const select = document.getElementById("risWeekSelect");
-  if(!select) return "";
-
-  const weeks = getRisWeeks();
-  const previous = select.value;
-
-  if(!weeks.length){
-    select.innerHTML = '<option value="">Aucune semaine</option>';
-    select.disabled = true;
-    return "";
-  }
-
-  select.disabled = false;
-  select.innerHTML = weeks.map(w =>
+  const select=document.getElementById("risWeekSelect");
+  if(!select) return null;
+  const weeks=getRisWeeks();
+  const previous=select.value;
+  select.innerHTML=weeks.map(w =>
     `<option value="${escapeN3(w.key)}">S${w.week} — ${w.year}</option>`
   ).join("");
-
-  if(previous && weeks.some(w => w.key === previous)){
-    select.value = previous;
-  } else {
-    select.value = weeks[0].key;
-  }
-
-  return select.value;
+  if(previous && weeks.some(w=>w.key===previous)) select.value=previous;
+  return select.value || (weeks[0]?.key || "");
 }
 
 function renderPreparationRIS(){
-  const host = document.getElementById("niveau3Content");
+  const host=document.getElementById("niveau3Content");
   if(!host) return;
 
-  const select = document.getElementById("risWeekSelect");
-  let risSelectedWeek = select?.value || ensureRisWeekSelector();
+  const select=document.getElementById("risWeekSelect");
+  let selectedWeek=select?.value || ensureRisWeekSelector();
+  let rows=(processedRecords || []).filter(r => String(r._niveau || r.Niveau || "").trim()==="3");
 
-  let rows = (allRecords || []).filter(r => risLevel(r) === "3");
-
-  if(!rows.length){
-    const title = document.getElementById("risTitle");
-    if(title) title.textContent = "Préparation RIS";
-    host.innerHTML = '<div class="n3-empty">Aucun fait de niveau 3 disponible dans FElignes.</div>';
-    return;
+  if(selectedWeek){
+    rows=rows.filter(r => r._weekKey===selectedWeek);
   }
 
-  if(risSelectedWeek){
-    rows = rows.filter(r => risWeekInfo(r)?.key === risSelectedWeek);
-  }
+  const selectedInfo=getRisWeeks().find(w=>w.key===selectedWeek);
+  const title=document.getElementById("risTitle");
+  if(title) title.textContent=selectedInfo ? `Préparation RIS S${selectedInfo.week}` : "Préparation RIS";
 
-  const selectedInfo = getRisWeeks().find(w => w.key === risSelectedWeek);
-  const title = document.getElementById("risTitle");
-
-  if(title){
-    title.textContent = selectedInfo
-      ? `Préparation RIS S${selectedInfo.week}`
-      : "Préparation RIS";
-  }
-
-  const order = [
+  const order=[
     ["48","LOZÈRE"],
     ["30","GARD"],
     ["34","HÉRAULT"],
@@ -5773,38 +5766,35 @@ function renderPreparationRIS(){
     ["66","PYRÉNÉES-ORIENTALES"]
   ];
 
-  let output = "";
-
+  let output="";
   for(const [code,label] of order){
-    const deptRows = rows.filter(r => risDepartment(r) === code);
-
-    output += `<div class="n3-dept">${label}</div>`;
+    const deptRows=rows.filter(r=>String(r._departement||"")===code);
+    output+=`<div class="n3-dept">${label}</div>`;
 
     for(const degree of ["1er","2nd"]){
-      output += `<div class="n3-degree">${degree} degré</div>`;
-
-      const degreeRows = deptRows
-        .filter(r => risDegree(r) === degree)
-        .sort((a,b) => {
-          const da = parseGristDate(a.Date_du_fait || a[FIELD.DATE_FAIT] || a.Date_de_saisie || a[FIELD.DATE_SAISIE])?.getTime() || 0;
-          const db = parseGristDate(b.Date_du_fait || b[FIELD.DATE_FAIT] || b.Date_de_saisie || b[FIELD.DATE_SAISIE])?.getTime() || 0;
-          return db - da;
+      output+=`<div class="n3-degree">${degree} degré</div>`;
+      const degreeRows=deptRows
+        .filter(r=>String(r._degre||"").toLowerCase().startsWith(degree==="1er"?"1":"2"))
+        .sort((a,b)=>{
+          const da=parseGristDate(a.Date_du_fait||a.Date_de_saisie)?.getTime()||0;
+          const db=parseGristDate(b.Date_du_fait||b.Date_de_saisie)?.getTime()||0;
+          return db-da;
         });
 
       if(!degreeRows.length){
-        output += `<div class="n3-empty">Aucun fait de niveau 3.</div>`;
+        output+=`<div class="n3-empty">Aucun fait de niveau 3.</div>`;
         continue;
       }
 
       for(const r of degreeRows){
-        const etab = n3Field(r,["Etablissement"]) || "Établissement non renseigné";
-        const ville = n3Field(r,["Ville"]) || "Ville non renseignée";
-        const numero = n3Field(r,["Numero_FE"]) || "";
-        const fait = n3Field(r,["Resume_du_fait","Résumé_du_fait","Resume"]);
-        const suite = n3Field(r,["Suivi_etablissement","Suite_etablissement"]);
-        const emas = n3Field(r,["Accompagnement_EMAS","Traitement_EMAS","Traitement_emas"]);
+        const etab=n3Field(r,["Etablissement"]) || "Établissement non renseigné";
+        const ville=n3Field(r,["Ville"]) || "Ville non renseignée";
+        const numero=n3Field(r,["Numero_FE"]) || "";
+        const fait=n3Field(r,["Resume_du_fait","Résumé_du_fait","Resume"]);
+        const suite=n3Field(r,["Suivi_etablissement","Suite_etablissement"]);
+        const emas=n3Field(r,["Accompagnement_EMAS","Traitement_EMAS","Traitement_emas"]);
 
-        output += `
+        output+=`
           <article class="n3-fact">
             <h3>${escapeN3(etab)} – ${escapeN3(ville)} – ${escapeN3(n3Date(r))} – FE n°${escapeN3(numero)}</h3>
             <p><strong>Fait :</strong> ${escapeN3(fait || "Non renseigné")}</p>
@@ -5814,16 +5804,17 @@ function renderPreparationRIS(){
       }
     }
   }
-
-  host.innerHTML = output ||
-    '<div class="n3-empty">Aucun fait de niveau 3 pour cette semaine.</div>';
+  host.innerHTML=output || '<div class="n3-empty">Aucun fait de niveau 3 pour cette semaine.</div>';
 }
+
+
+
+
 
 
   loadDocumentationData();
 
 </script>
-
 </body>
 
 </html>
