@@ -1,0 +1,5607 @@
+
+
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+  <meta charset="utf-8">
+
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1"
+  >
+
+  <title>Documentation EMAS</title>
+
+  <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+  <style>
+
+    :root {
+      --bg: #f6f7f9;
+      --card: #ffffff;
+      --text: #1f2937;
+      --muted: #667085;
+      --line: #e5e7eb;
+      --primary: #2f6fed;
+      --primary-hover: #245bcc;
+      --radius: 14px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Inter, Segoe UI, Arial, sans-serif;
+    }
+
+    .page {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 34px 24px 60px;
+    }
+
+    .hero,
+    .section {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 28px;
+      margin-bottom: 22px;
+    }
+
+    .hero h1 {
+      margin: 0 0 10px;
+      font-size: 30px;
+    }
+
+    h2 {
+      margin: 0 0 12px;
+      font-size: 22px;
+    }
+
+    p {
+      line-height: 1.6;
+      margin: 8px 0 14px;
+    }
+
+    .muted {
+      color: var(--muted);
+    }
+
+    .note {
+      padding: 14px 16px;
+      background: #f8fafc;
+      border-left: 4px solid #98a2b3;
+      border-radius: 8px;
+      margin: 16px 0;
+    }
+
+
+    /* =========================
+       DIAGNOSTIC
+       ========================= */
+
+    .diagnostic {
+      padding: 12px 14px;
+      margin-top: 14px;
+      border-radius: 9px;
+      background: #f8fafc;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .diagnostic.ok {
+      background: #ecfdf3;
+      color: #067647;
+    }
+
+    .diagnostic.error {
+      background: #fef3f2;
+      color: #b42318;
+    }
+
+
+    /* =========================
+       FILTRES
+       ========================= */
+
+    .filters-area {
+      margin-top: 20px;
+      margin-bottom: 14px;
+      padding: 16px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #fafafa;
+    }
+
+    .filter-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 14px;
+    }
+
+    .filter-row:last-child {
+      margin-bottom: 0;
+    }
+
+    .filter-label {
+      min-width: 105px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--muted);
+    }
+
+    .week-select,
+    .date-select,
+    .search-input {
+      min-width: 230px;
+      padding: 9px 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #ffffff;
+      color: var(--text);
+      font-size: 14px;
+      cursor: pointer;
+    }
+
+    .week-select:focus,
+    .date-select:focus,
+    .search-input:focus {
+      outline: 2px solid rgba(47, 111, 237, 0.15);
+      border-color: var(--primary);
+    }
+
+    .search-input {
+      flex: 1;
+      min-width: 280px;
+    }
+
+    .department-filters {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .department-btn {
+      padding: 8px 14px;
+      border: 1px solid var(--line);
+      background: #ffffff;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .department-btn:hover {
+      background: #f3f4f6;
+    }
+
+    .department-btn.active {
+      background: var(--primary);
+      border-color: var(--primary);
+      color: #ffffff;
+    }
+
+    .department-btn.active:hover {
+      background: var(--primary-hover);
+      border-color: var(--primary-hover);
+    }
+
+
+    /* =========================
+       TABLEAU
+       ========================= */
+
+    .table-wrap {
+      overflow: auto;
+      max-height: 520px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      margin-top: 12px;
+    }
+
+    table {
+      width: 100%;
+      min-width: 950px;
+      border-collapse: collapse;
+      background: #ffffff;
+    }
+
+    th,
+    td {
+      padding: 12px 14px;
+      text-align: left;
+      border-bottom: 1px solid var(--line);
+      white-space: nowrap;
+    }
+
+    th {
+      position: sticky;
+      top: 0;
+      z-index: 1;
+      font-size: 13px;
+      background: #f9fafb;
+      color: #475467;
+    }
+
+    tr:last-child td {
+      border-bottom: none;
+    }
+
+    tr:hover td {
+      background: #fafafa;
+    }
+
+    .empty-table {
+      padding: 32px 20px;
+      text-align: center;
+      color: var(--muted);
+    }
+
+
+    /* =========================
+       PAGINATION
+       ========================= */
+
+    .pagination {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-top: 14px;
+    }
+
+    .pagination-controls {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .page-btn {
+      padding: 8px 12px;
+      border: 1px solid var(--line);
+      background: #ffffff;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .page-btn:hover:not(:disabled) {
+      background: #f3f4f6;
+    }
+
+    .page-btn.active {
+      background: var(--primary);
+      color: #ffffff;
+      border-color: var(--primary);
+    }
+
+    .page-btn:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
+    .pagination-info {
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    /* =========================
+       NIVEAU / TYPE DE FAIT
+       ========================= */
+
+    .level-badge,
+    .fact-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 999px;
+      font-weight: 700;
+      line-height: 1;
+    }
+
+    .level-badge {
+      min-width: 30px;
+      height: 30px;
+      padding: 0 10px;
+      background: #eef2f6;
+      border: 1px solid #d0d5dd;
+      color: #344054;
+      font-size: 14px;
+    }
+
+    .level-badge.level-3 {
+      background: #fff4e5;
+      border-color: #fdb022;
+      color: #b54708;
+    }
+
+    .fact-badges {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      max-width: 760px;
+      white-space: normal;
+    }
+
+    .fact-badge {
+      padding: 7px 10px;
+      background: #f2f4f7;
+      border: 1px solid #d0d5dd;
+      color: #344054;
+      font-size: 12px;
+      font-weight: 600;
+      white-space: normal;
+    }
+
+    /* Si le FE est de niveau 3, ses types reprennent exactement
+       le code couleur orange du badge Niveau 3. */
+    .fact-badge.level-3 {
+      background: #fff4e5;
+      border-color: #fdb022;
+      color: #b54708;
+    }
+
+    td.type-cell {
+      white-space: normal;
+      min-width: 380px;
+      width: 420px;
+    }
+
+    td.level-cell {
+      text-align: center;
+      min-width: 76px;
+    }
+
+    .period-filters {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      flex: 1;
+      flex-wrap: wrap;
+    }
+
+    .period-filter-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .period-label {
+      font-size: 12px;
+      color: var(--muted);
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    @media (max-width: 700px) {
+      .period-filters {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+      }
+
+      .period-filter-item {
+        width: 100%;
+      }
+
+      .week-select,
+      .date-select {
+        flex: 1;
+        min-width: 0;
+      }
+    }
+
+    .inline-filter-label,
+    .level-filter-label {
+      min-width: auto;
+      margin-left: 14px;
+    }
+
+    /* Valeurs des colonnes Numéro FE, Date, ID/Nom et Ville uniquement */
+    tbody td:nth-child(2),
+    tbody td:nth-child(3),
+    tbody td:nth-child(4),
+    tbody td:nth-child(5) {
+      font-size: 13px;
+    }
+
+    .fact-date-cell {
+      min-width: 105px;
+      white-space: nowrap;
+      font-size: 13px;
+    }
+
+    .summary-cell {
+      min-width: 360px;
+      width: 420px;
+      max-width: 520px;
+      white-space: normal;
+      line-height: 1.45;
+      font-size: 13px;
+      vertical-align: top;
+    }
+
+
+    /* =========================
+       NOTE BLANCHE
+       ========================= */
+
+    .white-note-header {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 18px;
+      flex-wrap: wrap;
+      margin-bottom: 18px;
+    }
+
+    .white-note-title {
+      margin-bottom: 4px;
+    }
+
+    .white-note-controls {
+      display: flex;
+      align-items: flex-end;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .white-note-control {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .white-note-control label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--muted);
+    }
+
+    .white-note-select {
+      min-width: 190px;
+      padding: 9px 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #ffffff;
+      color: var(--text);
+      font-size: 14px;
+    }
+
+    .white-note-date-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .white-note-date-row .white-note-select {
+      min-width: 190px;
+    }
+
+    .white-note-download-btn {
+      margin-top: 2px;
+      padding: 9px 12px;
+      border: 1px solid var(--primary);
+      border-radius: 8px;
+      background: var(--primary);
+      color: #ffffff;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
+    }
+
+    .white-note-download-btn:hover:not(:disabled) {
+      background: var(--primary-hover);
+      border-color: var(--primary-hover);
+    }
+
+    .white-note-download-btn:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
+    .white-note-pdf-export {
+      width: 1040px;
+      padding: 28px 30px;
+      background: #ffffff;
+      color: var(--text);
+      font-family: Inter, Segoe UI, Arial, sans-serif;
+    }
+
+    .white-note-pdf-export .white-note-title {
+      margin: 0 0 4px;
+      font-size: 24px;
+    }
+
+    .white-note-pdf-export .white-note-period {
+      margin: 0 0 18px;
+    }
+
+    .white-note-pdf-export .white-note-table-wrap {
+      overflow: visible;
+    }
+
+    .white-note-pdf-export .white-note-table {
+      width: 100%;
+      min-width: 0;
+      table-layout: fixed;
+    }
+
+    .white-note-pdf-export .white-note-table th,
+    .white-note-pdf-export .white-note-table td {
+      font-size: 11px;
+      padding: 7px 8px;
+      overflow-wrap: anywhere;
+    }
+
+    .white-note-pdf-export .white-note-table th:nth-child(1),
+    .white-note-pdf-export .white-note-table td:nth-child(1) {
+      width: 9%;
+    }
+
+    .white-note-pdf-export .white-note-table th:nth-child(2),
+    .white-note-pdf-export .white-note-table td:nth-child(2) {
+      width: 41%;
+      min-width: 0;
+    }
+
+    .white-note-pdf-export .white-note-table th:nth-child(3),
+    .white-note-pdf-export .white-note-table td:nth-child(3) {
+      width: 25%;
+      min-width: 0;
+    }
+
+    .white-note-pdf-export .white-note-table th:nth-child(4),
+    .white-note-pdf-export .white-note-table td:nth-child(4) {
+      width: 25%;
+      min-width: 0;
+    }
+
+    .white-note-pdf-export tr {
+      break-inside: avoid;
+      page-break-inside: avoid;
+    }
+
+    .white-note-period {
+      margin: 0 0 18px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .white-note-degree {
+      margin-top: 24px;
+      padding-top: 22px;
+      border-top: 1px solid var(--line);
+    }
+
+    .white-note-degree:first-of-type {
+      margin-top: 0;
+      padding-top: 0;
+      border-top: none;
+    }
+
+    .white-note-recap {
+      margin-bottom: 12px;
+    }
+
+    .white-note-recap-title {
+      margin: 0 0 8px;
+      font-size: 16px;
+      font-weight: 700;
+    }
+
+    .white-note-counts {
+      margin: 3px 0;
+      line-height: 1.5;
+      font-size: 14px;
+    }
+
+    .white-note-counts.actualisation {
+      font-style: italic;
+    }
+
+    .white-note-total {
+      margin-top: 5px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .white-note-stats-line {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      gap: 8px 28px;
+      margin: 3px 0 8px;
+    }
+
+    .white-note-stats-line .white-note-counts,
+    .white-note-stats-line .white-note-total {
+      margin: 0;
+    }
+
+    .level-3-text {
+      color: #b54708;
+      font-weight: inherit;
+    }
+
+    .white-note-table-wrap {
+      overflow: auto;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+    }
+
+    .white-note-table {
+      min-width: 760px;
+    }
+
+    .white-note-table th:nth-child(1),
+    .white-note-table td:nth-child(1) {
+      width: 84px;
+      text-align: center;
+    }
+
+    .white-note-table th:nth-child(2),
+    .white-note-table td:nth-child(2) {
+      min-width: 360px;
+      white-space: normal;
+      line-height: 1.45;
+    }
+
+    .white-note-table th:nth-child(3),
+    .white-note-table td:nth-child(3) {
+      min-width: 260px;
+      white-space: normal;
+    }
+
+    .white-note-table th:nth-child(4),
+    .white-note-table td:nth-child(4) {
+      min-width: 260px;
+      white-space: normal;
+    }
+
+    .white-note-empty {
+      padding: 24px 18px;
+      text-align: center;
+      color: var(--muted);
+    }
+
+    @media (max-width: 700px) {
+      .white-note-controls,
+      .white-note-control {
+        width: 100%;
+      }
+
+      .white-note-select {
+        width: 100%;
+        min-width: 0;
+      }
+    }
+
+
+    /* =========================
+       BRQ
+       ========================= */
+
+    .brq-header {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 18px;
+      flex-wrap: wrap;
+      margin-bottom: 18px;
+    }
+
+    .brq-title { margin-bottom: 4px; }
+
+    .brq-controls {
+      display: flex;
+      align-items: flex-end;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .brq-control {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .brq-control label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--muted);
+    }
+
+    .brq-select {
+      min-width: 250px;
+      padding: 9px 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #ffffff;
+      color: var(--text);
+      font-size: 14px;
+    }
+
+    .brq-period-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .brq-period-row .brq-select {
+      flex: 1 1 auto;
+      min-width: 0;
+    }
+
+    .brq-download-btn {
+      flex: 0 0 auto;
+      min-width: 54px;
+      height: 38px;
+      padding: 0 14px;
+      border: 1px solid #175cd3;
+      border-radius: 8px;
+      background: #175cd3;
+      color: #ffffff;
+      font: inherit;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .brq-download-btn:hover:not(:disabled) {
+      background: #1849a9;
+      border-color: #1849a9;
+    }
+
+    .brq-download-btn:disabled {
+      opacity: 0.55;
+      cursor: default;
+    }
+
+
+    .brq-department {
+      margin-top: 24px;
+      padding-top: 22px;
+      border-top: 1px solid var(--line);
+    }
+
+    .brq-department:first-child {
+      margin-top: 0;
+      padding-top: 0;
+      border-top: none;
+    }
+
+    .brq-department-title {
+      margin: 0 0 10px;
+      font-size: 16px;
+      font-weight: 700;
+    }
+
+    .brq-source-period {
+      margin: -4px 0 10px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .brq-source-period strong {
+      font-weight: 700;
+    }
+
+    .brq-department-stats {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      gap: 8px 30px;
+      margin: 0 0 12px;
+      font-size: 14px;
+      color: var(--text);
+    }
+
+    .brq-department-stats strong {
+      font-weight: 700;
+    }
+
+    .brq-table-wrap {
+      overflow: auto;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+    }
+
+    .brq-table { min-width: 560px; }
+
+    .brq-table th,
+    .brq-table td { text-align: center; }
+
+    .brq-table th:first-child,
+    .brq-table td:first-child {
+      text-align: left;
+      font-weight: 600;
+      min-width: 180px;
+    }
+
+    /* 1 px plus petit uniquement pour les libellés Type de fait du BRQ */
+    .brq-table tbody td:first-child {
+      font-size: 15px;
+    }
+
+    .brq-unaccounted {
+      margin-top: 12px;
+      padding: 12px 14px;
+      border: 1px solid var(--line);
+      border-radius: 9px;
+      background: #fafafa;
+    }
+
+    .brq-unaccounted-title {
+      margin: 0 0 7px;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .brq-unaccounted-line {
+      margin: 4px 0;
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    /* Dans les FE non comptabilisés du BRQ, la mention Niveau 3
+       doit toujours ressortir en orange, sans gras. */
+    .brq-unaccounted-line .level-3-text {
+      color: #b54708 !important;
+      font-weight: 400;
+    }
+
+    .brq-empty-department,
+    .brq-empty {
+      padding: 14px 16px;
+      border: 1px solid var(--line);
+      border-radius: 9px;
+      color: var(--muted);
+      background: #fafafa;
+      font-size: 14px;
+    }
+
+    @media (max-width: 700px) {
+      .brq-controls,
+      .brq-control { width: 100%; }
+
+      .brq-select {
+        width: 100%;
+        min-width: 0;
+      }
+    }
+
+
+  </style>
+
+</head>
+
+<body>
+
+<div class="page">
+
+
+  <!-- EN-TÊTE -->
+
+  <section class="hero">
+
+    <h1>Documentation EMAS</h1>
+
+    <p>
+      Recherche des faits d’établissement, génération des Notes Blanches
+      et consultation des BRQ de l’année scolaire 2026-2027.
+    </p>
+
+    <p class="muted">
+      Cette page est indépendante du centre opérationnel et lit directement
+      la table normalisée FE26_27 afin de limiter le temps de chargement.
+    </p>
+
+  </section>
+
+
+  <!-- PREMIER TABLEAU -->
+
+  <section class="section">
+
+    <h2>Recherche des faits d’établissement</h2>
+
+    <p>
+      Recherche par semaine, date, département, niveau, degré, établissement,
+      ville ou numéro de fait.
+    </p>
+
+    <div
+      id="diagnostic"
+      class="diagnostic"
+    >
+      Connexion au widget Grist...
+    </div>
+
+
+    <!-- FILTRES -->
+
+    <div class="filters-area">
+
+      <div class="filter-row">
+
+        <span class="filter-label">
+          Période
+        </span>
+
+        <div class="period-filters">
+
+          <div class="period-filter-item">
+            <select
+              id="week-filter"
+              class="week-select"
+              onchange="setWeek(this.value)"
+            >
+              <option value="all">
+                Toutes les semaines
+              </option>
+            </select>
+          </div>
+
+          <div class="period-filter-item">
+            <select
+              id="date-filter"
+              class="date-select"
+              onchange="setDateFilter(this.value)"
+            >
+              <option value="all">
+                Toutes les dates
+              </option>
+            </select>
+          </div>
+
+        </div>
+
+      </div>
+
+
+      <div class="filter-row">
+
+        <span class="filter-label">
+          Recherche
+        </span>
+
+        <input
+          id="text-search"
+          class="search-input"
+          type="search"
+          placeholder="Nom de l’établissement, ville, n° FE..."
+          oninput="setSearch(this.value)"
+        >
+
+      </div>
+
+
+      <div class="filter-row">
+
+        <span class="filter-label">
+          Département
+        </span>
+
+        <div
+          id="department-filters"
+          class="department-filters"
+        >
+        </div>
+
+        <span class="filter-label inline-filter-label">
+          Niveau
+        </span>
+
+        <div
+          id="level-filters"
+          class="department-filters"
+        >
+        </div>
+
+        <span class="filter-label inline-filter-label">
+          Degré
+        </span>
+
+        <div
+          id="degree-filters"
+          class="department-filters"
+        >
+        </div>
+
+      </div>
+
+    </div>
+
+
+    <!-- TABLEAU -->
+
+    <div
+      id="table1"
+      class="table-wrap"
+    >
+    </div>
+
+
+    <!-- PAGINATION -->
+
+    <div
+      id="pagination"
+      class="pagination"
+    >
+    </div>
+
+  </section>
+
+
+  <!-- NOTE BLANCHE -->
+
+  <section class="section" id="white-note-section">
+
+    <div class="white-note-header">
+      <div>
+        <h2 id="white-note-title" class="white-note-title">
+          Note Blanche
+        </h2>
+        <p id="white-note-period" class="white-note-period"></p>
+      </div>
+
+      <div class="white-note-controls">
+        <div class="white-note-control">
+          <label for="white-note-department">Département</label>
+          <select
+            id="white-note-department"
+            class="white-note-select"
+            onchange="setWhiteNoteDepartment(this.value)"
+          ></select>
+        </div>
+
+        <div class="white-note-control">
+          <label for="white-note-date">Jour de la note</label>
+          <div class="white-note-date-row">
+            <select
+              id="white-note-date"
+              class="white-note-select"
+              onchange="setWhiteNoteDate(this.value)"
+            ></select>
+            <button
+              id="white-note-download"
+              class="white-note-download-btn"
+              type="button"
+              onclick="downloadSelectedWhiteNotePdf()"
+              title="Télécharger la Note Blanche en PDF"
+            >
+              PDF
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="white-note-content">
+      <div class="white-note-empty">
+        Les Notes Blanches seront disponibles dès réception des données FE26_27.
+      </div>
+    </div>
+
+  </section>
+
+
+  <!-- BRQ -->
+
+  <section class="section" id="brq-section">
+
+    <div class="brq-header">
+      <div>
+        <h2 id="brq-title" class="brq-title">BRQ</h2>
+        <p id="brq-source-period-title" class="brq-source-period"></p>
+      </div>
+
+      <div class="brq-controls">
+        <div class="brq-control">
+          <label for="brq-period">Période</label>
+          <div class="brq-period-row">
+            <select id="brq-period" class="brq-select" onchange="setBrqPeriod(this.value)"></select>
+            <button
+              id="brq-download"
+              class="brq-download-btn"
+              type="button"
+              onclick="downloadSelectedBrqPdf()"
+              title="Télécharger le BRQ en PDF"
+            >PDF</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="brq-content">
+      <div class="brq-empty">Les BRQ seront disponibles dès réception des données FE26_27.</div>
+    </div>
+
+  </section>
+
+
+</div>
+
+
+<script>
+  /*
+    ==================================================
+    CONFIGURATION DES COLONNES GRIST
+    ==================================================
+
+    IMPORTANT :
+    - On utilise UNIQUEMENT les identifiants techniques Grist.
+    - On ne dépend JAMAIS de la position des colonnes dans Excel/Grist.
+    - Déplacer une colonne ne casse donc pas le widget.
+  */
+
+  const FIELD = Object.freeze({
+    NUMERO_FE: "Numero_FE",
+    DATE_SAISIE: "Date_de_saisie",
+    DATE_FAIT: "Date_du_fait",
+    UAI: "UAI",
+    ETABLISSEMENT: "Etablissement",
+    ID_NOM: "ID_et_Nom",
+    VILLE: "Ville",
+    DEPARTEMENT: "Departement",
+    DEGRE: "Degre",
+    NIVEAU: "Niveau",
+    TYPES: "Types_de_fait",
+    RESUME: "Resume_du_fait"
+  });
+
+  const COLUMNS = Object.freeze([
+    { id: "_niveau", label: "Niveau" },
+    { id: FIELD.NUMERO_FE, label: "Numéro FE" },
+    { id: FIELD.DATE_SAISIE, label: "Date de saisie" },
+    { id: FIELD.ID_NOM, label: "ID et Nom" },
+    { id: FIELD.VILLE, label: "Ville" },
+    { id: FIELD.RESUME, label: "Résumé" },
+    { id: "_typeFait", label: "Type de fait" },
+    { id: "_dateDuFait", label: "Date du fait" }
+  ]);
+
+  const PAGE_SIZE = 10;
+
+  let allRecords = [];
+  let currentPage = 1;
+
+  /*
+    Identifiant de génération :
+    si Grist déclenche onRecords plusieurs fois rapidement,
+    seul le traitement le plus récent a le droit de terminer.
+  */
+  let recordsGeneration = 0;
+  let selectedDepartment = "all";
+  let selectedWeek = "all";
+  let selectedDate = "all";
+  let selectedLevel = "all";
+  let selectedDegree = "all";
+  let searchText = "";
+
+  let selectedWhiteNoteDepartment = "";
+  let selectedWhiteNoteDate = "";
+  let selectedBrqPeriod = "";
+
+  const diagnostic = document.getElementById("diagnostic");
+
+  /*
+    Si une erreur JavaScript survient, on l'affiche directement
+    dans le widget au lieu de rester bloqué sur "Connexion...".
+  */
+  window.addEventListener("error", function(event) {
+    if (diagnostic) {
+      diagnostic.textContent =
+        "Erreur JavaScript : " +
+        (event.message || "erreur inconnue");
+      diagnostic.className = "diagnostic error";
+    }
+  });
+
+
+  /*
+    ==================================================
+    INITIALISATION GRIST
+    ==================================================
+  */
+
+  grist.ready({
+    requiredAccess: "read table"
+  });
+
+
+  /*
+    ==================================================
+    RÉCEPTION DES LIGNES
+    ==================================================
+  */
+
+  /*
+    ==================================================
+    CHARGEMENT OPTIMISÉ DE LA DOCUMENTATION
+    ==================================================
+
+    La page lit directement FE26_27. Elle ne dépend pas de la table
+    à laquelle le widget est lié et ne charge pas FE25_26 au démarrage.
+  */
+
+  const DATA_TABLE = "FE26_27";
+  let dataLoadStarted = false;
+
+  function gristTableToRows(table) {
+    if (!table || !Array.isArray(table.id)) return [];
+    return table.id.map(function(id, index) {
+      const row = { id: id };
+      Object.keys(table).forEach(function(key) {
+        if (Array.isArray(table[key])) row[key] = table[key][index];
+      });
+      return row;
+    });
+  }
+
+  function normalizeDepartment(value, uai) {
+    const direct = String(value ?? "").match(/\d{1,3}/);
+    if (direct) return String(Number(direct[0]));
+    const uaiMatch = String(uai ?? "").trim().match(/^(\d{3})/);
+    return uaiMatch ? String(Number(uaiMatch[1])) : "";
+  }
+
+  function buildIdEtNom(record) {
+    const uai = String(record[FIELD.UAI] ?? "").trim();
+    const nom = String(record[FIELD.ETABLISSEMENT] ?? "").trim();
+    if (uai && nom) return uai + " - " + nom;
+    return nom || uai || "Établissement non renseigné";
+  }
+
+  function normalizeDegree(value) {
+    const text = normalizeText(value);
+    if (text.includes("1er") || text.includes("premier")) return "1er";
+    if (text.includes("2nd") || text.includes("second")) return "2nd";
+    return "";
+  }
+
+  function normalizeLevel(value) {
+    const m = String(value ?? "").match(/[123]/);
+    return m ? m[0] : "";
+  }
+
+  async function loadDocumentationData() {
+    if (dataLoadStarted) return;
+    dataLoadStarted = true;
+    showDiagnostic("Connexion à FE26_27…", "");
+
+    try {
+      const table = await grist.docApi.fetchTable(DATA_TABLE);
+      const records = gristTableToRows(table);
+      const processedRecords = [];
+
+      for (let i = 0; i < records.length; i++) {
+        const source = records[i] || {};
+        if (!getNumeroFE(source[FIELD.NUMERO_FE])) continue;
+
+        const dateSaisie = parseGristDate(source[FIELD.DATE_SAISIE]);
+        const weekInfo = dateSaisie ? getISOWeekInfo(dateSaisie) : null;
+
+        const record = {
+          ...source,
+          [FIELD.ID_NOM]: buildIdEtNom(source)
+        };
+
+        /*
+          Le détecteur historique n'analyse plus toute la ligne :
+          uniquement les champs normalisés nécessaires aux NB / BRQ.
+        */
+        const typeAnalysis = analyzeRecordFast({
+          Niveau: source[FIELD.NIVEAU],
+          Degre: source[FIELD.DEGRE],
+          Types_de_fait: source[FIELD.TYPES],
+          Date_du_fait: source[FIELD.DATE_FAIT]
+        });
+
+        const dateFait = parseGristDate(source[FIELD.DATE_FAIT]);
+
+        processedRecords.push({
+          ...record,
+          _departement: normalizeDepartment(
+            source[FIELD.DEPARTEMENT],
+            source[FIELD.UAI]
+          ),
+          _rawDateDeSaisie: source[FIELD.DATE_SAISIE],
+          _date: dateSaisie,
+          _weekKey: weekInfo ? weekInfo.key : "",
+          _weekNumber: weekInfo ? weekInfo.week : null,
+          _weekYear: weekInfo ? weekInfo.year : null,
+          _dateKey: dateSaisie ? formatDateKey(dateSaisie) : "",
+          _niveau: normalizeLevel(source[FIELD.NIVEAU]) || typeAnalysis.level,
+          _degre: normalizeDegree(source[FIELD.DEGRE]) || typeAnalysis.degree,
+          _typeFait: typeAnalysis.types,
+          _dateDuFait: dateFait
+            ? formatDateFR(dateFait)
+            : (typeAnalysis.dateDuFait || "")
+        });
+      }
+
+      processedRecords.sort(function(a, b) {
+        return getNumeroFE(b[FIELD.NUMERO_FE]) -
+               getNumeroFE(a[FIELD.NUMERO_FE]);
+      });
+
+      allRecords = processedRecords;
+      currentPage = 1;
+
+      renderWeekFilter();
+      renderDateFilter();
+      renderDegreeFilters();
+      renderDepartmentFilters();
+      renderLevelFilters();
+      renderTable();
+      renderWhiteNote();
+      renderBRQ();
+
+      showDiagnostic(
+        "Connexion réussie : " + allRecords.length +
+        " faits chargés depuis FE26_27.",
+        "ok"
+      );
+    }
+    catch (error) {
+      console.error(error);
+      dataLoadStarted = false;
+      showDiagnostic(
+        "Erreur de chargement de FE26_27 : " +
+        (error && error.message ? error.message : String(error)),
+        "error"
+      );
+    }
+  }
+
+  grist.ready({ requiredAccess: "read table" });
+
+  function showDiagnostic(message, type) {
+    diagnostic.textContent = message;
+    diagnostic.className =
+      "diagnostic" + (type ? " " + type : "");
+  }
+
+
+  /*
+    ==================================================
+    NUMÉRO FE
+    ==================================================
+  */
+
+  function getNumeroFE(value) {
+
+    if (
+      value === null ||
+      value === undefined ||
+      value === ""
+    ) {
+      return 0;
+    }
+
+    const texte = String(value);
+    const nombres = texte.match(/\d+/g);
+
+    if (!nombres || nombres.length === 0) {
+      return 0;
+    }
+
+    return Number(nombres[nombres.length - 1]);
+  }
+
+
+  /*
+    ==================================================
+    DÉPARTEMENT
+    ==================================================
+  */
+
+  function getDepartement(record) {
+    if (!record) return "";
+    const direct = normalizeDepartment(
+      record[FIELD.DEPARTEMENT],
+      record[FIELD.UAI]
+    );
+    if (direct) return direct;
+
+    const match = String(record[FIELD.ID_NOM] ?? "")
+      .trim()
+      .match(/^(\d{3})/);
+
+    return match ? String(Number(match[1])) : "";
+  }
+
+
+  /*
+    ==================================================
+    ANALYSE DE LA LIGNE : NIVEAU / TYPE DE FAIT
+    ==================================================
+
+    Le widget ne modifie aucune donnée Grist.
+    Il lit les valeurs de la ligne et calcule seulement
+    ce qui doit être affiché dans le tableau.
+  */
+
+  function valueToDetectionStrings(value) {
+
+    if (
+      value === null ||
+      value === undefined ||
+      value === ""
+    ) {
+      return [];
+    }
+
+    if (Array.isArray(value)) {
+
+      const source =
+        value[0] === "L"
+          ? value.slice(1)
+          : value;
+
+      return source
+        .filter(item =>
+          item !== null &&
+          item !== undefined &&
+          item !== ""
+        )
+        .map(item => String(item));
+    }
+
+    /*
+      Les cellules Grist utiles à cette analyse sont normalement
+      primitives ou des listes. Pour éviter toute récursion coûteuse
+      ou objet circulaire, on ne parcourt pas les objets complexes.
+    */
+    if (typeof value === "object") {
+
+      if (value instanceof Date) {
+        return [value.toISOString()];
+      }
+
+      try {
+        return [JSON.stringify(value)];
+      }
+      catch {
+        return [];
+      }
+    }
+
+    return [String(value)];
+  }
+
+
+  function normalizeDetectionText(value) {
+
+    return String(value)
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[’‘]/g, "'")
+      .toLowerCase()
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+
+  /*
+    ==================================================
+    ANALYSE UNIQUE D'UN RECORD
+    ==================================================
+
+    Une ligne est parcourue UNE SEULE FOIS.
+    On en extrait à la fois :
+      - le niveau 2 / 3 ;
+      - les catégories de faits.
+
+    Cela reste une analyse d'affichage :
+    aucune donnée n'est écrite dans Grist.
+  */
+
+  function normalizeText(value) {
+
+    return String(value || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .trim();
+  }
+
+
+
+
+  /*
+    Détection robuste des types de faits.
+
+    Objectifs :
+    - ignorer accents, ponctuation, retours à la ligne et espaces multiples ;
+    - tolérer de petites fautes d'orthographe ;
+    - reconnaître plusieurs types sur un même fait ;
+    - éviter de dépendre d'une citation exacte.
+  */
+  function levenshteinDistance(a, b) {
+    a = String(a || "");
+    b = String(b || "");
+
+    if (a === b) return 0;
+    if (!a.length) return b.length;
+    if (!b.length) return a.length;
+
+    const previous = new Array(b.length + 1);
+    const current = new Array(b.length + 1);
+
+    for (let j = 0; j <= b.length; j++) previous[j] = j;
+
+    for (let i = 1; i <= a.length; i++) {
+      current[0] = i;
+
+      for (let j = 1; j <= b.length; j++) {
+        const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+        current[j] = Math.min(
+          current[j - 1] + 1,
+          previous[j] + 1,
+          previous[j - 1] + cost
+        );
+      }
+
+      for (let j = 0; j <= b.length; j++) previous[j] = current[j];
+    }
+
+    return previous[b.length];
+  }
+
+
+  function normalizeFactDetectionText(value) {
+    return String(value || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[’‘`´]/g, "'")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+
+  function factDetectionTokens(value) {
+    const normalized = normalizeFactDetectionText(value);
+    return normalized ? normalized.split(" " ).filter(Boolean) : [];
+  }
+
+
+  function tokenApproximatelyMatches(token, target) {
+    token = String(token || "");
+    target = String(target || "");
+
+    if (!token || !target) return false;
+    if (token === target) return true;
+
+    /* Tolérance prudente : 1 faute sur les mots courts, 2 sur les mots longs. */
+    const maxDistance = target.length >= 9 ? 2 : 1;
+
+    /* Empêche les mots très courts de produire des faux positifs. */
+    if (Math.min(token.length, target.length) < 4) {
+      return false;
+    }
+
+    return levenshteinDistance(token, target) <= maxDistance;
+  }
+
+
+  function hasApproxToken(tokens, targets) {
+    const targetList = Array.isArray(targets) ? targets : [targets];
+
+    return targetList.some(function(target) {
+      return tokens.some(function(token) {
+        return tokenApproximatelyMatches(token, target);
+      });
+    });
+  }
+
+
+  function hasAllApproxTokens(tokens, groups) {
+    return groups.every(function(group) {
+      return hasApproxToken(tokens, group);
+    });
+  }
+
+
+  function detectFactTypeFlags(value) {
+    const normalized = normalizeFactDetectionText(value);
+    const tokens = factDetectionTokens(value);
+
+    /*
+      Version compacte : gère aussi les libellés coupés avec des espaces
+      entre les lettres ou des retours à la ligne très inhabituels.
+    */
+    const compact = normalized.replace(/[^a-z0-9]/g, "");
+
+    const hasValRep =
+      compact.includes("valeursdelarepublique") ||
+      compact.includes("valeurdelarepublique") ||
+      compact.includes("valrep") ||
+      hasAllApproxTokens(tokens, [
+        ["valeur", "valeurs"],
+        ["republique"]
+      ]);
+
+    const hasHarassment =
+      compact.includes("harcelement") ||
+      compact.includes("cyberharcelement") ||
+      hasApproxToken(tokens, ["harcelement", "harcelements"]);
+
+    const hasGoods =
+      compact.includes("atteintesauxbiens") ||
+      compact.includes("atteinteauxbiens") ||
+      hasAllApproxTokens(tokens, [
+        ["atteinte", "atteintes"],
+        ["bien", "biens"]
+      ]);
+
+    const hasSecurityClimate =
+      compact.includes("atteintealasecurite") ||
+      compact.includes("atteintesalasecurite") ||
+      compact.includes("climatscolaire") ||
+      compact.includes("climatdeletablissement") ||
+      hasApproxToken(tokens, ["securite"]) ||
+      (
+        hasApproxToken(tokens, ["climat"]) &&
+        hasApproxToken(tokens, ["scolaire", "etablissement"])
+      );
+
+    const hasPersonsGeneric =
+      compact.includes("atteintesauxpersonnes") ||
+      compact.includes("atteinteauxpersonnes") ||
+      hasAllApproxTokens(tokens, [
+        ["atteinte", "atteintes"],
+        ["personne", "personnes"]
+      ]);
+
+    const hasPhysical =
+      compact.includes("violencesphysiques") ||
+      compact.includes("violencephysique") ||
+      hasAllApproxTokens(tokens, [
+        ["violence", "violences"],
+        ["physique", "physiques"]
+      ]);
+
+    const hasSexual =
+      compact.includes("violencessexuelles") ||
+      compact.includes("violencesexuelle") ||
+      hasAllApproxTokens(tokens, [
+        ["violence", "violences"],
+        ["sexuelle", "sexuelles", "sexuel", "sexuels"]
+      ]);
+
+    const hasVerbal =
+      compact.includes("violencesverbales") ||
+      compact.includes("violenceverbale") ||
+      hasAllApproxTokens(tokens, [
+        ["violence", "violences"],
+        ["verbale", "verbales", "verbal", "verbaux"]
+      ]);
+
+    return {
+      hasValRep,
+      hasHarassment,
+      hasGoods,
+      hasSecurityClimate,
+      hasPersonsGeneric,
+      hasPhysical,
+      hasSexual,
+      hasVerbal
+    };
+  }
+
+
+  function extractFactDate(value) {
+
+    const text =
+      String(value || "").trim();
+
+    const match =
+      text.match(
+        /(\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{2,4}|\d{4}[\/\-.]\d{1,2}[\/\-.]\d{1,2})/
+      );
+
+    if (!match) {
+      return "";
+    }
+
+    const raw = match[1];
+
+    let parts =
+      raw.split(/[\/\-.]/);
+
+    if (
+      parts.length !== 3
+    ) {
+      return "";
+    }
+
+    /*
+      AAAA-MM-JJ
+    */
+    if (parts[0].length === 4) {
+      return (
+        String(Number(parts[2])).padStart(2, "0") +
+        "/" +
+        String(Number(parts[1])).padStart(2, "0") +
+        "/" +
+        parts[0]
+      );
+    }
+
+    /*
+      JJ/MM/AAAA ou JJ/MM/AA
+    */
+    let year =
+      Number(parts[2]);
+
+    if (year < 100) {
+      year += year >= 70 ? 1900 : 2000;
+    }
+
+    return (
+      String(Number(parts[0])).padStart(2, "0") +
+      "/" +
+      String(Number(parts[1])).padStart(2, "0") +
+      "/" +
+      year
+    );
+  }
+
+
+  function analyzeRecordFast(record) {
+
+    const values = [];
+    const levelCandidates = [];
+
+    let hasValRep = false;
+    let hasHarassment = false;
+    let hasGoods = false;
+    let hasSecurityClimate = false;
+    let hasPersonsGeneric = false;
+    let hasPhysical = false;
+    let hasSexual = false;
+    let hasVerbal = false;
+
+    let hasSecondDegree = false;
+    let hasFirstDegree = false;
+
+    let dateDuFait = "";
+    let dateDuFaitExpectedNext = false;
+
+    Object.keys(record || {}).forEach(function(key) {
+
+      const value = record[key];
+
+      if (
+        value === null ||
+        value === undefined
+      ) {
+        return;
+      }
+
+      let textValue = "";
+
+      if (value instanceof Date) {
+        textValue = "";
+      }
+      else if (Array.isArray(value)) {
+        textValue = value.join(" ");
+      }
+      else if (typeof value === "object") {
+        /*
+          Les objets internes Grist ne sont pas utiles pour nos filtres
+          et peuvent être très coûteux à sérialiser.
+        */
+        return;
+      }
+      else {
+        textValue = String(value);
+      }
+
+      if (!textValue) {
+        return;
+      }
+
+      /*
+        Protection contre une cellule anormalement volumineuse.
+      */
+      if (textValue.length > 20000) {
+        textValue = textValue.slice(0, 20000);
+      }
+
+      values.push(textValue);
+
+      const normalizedKey = normalizeText(key);
+      const normalizedValue = normalizeText(textValue);
+
+      /*
+        Date du fait :
+        intégrée à CETTE MÊME boucle d'analyse.
+
+        Cas gérés :
+        - une colonne dont l'identifiant contient "Date du fait" ;
+        - une cellule contenant "Date du fait : 10/09/2026" ;
+        - une cellule "Date du fait", suivie de la date dans la valeur suivante.
+      */
+      if (!dateDuFait) {
+
+        if (
+          normalizedKey.includes("date du fait") ||
+          normalizedKey.includes("date_du_fait") ||
+          normalizedKey.includes("datedufait")
+        ) {
+          dateDuFait =
+            extractFactDate(textValue);
+        }
+
+        if (!dateDuFait) {
+
+          const phrasePosition =
+            normalizedValue.indexOf("date du fait");
+
+          if (phrasePosition !== -1) {
+
+            const originalLower =
+              textValue.toLowerCase();
+
+            const originalPhrasePosition =
+              originalLower.indexOf("date du fait");
+
+            const afterPhrase =
+              originalPhrasePosition !== -1
+                ? textValue.slice(
+                    originalPhrasePosition +
+                    "date du fait".length
+                  )
+                : textValue;
+
+            dateDuFait =
+              extractFactDate(afterPhrase);
+
+            if (!dateDuFait) {
+              dateDuFaitExpectedNext = true;
+            }
+          }
+          else if (dateDuFaitExpectedNext) {
+
+            dateDuFait =
+              extractFactDate(textValue);
+
+            /*
+              On ne garde l'attente que sur la valeur immédiatement suivante.
+            */
+            dateDuFaitExpectedNext = false;
+          }
+        }
+      }
+
+      /*
+        Niveau :
+        on ne cherche 2/3 comme valeurs isolées que dans
+        les colonnes dont le nom évoque le niveau.
+      */
+      if (
+        normalizedKey.includes("niveau") ||
+        normalizedKey.includes("level")
+      ) {
+        const levelMatch =
+          normalizedValue.match(/(?:^|\D)([23])(?:\D|$)/);
+
+        if (levelMatch) {
+          levelCandidates.push(levelMatch[1]);
+        }
+      }
+
+      /*
+        Détection explicite "niveau 2" / "niveau 3"
+        dans n'importe quelle cellule.
+      */
+      if (/\bniveau\s*3\b/.test(normalizedValue)) {
+        levelCandidates.push("3");
+      }
+      else if (/\bniveau\s*2\b/.test(normalizedValue)) {
+        levelCandidates.push("2");
+      }
+
+      /*
+        Degré
+      */
+      if (
+        /\bcollege\b/.test(normalizedValue) ||
+        /\blycee\b/.test(normalizedValue)
+      ) {
+        hasSecondDegree = true;
+      }
+
+      if (
+        /\bcirconscription\b/.test(normalizedValue) ||
+        /\becole maternelle\b/.test(normalizedValue) ||
+        /\becole elementaire\b/.test(normalizedValue) ||
+        /\becole primaire\b/.test(normalizedValue)
+      ) {
+        hasFirstDegree = true;
+      }
+    });
+
+    /*
+      Détection tolérante des catégories :
+      aucune citation exacte n'est exigée et les catégories sont indépendantes.
+    */
+    const detectedFactTypes =
+      detectFactTypeFlags(values.join(" "));
+
+    hasValRep = detectedFactTypes.hasValRep;
+    hasHarassment = detectedFactTypes.hasHarassment;
+    hasGoods = detectedFactTypes.hasGoods;
+    hasSecurityClimate = detectedFactTypes.hasSecurityClimate;
+    hasPersonsGeneric = detectedFactTypes.hasPersonsGeneric;
+    hasPhysical = detectedFactTypes.hasPhysical;
+    hasSexual = detectedFactTypes.hasSexual;
+    hasVerbal = detectedFactTypes.hasVerbal;
+
+    const types = [];
+
+    if (hasValRep) {
+      types.push("AttValRep");
+    }
+
+    if (hasHarassment) {
+      types.push("Harcel");
+    }
+
+    if (hasGoods) {
+      types.push("AttBiens");
+    }
+
+    if (
+      hasPhysical &&
+      hasSexual &&
+      hasVerbal
+    ) {
+      types.push(
+        "AttPers: VP + VS + VV"
+      );
+    }
+    else if (
+      hasPhysical &&
+      hasSexual
+    ) {
+      types.push(
+        "AttPers: VP + VS"
+      );
+    }
+    else if (
+      hasPhysical &&
+      hasVerbal
+    ) {
+      types.push(
+        "AttPers: VP + VV"
+      );
+    }
+    else if (
+      hasSexual &&
+      hasVerbal
+    ) {
+      types.push(
+        "AttPers: VS + VV"
+      );
+    }
+    else if (hasPhysical) {
+      types.push(
+        "AttPers: VP"
+      );
+    }
+    else if (hasSexual) {
+      types.push(
+        "AttPers: VS"
+      );
+    }
+    else if (hasVerbal) {
+      types.push(
+        "AttPers: VV"
+      );
+    }
+    else if (hasPersonsGeneric) {
+      types.push(
+        "AttPers"
+      );
+    }
+
+    if (hasSecurityClimate) {
+      types.push(
+        "AttSecu"
+      );
+    }
+
+    let level = "";
+
+    if (levelCandidates.includes("3")) {
+      level = "3";
+    }
+    else if (levelCandidates.includes("2")) {
+      level = "2";
+    }
+
+    let degree = "";
+
+    if (hasSecondDegree) {
+      degree = "2nd";
+    }
+    else if (hasFirstDegree) {
+      degree = "1er";
+    }
+
+    return {
+      level,
+      degree,
+      types,
+      dateDuFait
+    };
+  }
+
+
+  function renderLevelBadge(level) {
+
+    if (!level) {
+      return "";
+    }
+
+    const levelClass =
+      String(level) === "3"
+        ? "level-badge level-3"
+        : "level-badge";
+
+    return `
+      <span class="${levelClass}">
+        ${escapeHtml(level)}
+      </span>
+    `;
+  }
+
+
+  function getFullFactLabel(type) {
+
+    const labels = {
+      "AttValRep":
+        "Atteintes aux valeurs de la République",
+
+      "Harcel":
+        "Harcèlement ou suspicion de harcèlement / Cyber-harcèlement",
+
+      "AttBiens":
+        "Atteintes aux biens",
+
+      "AttSecu":
+        "Atteinte à la sécurité",
+
+      "AttPers":
+        "Atteintes aux personnes",
+
+      "AttPers: VP":
+        "Atteintes aux personnes : Violences physiques",
+
+      "AttPers: VS":
+        "Atteintes aux personnes : Violences sexuelles",
+
+      "AttPers: VV":
+        "Atteintes aux personnes : Violences verbales",
+
+      "AttPers: VP + VS":
+        "Atteintes aux personnes : Violences physiques et sexuelles",
+
+      "AttPers: VP + VV":
+        "Atteintes aux personnes : Violences physiques et verbales",
+
+      "AttPers: VS + VV":
+        "Atteintes aux personnes : Violences sexuelles et verbales",
+
+      "AttPers: VP + VS + VV":
+        "Atteintes aux personnes : Violences physiques, sexuelles et verbales"
+    };
+
+    return labels[type] || type;
+  }
+
+
+  function renderFactBadges(types, level) {
+
+    if (
+      !Array.isArray(types) ||
+      types.length === 0
+    ) {
+      return "";
+    }
+
+    return `
+      <div class="fact-badges">
+        ${types.map(function(type) {
+
+          const fullLabel =
+            getFullFactLabel(type);
+
+          const levelClass =
+            String(level) === "3"
+              ? "fact-badge level-3"
+              : "fact-badge";
+
+          return `
+            <span
+              class="${levelClass}"
+              title="${escapeHtml(fullLabel)}"
+            >
+              ${escapeHtml(type)}
+            </span>
+          `;
+        }).join("")}
+      </div>
+    `;
+  }
+
+
+
+  /*
+    ==================================================
+    BRQ
+    ==================================================
+  */
+
+  const BRQ_TYPES = Object.freeze([
+    { key: "ValRep", label: "Valeurs de la République" },
+    { key: "Harcel", label: "Harcèlement" },
+    { key: "VP", label: "Violences physiques" },
+    { key: "VV", label: "Violences verbales" },
+    { key: "VS", label: "Violences sexuelles" }
+  ]);
+
+  function isPrivateRecord(record) {
+    if (!record) return false;
+
+    let found = false;
+    Object.keys(record).some(function(key) {
+      if (String(key).startsWith("_")) return false;
+      const value = record[key];
+      if (value === null || value === undefined || typeof value === "object") return false;
+
+      const keyText = normalizeText(key);
+      const valueText = normalizeText(String(value));
+      const keySuggestsSector =
+        keyText.includes("secteur") ||
+        keyText.includes("statut") ||
+        keyText.includes("public prive") ||
+        keyText.includes("public_prive") ||
+        keyText.includes("prive");
+
+      if (
+        (keySuggestsSector && /\bprive\b/.test(valueText)) ||
+        valueText === "prive" ||
+        valueText.includes("enseignement prive") ||
+        valueText.includes("etablissement prive")
+      ) {
+        found = true;
+        return true;
+      }
+      return false;
+    });
+    return found;
+  }
+
+  function getBrqCategory(record) {
+    if (isPrivateRecord(record)) return "private";
+    if (record._degre === "1er") return "first";
+    if (record._degre === "2nd") return "second";
+    return "";
+  }
+
+  function getBrqTypeFlags(record) {
+    const types = Array.isArray(record._typeFait) ? record._typeFait : [];
+    const joinedTypes = types.join(" | ");
+    const rawParts = [];
+
+    Object.keys(record || {}).forEach(function(key) {
+      if (String(key).startsWith("_")) return;
+
+      const value = record[key];
+      if (value === null || value === undefined || value === "") return;
+
+      if (Array.isArray(value)) {
+        value.forEach(function(item) {
+          if (item !== null && item !== undefined && typeof item !== "object") {
+            rawParts.push(String(item));
+          }
+        });
+        return;
+      }
+
+      if (typeof value !== "object") {
+        rawParts.push(String(value));
+      }
+    });
+
+    const detected = detectFactTypeFlags(rawParts.join(" "));
+
+    return {
+      ValRep: types.includes("AttValRep") || detected.hasValRep,
+      Harcel: types.includes("Harcel") || detected.hasHarassment,
+      VP: joinedTypes.includes("VP") || detected.hasPhysical,
+      VV: joinedTypes.includes("VV") || detected.hasVerbal,
+      VS: joinedTypes.includes("VS") || detected.hasSexual
+    };
+  }
+
+  function isBrqCountedRecord(record) {
+    const flags = getBrqTypeFlags(record);
+    return flags.ValRep || flags.Harcel || flags.VP || flags.VV || flags.VS;
+  }
+
+  const BRQ_START_DATE = "2026-09-02";
+
+  /*
+    Pendant les vacances scolaires (zone C / académie de Montpellier),
+    les BRQ journaliers et les BRQ hebdomadaires de vacances sont remplacés
+    par un seul BRQ couvrant toute la période de vacances.
+  */
+  const BRQ_SCHOOL_BREAK_PERIODS = Object.freeze([
+    {
+      key: "VacOct",
+      label: "VacOct",
+      start: "2026-10-17",
+      end: "2026-11-01"
+    },
+    {
+      key: "VacNoel",
+      label: "VacDec",
+      start: "2026-12-19",
+      end: "2027-01-03"
+    },
+    {
+      key: "VacHiver",
+      label: "VacFev",
+      start: "2027-02-06",
+      end: "2027-02-21"
+    },
+    {
+      key: "VacPrintemps",
+      label: "VacAvr",
+      start: "2027-04-03",
+      end: "2027-04-18"
+    }
+  ]);
+
+  function getBrqSchoolBreakForDateKey(dateKey) {
+    if (!dateKey) return null;
+
+    return BRQ_SCHOOL_BREAK_PERIODS.find(function(period) {
+      return dateKey >= period.start && dateKey <= period.end;
+    }) || null;
+  }
+
+  function isBrqSchoolBreakDateKey(dateKey) {
+    return Boolean(getBrqSchoolBreakForDateKey(dateKey));
+  }
+
+  function getBrqVacationPeriods() {
+    return BRQ_SCHOOL_BREAK_PERIODS.filter(function(period) {
+      return allRecords.some(function(record) {
+        return record._dateKey &&
+          record._dateKey >= BRQ_START_DATE &&
+          record._dateKey >= period.start &&
+          record._dateKey <= period.end;
+      });
+    }).map(function(period) {
+      return {
+        key: period.key,
+        label: period.label,
+        start: period.start,
+        end: period.end,
+        startDate: parseGristDate(period.start),
+        endDate: parseGristDate(period.end)
+      };
+    });
+  }
+
+  function getBrqEffectiveDailyDate(recordDate) {
+    if (!recordDate) return null;
+
+    /*
+      Un BRQ porte la date du JOUR D'ENVOI et reprend les faits saisis
+      depuis le BRQ précédent :
+      - lundi -> mardi ;
+      - mardi -> mercredi ;
+      - mercredi -> jeudi ;
+      - jeudi -> vendredi ;
+      - vendredi + samedi + dimanche -> lundi.
+
+      Exemples 2026 :
+      faits du 02/09 -> BRQ du 03/09 ;
+      faits du 04, 05 et 06/09 -> BRQ du 07/09 ;
+      faits du 11, 12 et 13/09 -> BRQ du 14/09.
+    */
+    const day = recordDate.getUTCDay();
+
+    if (day === 5) return addDaysUTC(recordDate, 3); // vendredi -> lundi
+    if (day === 6) return addDaysUTC(recordDate, 2); // samedi -> lundi
+    if (day === 0) return addDaysUTC(recordDate, 1); // dimanche -> lundi
+
+    return addDaysUTC(recordDate, 1); // lundi à jeudi -> lendemain
+  }
+
+  function getBrqDailySourceRange(dateKey) {
+    const brqDate = parseGristDate(dateKey);
+    if (!brqDate) return null;
+
+    /* Un BRQ daté du lundi reprend vendredi, samedi et dimanche. */
+    if (brqDate.getUTCDay() === 1) {
+      const startDate = addDaysUTC(brqDate, -3);
+      const endDate = addDaysUTC(brqDate, -1);
+      return {
+        brqDate: brqDate,
+        startDate: startDate,
+        endDate: endDate,
+        startKey: formatDateKey(startDate),
+        endKey: formatDateKey(endDate),
+        weekendGroup: true
+      };
+    }
+
+    const sourceDate = addDaysUTC(brqDate, -1);
+    return {
+      brqDate: brqDate,
+      startDate: sourceDate,
+      endDate: sourceDate,
+      startKey: formatDateKey(sourceDate),
+      endKey: formatDateKey(sourceDate),
+      weekendGroup: false
+    };
+  }
+
+  function getSelectedBrqDailySourceRange() {
+    if (!selectedBrqPeriod || !selectedBrqPeriod.startsWith("D:")) return null;
+    return getBrqDailySourceRange(selectedBrqPeriod.slice(2));
+  }
+
+  function getBrqDailyDates() {
+    const dates = new Map();
+
+    allRecords.forEach(function(record) {
+      if (
+        record._date &&
+        record._dateKey &&
+        record._dateKey >= BRQ_START_DATE &&
+        !isBrqSchoolBreakDateKey(record._dateKey)
+      ) {
+        const brqDate = getBrqEffectiveDailyDate(record._date);
+        if (!brqDate) return;
+
+        const brqDateKey = formatDateKey(brqDate);
+        dates.set(brqDateKey, brqDate);
+      }
+    });
+
+    return Array.from(dates.entries()).sort(function(a,b){
+      return b[0].localeCompare(a[0]);
+    });
+  }
+
+  function getBrqWeeks() {
+    const weeks = new Map();
+
+    allRecords.forEach(function(record) {
+      if (
+        !record._weekKey ||
+        !record._weekNumber ||
+        !record._weekYear ||
+        !record._date ||
+        !record._dateKey ||
+        record._dateKey < BRQ_START_DATE
+      ) {
+        return;
+      }
+
+      if (!weeks.has(record._weekKey)) {
+        const monday = getMondayUTC(record._date);
+        const sunday = addDaysUTC(monday, 6);
+        const mondayKey = formatDateKey(monday);
+        const sundayKey = formatDateKey(sunday);
+
+        /*
+          Une semaine entièrement comprise dans une période de vacances
+          n'a pas de BRQ hebdomadaire propre : elle sera incluse dans le BRQ VacX.
+        */
+        const fullyInsideVacation = BRQ_SCHOOL_BREAK_PERIODS.some(function(period) {
+          return mondayKey >= period.start && sundayKey <= period.end;
+        });
+
+        if (fullyInsideVacation) return;
+
+        weeks.set(record._weekKey, {
+          key: record._weekKey,
+          week: record._weekNumber,
+          year: record._weekYear,
+          monday: monday,
+          sunday: sunday
+        });
+      }
+    });
+
+    return Array.from(weeks.values()).sort(function(a,b){
+      if (a.year !== b.year) return b.year - a.year;
+      return b.week - a.week;
+    });
+  }
+
+  function getMondayUTC(date) {
+    const day = date.getUTCDay();
+    return addDaysUTC(date, day === 0 ? -6 : 1 - day);
+  }
+
+  /*
+    Les BRQ numérotés sont constitués des BRQ journaliers hors vacances
+    + d'un seul BRQ par période de vacances contenant des données.
+  */
+  function getBrqNumberedPeriodsAscending() {
+    const periods = [];
+
+    getBrqDailyDates().forEach(function(item) {
+      periods.push({
+        value: "D:" + item[0],
+        sortKey: item[0]
+      });
+    });
+
+    getBrqVacationPeriods().forEach(function(period) {
+      periods.push({
+        value: "V:" + period.key,
+        sortKey: period.start
+      });
+    });
+
+    return periods.sort(function(a, b) {
+      if (a.sortKey !== b.sortKey) return a.sortKey.localeCompare(b.sortKey);
+      return a.value.localeCompare(b.value);
+    });
+  }
+
+  function getBrqPeriodNumber(value) {
+    const periods = getBrqNumberedPeriodsAscending();
+    const index = periods.findIndex(function(period) {
+      return period.value === value;
+    });
+    return index === -1 ? "" : index + 1;
+  }
+
+  function getBrqDailyNumber(dateKey) {
+    return getBrqPeriodNumber("D:" + dateKey);
+  }
+
+  function renderBrqPeriodOptions() {
+    const select = document.getElementById("brq-period");
+    if (!select) return;
+
+    const dailyDates = getBrqDailyDates();
+    const vacationPeriods = getBrqVacationPeriods();
+    const weeks = getBrqWeeks();
+    const options = [];
+
+    dailyDates.forEach(function(item) {
+      const dateKey = item[0];
+      const date = item[1];
+      const value = "D:" + dateKey;
+      options.push({
+        value: value,
+        sortKey: dateKey,
+        label: `BRQ n°${getBrqPeriodNumber(value)} - ${formatLongDate(date)}`
+      });
+    });
+
+    vacationPeriods.forEach(function(period) {
+      const value = "V:" + period.key;
+      options.push({
+        value: value,
+        sortKey: period.start,
+        label: `BRQ n°${getBrqPeriodNumber(value)} - ${period.label}`
+      });
+    });
+
+    weeks.forEach(function(info) {
+      const value = "W:" + info.key;
+      options.push({
+        value: value,
+        sortKey: formatDateKey(info.monday),
+        label: `BRQ S${info.week} - ${formatDayMonth(info.monday)} au ${formatDayMonth(info.sunday)}`
+      });
+    });
+
+    options.sort(function(a, b) {
+      if (a.sortKey !== b.sortKey) return b.sortKey.localeCompare(a.sortKey);
+      return a.value.localeCompare(b.value);
+    });
+
+    const validValues = options.map(function(option) { return option.value; });
+
+    if (!validValues.length) {
+      selectedBrqPeriod = "";
+      select.innerHTML = '<option value="">Aucun BRQ disponible</option>';
+      return;
+    }
+
+    if (!selectedBrqPeriod || !validValues.includes(selectedBrqPeriod)) {
+      selectedBrqPeriod = validValues[0];
+    }
+
+    select.innerHTML = options.map(function(option) {
+      return `<option value="${escapeHtml(option.value)}">${escapeHtml(option.label)}</option>`;
+    }).join("");
+
+    select.value = selectedBrqPeriod;
+  }
+
+  function setBrqPeriod(value) {
+    selectedBrqPeriod = value;
+    renderBRQ();
+  }
+
+  function getSelectedBrqRecords() {
+    if (!selectedBrqPeriod) return [];
+
+    if (selectedBrqPeriod.startsWith("D:")) {
+      const dateKey = selectedBrqPeriod.slice(2);
+      return allRecords.filter(function(record) {
+        if (
+          !record._date ||
+          !record._dateKey ||
+          record._dateKey < BRQ_START_DATE ||
+          isBrqSchoolBreakDateKey(record._dateKey)
+        ) {
+          return false;
+        }
+
+        const brqDate = getBrqEffectiveDailyDate(record._date);
+        return Boolean(brqDate && formatDateKey(brqDate) === dateKey);
+      });
+    }
+
+    if (selectedBrqPeriod.startsWith("W:")) {
+      const weekKey = selectedBrqPeriod.slice(2);
+      return allRecords.filter(function(record){ return record._weekKey === weekKey; });
+    }
+
+    if (selectedBrqPeriod.startsWith("V:")) {
+      const vacationKey = selectedBrqPeriod.slice(2);
+      const period = BRQ_SCHOOL_BREAK_PERIODS.find(function(item) {
+        return item.key === vacationKey;
+      });
+
+      if (!period) return [];
+
+      return allRecords.filter(function(record) {
+        return record._dateKey &&
+          record._dateKey >= period.start &&
+          record._dateKey <= period.end;
+      });
+    }
+
+    return [];
+  }
+
+  function getBrqCounts(records) {
+    const counts = {};
+    BRQ_TYPES.forEach(function(type) {
+      counts[type.key] = { first:0, second:0, private:0 };
+    });
+
+    records.forEach(function(record) {
+      const category = getBrqCategory(record);
+      if (!category) return;
+      const flags = getBrqTypeFlags(record);
+      BRQ_TYPES.forEach(function(type) {
+        if (flags[type.key]) counts[type.key][category]++;
+      });
+    });
+    return counts;
+  }
+
+  function formatBrqTypeForLine(record) {
+    if (!Array.isArray(record._typeFait) || !record._typeFait.length) return "Type non renseigné";
+    return record._typeFait.map(function(type){ return getFullFactLabel(type); }).join(" + ");
+  }
+
+  function formatNonZeroCount(value) {
+    const numericValue = Number(value) || 0;
+    return numericValue !== 0
+      ? `<strong>${numericValue}</strong>`
+      : "0";
+  }
+
+  function renderBrqDepartment(department, records, weeklyMode) {
+    const departmentRecords = records.filter(function(record){ return record._departement === department; });
+    let html = `<div class="brq-department"><p class="brq-department-title">DSDEN.${escapeHtml(department)}</p>`;
+
+    if (!departmentRecords.length) {
+      html += `<div class="brq-empty-department">Aucun fait d'établissement recensé dans le département ${escapeHtml(department)} pour cette période.</div></div>`;
+      return html;
+    }
+
+    const totalFE = departmentRecords.length;
+    const totalDayFacts = departmentRecords.filter(isWhiteNoteDayFact).length;
+    const totalUpdates = departmentRecords.filter(isWhiteNoteUpdate).length;
+    const totalN2 = departmentRecords.filter(function(record) { return record._niveau === "2"; }).length;
+    const totalN3 = departmentRecords.filter(function(record) { return record._niveau === "3"; }).length;
+
+    html += `
+      <div class="brq-department-stats">
+        <span>Total FE : <strong>${totalFE}</strong> dont <strong>${totalDayFacts}</strong> ${totalDayFacts <= 1 ? "Fait du jour" : "Faits du jour"} et <strong>${totalUpdates}</strong> ${totalUpdates <= 1 ? "Fait d'actualisation" : "Faits d'actualisation"}</span>
+        <span>Total FE N2 : <strong>${totalN2}</strong> - Total FE N3 : <strong>${totalN3}</strong></span>
+      </div>
+    `;
+
+    const counts = getBrqCounts(departmentRecords);
+    html += `<div class="brq-table-wrap"><table class="brq-table"><thead><tr><th>Type de fait</th><th>1er degré</th><th>2nd degré</th><th>Privé</th></tr></thead><tbody>`;
+
+    BRQ_TYPES.forEach(function(type) {
+      html += `<tr><td>${escapeHtml(type.label)}</td><td>${formatNonZeroCount(counts[type.key].first)}</td><td>${formatNonZeroCount(counts[type.key].second)}</td><td>${formatNonZeroCount(counts[type.key].private)}</td></tr>`;
+    });
+
+    html += `</tbody></table></div>`;
+
+    if (!weeklyMode) {
+      const unaccounted = departmentRecords
+        .filter(function(record){ return !isBrqCountedRecord(record); })
+        .sort(function(a, b) {
+          /* Dans les FE non comptabilisés du BRQ : niveaux 3 d'abord, puis niveaux 2. */
+          const levelA = String(a._niveau || "");
+          const levelB = String(b._niveau || "");
+
+          if (levelA === "3" && levelB !== "3") return -1;
+          if (levelB === "3" && levelA !== "3") return 1;
+          if (levelA === "2" && levelB !== "2") return -1;
+          if (levelB === "2" && levelA !== "2") return 1;
+          return 0;
+        });
+      if (unaccounted.length) {
+        const unaccountedTitle = unaccounted.length === 1
+          ? "FE non comptabilisé dans le tableau :"
+          : "FE non comptabilisés dans le tableau :";
+        html += `<div class="brq-unaccounted"><p class="brq-unaccounted-title">${unaccountedTitle}</p>`;
+        unaccounted.forEach(function(record) {
+          const idNom = record[FIELD.ID_NOM] || "Établissement non renseigné";
+          const niveau = record._niveau || "?";
+          const type = formatBrqTypeForLine(record);
+          const resume = record[FIELD.RESUME] || "Résumé non renseigné";
+          const timingLabel = getFactTimingLabel(record);
+          const niveauHtml = String(niveau) === "3"
+            ? `<span class="level-3-text">(Niveau 3)</span>`
+            : `(Niveau ${escapeHtml(String(niveau))})`;
+          html += `<p class="brq-unaccounted-line">${escapeHtml(String(idNom))} ${niveauHtml} - ${escapeHtml(type)} - ${escapeHtml(String(resume))}${timingLabel ? ` <em>(${escapeHtml(timingLabel)})</em>` : ""}</p>`;
+        });
+        html += `</div>`;
+      }
+    }
+
+    html += `</div>`;
+    return html;
+  }
+
+
+  function getSelectedBrqPdfMeta() {
+    if (!selectedBrqPeriod) return null;
+
+    if (selectedBrqPeriod.startsWith("W:")) {
+      const weekKey = selectedBrqPeriod.slice(2);
+      const info = getBrqWeeks().find(function(item) { return item.key === weekKey; });
+      if (!info) return null;
+      return {
+        title: "BRQ S" + info.week,
+        subtitle: formatDayMonth(info.monday) + " au " + formatDayMonth(info.sunday),
+        filenameBase: "BRQ S" + info.week + " année 2026-2027",
+        weeklyMode: true,
+        vacationMode: false
+      };
+    }
+
+    if (selectedBrqPeriod.startsWith("V:")) {
+      const vacationKey = selectedBrqPeriod.slice(2);
+      const period = BRQ_SCHOOL_BREAK_PERIODS.find(function(item) {
+        return item.key === vacationKey;
+      });
+      if (!period) return null;
+      const number = getBrqPeriodNumber(selectedBrqPeriod);
+      return {
+        title: "BRQ n°" + number + " - " + period.label,
+        subtitle: formatLongDate(parseGristDate(period.start)) + " au " + formatLongDate(parseGristDate(period.end)),
+        filenameBase: "BRQ n°" + number + " année 2026-2027",
+        weeklyMode: false,
+        vacationMode: true
+      };
+    }
+
+    const dateKey = selectedBrqPeriod.slice(2);
+    const date = parseGristDate(dateKey);
+    const number = getBrqDailyNumber(dateKey);
+    const sourceRange = getBrqDailySourceRange(dateKey);
+    return {
+      title: "BRQ n°" + number + " - " + (date ? formatLongDate(date) : dateKey),
+      subtitle: sourceRange && sourceRange.weekendGroup
+        ? "du " + formatLongDate(sourceRange.startDate) + " au " + formatLongDate(sourceRange.endDate)
+        : "",
+      filenameBase: "BRQ n°" + number + " année 2026-2027",
+      weeklyMode: false,
+      vacationMode: false,
+      sourceRange: sourceRange
+    };
+  }
+
+  async function downloadSelectedBrqPdf() {
+    const button = document.getElementById("brq-download");
+    const meta = getSelectedBrqPdfMeta();
+    if (!meta) return;
+
+    const JsPdfConstructor =
+      window.jspdf && window.jspdf.jsPDF
+        ? window.jspdf.jsPDF
+        : (window.jsPDF || null);
+
+    if (!JsPdfConstructor) {
+      alert("Le module PDF n'a pas pu être chargé. Vérifiez votre connexion puis réessayez.");
+      return;
+    }
+
+    const records = getSelectedBrqRecords();
+    const brqDepartmentOrder = ["34", "30", "66", "11", "48"];
+    const availableDepartments = new Set(getDepartments());
+    const departments = brqDepartmentOrder.filter(function(department) {
+      return availableDepartments.has(department);
+    });
+
+    if (button) {
+      button.disabled = true;
+      button.textContent = "...";
+    }
+
+    try {
+      const doc = new JsPdfConstructor({
+        orientation: "landscape",
+        unit: "mm",
+        format: "a4"
+      });
+
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const marginX = 10;
+      const marginTop = 10;
+      const marginBottom = 14;
+      const contentWidth = pageWidth - marginX * 2;
+      const orange = [181, 71, 8];
+      const grayBorder = [208, 213, 221];
+      const textColor = [52, 64, 84];
+      const headerBg = [247, 248, 250];
+      let y = marginTop;
+
+      function setNormal(size, color) {
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(size || 9);
+        doc.setTextColor.apply(doc, color || textColor);
+      }
+
+      function setBold(size, color) {
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(size || 9);
+        doc.setTextColor.apply(doc, color || textColor);
+      }
+
+      function ensureSpace(requiredHeight) {
+        if (y + requiredHeight <= pageHeight - marginBottom) return;
+        doc.addPage("a4", "landscape");
+        y = marginTop;
+      }
+
+      function drawParts(parts, startX, baselineY, color, size) {
+        let x = startX;
+        parts.forEach(function(part) {
+          doc.setFont("helvetica", part.bold ? "bold" : "normal");
+          doc.setFontSize(size || 8.8);
+          doc.setTextColor.apply(doc, color || textColor);
+          const text = String(part.text);
+          doc.text(text, x, baselineY);
+          x += doc.getTextWidth(text);
+        });
+      }
+
+      function n(value) {
+        const numericValue = Number(value) || 0;
+        return { text: String(numericValue), bold: numericValue !== 0 };
+      }
+
+      setBold(16);
+      doc.text(meta.title, marginX, y + 5);
+      y += 9;
+      if (meta.subtitle) {
+        setNormal(9.5);
+        doc.text(meta.subtitle, marginX, y + 3);
+        y += 10;
+      } else {
+        y += 4;
+      }
+
+      const tableWidths = [contentWidth - 96, 32, 32, 32];
+      const headers = ["Type de fait", "1er degré", "2nd degré", "Privé"];
+
+      function drawBrqTableHeader() {
+        const h = 8;
+        let x = marginX;
+        headers.forEach(function(header, index) {
+          doc.setFillColor.apply(doc, headerBg);
+          doc.setDrawColor.apply(doc, grayBorder);
+          doc.setLineWidth(0.2);
+          doc.rect(x, y, tableWidths[index], h, "FD");
+          setBold(8.5);
+          doc.text(header, x + tableWidths[index] / 2, y + 5.2, { align: "center" });
+          x += tableWidths[index];
+        });
+        y += h;
+      }
+
+      function drawDepartment(department) {
+        const departmentRecords = records.filter(function(record) {
+          return record._departement === department;
+        });
+
+        ensureSpace(24);
+        setBold(11.5);
+        doc.text("DSDEN." + department, marginX, y + 4);
+        y += 8;
+
+        if (!departmentRecords.length) {
+          setNormal(8.5);
+          doc.text(
+            "Aucun fait d'établissement recensé dans le département " + department + " pour cette période.",
+            marginX,
+            y + 3
+          );
+          y += 10;
+          return;
+        }
+
+        const totalFE = departmentRecords.length;
+        const totalDayFacts = departmentRecords.filter(isWhiteNoteDayFact).length;
+        const totalUpdates = departmentRecords.filter(isWhiteNoteUpdate).length;
+        const totalN2 = departmentRecords.filter(function(record) { return record._niveau === "2"; }).length;
+        const totalN3 = departmentRecords.filter(function(record) { return record._niveau === "3"; }).length;
+
+        drawParts([
+          { text: "Total FE : ", bold: false }, n(totalFE),
+          { text: " dont ", bold: false }, n(totalDayFacts),
+          { text: " " + (totalDayFacts <= 1 ? "Fait du jour" : "Faits du jour") + " et ", bold: false }, n(totalUpdates),
+          { text: " " + (totalUpdates <= 1 ? "Fait d'actualisation" : "Faits d'actualisation"), bold: false }
+        ], marginX, y + 3, textColor, 8.8);
+
+        drawParts([
+          { text: "Total FE N2 : ", bold: false }, n(totalN2),
+          { text: " - Total FE N3 : ", bold: false }, n(totalN3)
+        ], marginX + 150, y + 3, textColor, 8.8);
+        y += 8;
+
+        ensureSpace(12);
+        drawBrqTableHeader();
+        const counts = getBrqCounts(departmentRecords);
+
+        BRQ_TYPES.forEach(function(type) {
+          const values = [
+            type.label,
+            counts[type.key].first,
+            counts[type.key].second,
+            counts[type.key].private
+          ];
+          const rowH = 8;
+          if (y + rowH > pageHeight - marginBottom) {
+            doc.addPage("a4", "landscape");
+            y = marginTop;
+            drawBrqTableHeader();
+          }
+
+          let x = marginX;
+          values.forEach(function(value, index) {
+            doc.setDrawColor.apply(doc, grayBorder);
+            doc.setLineWidth(0.2);
+            doc.rect(x, y, tableWidths[index], rowH);
+
+            if (index === 0) {
+              setNormal(8.3);
+              doc.text(String(value), x + 2, y + 5.1);
+            } else {
+              const num = Number(value) || 0;
+              if (num !== 0) setBold(8.3); else setNormal(8.3);
+              doc.text(String(num), x + tableWidths[index] / 2, y + 5.1, { align: "center" });
+            }
+            x += tableWidths[index];
+          });
+          y += rowH;
+        });
+
+        if (!meta.weeklyMode && !meta.vacationMode) {
+          const unaccounted = departmentRecords
+            .filter(function(record) {
+              return !isBrqCountedRecord(record);
+            })
+            .sort(function(a, b) {
+              /* PDF BRQ : niveaux 3 d'abord, puis niveaux 2, comme dans le BRQ affiché. */
+              const levelA = String(a._niveau || "");
+              const levelB = String(b._niveau || "");
+
+              if (levelA === "3" && levelB !== "3") return -1;
+              if (levelB === "3" && levelA !== "3") return 1;
+              if (levelA === "2" && levelB !== "2") return -1;
+              if (levelB === "2" && levelA !== "2") return 1;
+              return 0;
+            });
+
+          if (unaccounted.length) {
+            y += 4;
+            ensureSpace(12);
+            setBold(9.2);
+            doc.text("FE non comptabilisés dans le tableau :", marginX, y + 3);
+            y += 6;
+
+            unaccounted.forEach(function(record) {
+              const idNom = record[FIELD.ID_NOM] || "Établissement non renseigné";
+              /* PDF BRQ uniquement : retire l’identifiant établissement placé
+                 au début de ID_et_Nom, comme dans le PDF Note Blanche. */
+              const pdfEstablishmentName = String(idNom || "").replace(
+                /^\s*[0-9][A-Z0-9]{2,20}\s*[-–—]\s*/i,
+                ""
+              ).trim() || "Établissement non renseigné";
+              const niveau = record._niveau || "?";
+              const type = formatBrqTypeForLine(record);
+              const resume = record[FIELD.RESUME] || "Résumé non renseigné";
+              const timingLabel = getFactTimingLabel(record);
+              const prefix = String(pdfEstablishmentName) + " ";
+              const levelText = "(Niveau " + String(niveau) + ")";
+              const suffix = " - " + type + " - " + String(resume) + (timingLabel ? " (" + timingLabel + ")" : "");
+              /* PDF BRQ : mise en page mot par mot pour conserver (Niveau 3)
+                 en orange même lorsque la ligne se replie sur plusieurs lignes. */
+              setNormal(7.8);
+
+              const chunks = [];
+              function pushWords(text, color) {
+                String(text).split(/(\s+)/).forEach(function(part) {
+                  if (part) chunks.push({ text: part, color: color });
+                });
+              }
+
+              pushWords(prefix, textColor);
+              chunks.push({
+                text: levelText,
+                color: String(niveau) === "3" ? orange : textColor
+              });
+              pushWords(suffix, textColor);
+
+              const lineHeight = 4.1;
+              const laidOutLines = [[]];
+              let currentWidth = 0;
+
+              chunks.forEach(function(chunk) {
+                doc.setFont("helvetica", "normal");
+                doc.setFontSize(7.8);
+                const chunkWidth = doc.getTextWidth(chunk.text);
+                const currentLine = laidOutLines[laidOutLines.length - 1];
+                const isWhitespace = /^\s+$/.test(chunk.text);
+
+                if (!isWhitespace && currentLine.length && currentWidth + chunkWidth > contentWidth) {
+                  laidOutLines.push([]);
+                  currentWidth = 0;
+                }
+
+                /* Ne pas commencer une nouvelle ligne par un espace. */
+                if (!(currentWidth === 0 && isWhitespace)) {
+                  laidOutLines[laidOutLines.length - 1].push(chunk);
+                  currentWidth += chunkWidth;
+                }
+              });
+
+              const h = Math.max(5, laidOutLines.length * lineHeight + 1);
+              ensureSpace(h);
+
+              laidOutLines.forEach(function(line, lineIndex) {
+                let x = marginX;
+                line.forEach(function(chunk) {
+                  doc.setFont("helvetica", "normal");
+                  doc.setFontSize(7.8);
+                  doc.setTextColor.apply(doc, chunk.color);
+                  doc.text(chunk.text, x, y + 3 + lineIndex * lineHeight);
+                  x += doc.getTextWidth(chunk.text);
+                });
+              });
+
+              doc.setTextColor.apply(doc, textColor);
+              y += h;
+            });
+          }
+        }
+
+        y += 7;
+      }
+
+      departments.forEach(drawDepartment);
+
+      const totalPdfPages = doc.getNumberOfPages();
+      for (let pageIndex = 1; pageIndex <= totalPdfPages; pageIndex += 1) {
+        doc.setPage(pageIndex);
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(6.8);
+        doc.setTextColor(128, 128, 128);
+        doc.text(
+          "Page " + pageIndex + " / " + totalPdfPages,
+          pageWidth / 2,
+          pageHeight - 5,
+          { align: "center" }
+        );
+      }
+
+      /* Un slash n'est pas valide dans un nom de fichier Windows : on garde
+         la forme demandée visuellement, avec un tiret dans le nom du fichier. */
+      doc.save(meta.filenameBase + ".pdf");
+    } catch (error) {
+      console.error("Erreur lors de la génération du BRQ en PDF :", error);
+      alert("Impossible de générer le PDF du BRQ pour le moment.");
+    } finally {
+      if (button) {
+        button.disabled = false;
+        button.textContent = "PDF";
+      }
+    }
+  }
+
+  function renderBRQ() {
+    const title = document.getElementById("brq-title");
+    const content = document.getElementById("brq-content");
+    const downloadButton = document.getElementById("brq-download");
+    if (!title || !content) return;
+
+    renderBrqPeriodOptions();
+    if (!selectedBrqPeriod) {
+      title.textContent = "BRQ";
+      content.innerHTML = '<div class="brq-empty">Aucun BRQ disponible.</div>';
+      if (downloadButton) downloadButton.disabled = true;
+      return;
+    }
+
+    if (downloadButton) downloadButton.disabled = false;
+
+    const sourcePeriodTitle = document.getElementById("brq-source-period-title");
+    if (sourcePeriodTitle) sourcePeriodTitle.textContent = "";
+
+    const weeklyMode = selectedBrqPeriod.startsWith("W:");
+    const vacationMode = selectedBrqPeriod.startsWith("V:");
+    const records = getSelectedBrqRecords();
+
+    if (weeklyMode) {
+      const weekKey = selectedBrqPeriod.slice(2);
+      const info = getBrqWeeks().find(function(item){ return item.key === weekKey; });
+      title.textContent = info ? "BRQ S" + info.week + " - " + formatDayMonth(info.monday) + " au " + formatDayMonth(info.sunday) : "BRQ hebdomadaire";
+    } else if (vacationMode) {
+      const vacationKey = selectedBrqPeriod.slice(2);
+      const period = BRQ_SCHOOL_BREAK_PERIODS.find(function(item) {
+        return item.key === vacationKey;
+      });
+      const number = getBrqPeriodNumber(selectedBrqPeriod);
+      title.textContent = period
+        ? "BRQ n°" + number + " - " + period.label
+        : "BRQ vacances";
+    } else {
+      const dateKey = selectedBrqPeriod.slice(2);
+      const date = parseGristDate(dateKey);
+      title.textContent = "BRQ n°" + getBrqDailyNumber(dateKey) + " - " + (date ? formatLongDate(date) : dateKey);
+      const sourceRange = getBrqDailySourceRange(dateKey);
+      if (sourcePeriodTitle && sourceRange && sourceRange.weekendGroup) {
+        sourcePeriodTitle.textContent =
+          "du " + formatLongDate(sourceRange.startDate) +
+          " au " + formatLongDate(sourceRange.endDate);
+      }
+    }
+
+    /*
+      Ordre d'affichage propre au BRQ uniquement.
+    */
+    const brqDepartmentOrder = ["34", "30", "66", "11", "48"];
+    const availableDepartments = new Set(getDepartments());
+
+    const departments = brqDepartmentOrder.filter(function(department) {
+      return availableDepartments.has(department);
+    });
+
+    if (!departments.length) {
+      content.innerHTML = '<div class="brq-empty">Aucun département disponible.</div>';
+      return;
+    }
+
+    content.innerHTML = departments.map(function(department){
+      return renderBrqDepartment(department, records, weeklyMode || vacationMode);
+    }).join("");
+  }
+
+
+  /*
+    ==================================================
+    DATE GRIST
+    ==================================================
+
+    Cette fonction accepte :
+    - un objet Date JavaScript ;
+    - un timestamp Grist en secondes ;
+    - un timestamp JavaScript en millisecondes ;
+    - YYYY-MM-DD ;
+    - YYYY-MM-DDTHH:mm:ss...
+    - DD/MM/YYYY ;
+    - DD/MM/YY.
+
+    Toutes les dates sont ensuite ramenées à une date "civile"
+    en UTC afin d'éviter les décalages de fuseau horaire.
+  */
+
+  function parseGristDate(value) {
+
+    if (
+      value === null ||
+      value === undefined ||
+      value === ""
+    ) {
+      return null;
+    }
+
+    /*
+      Cas 1 : Date JavaScript.
+    */
+    if (value instanceof Date) {
+
+      if (isNaN(value.getTime())) {
+        return null;
+      }
+
+      return new Date(Date.UTC(
+        value.getUTCFullYear(),
+        value.getUTCMonth(),
+        value.getUTCDate()
+      ));
+    }
+
+    /*
+      Cas 2 : valeur numérique Grist.
+
+      Grist transmet couramment les Date/DateTime comme timestamp
+      Unix en secondes. Si la valeur est déjà en millisecondes,
+      on la conserve telle quelle.
+    */
+    if (
+      typeof value === "number" &&
+      Number.isFinite(value)
+    ) {
+
+      const milliseconds =
+        Math.abs(value) < 100000000000
+          ? value * 1000
+          : value;
+
+      const parsed = new Date(milliseconds);
+
+      if (isNaN(parsed.getTime())) {
+        return null;
+      }
+
+      return new Date(Date.UTC(
+        parsed.getUTCFullYear(),
+        parsed.getUTCMonth(),
+        parsed.getUTCDate()
+      ));
+    }
+
+    /*
+      Cas 3 : chaîne de caractères.
+    */
+    let texte = String(value)
+      .trim()
+      .replace(/^["']+|["']+$/g, "");
+
+    if (!texte) {
+      return null;
+    }
+
+    /*
+      YYYY-MM-DD ou YYYY-MM-DDTHH...
+    */
+    let match = texte.match(
+      /^(\d{4})-(\d{1,2})-(\d{1,2})(?:[T\s].*)?$/
+    );
+
+    if (match) {
+      return makeUTCDate(
+        Number(match[1]),
+        Number(match[2]),
+        Number(match[3])
+      );
+    }
+
+    /*
+      DD/MM/YYYY ou DD-MM-YYYY
+    */
+    match = texte.match(
+      /^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})$/
+    );
+
+    if (match) {
+      return makeUTCDate(
+        Number(match[3]),
+        Number(match[2]),
+        Number(match[1])
+      );
+    }
+
+    /*
+      DD/MM/YY ou DD-MM-YY
+      00-69 -> 2000-2069
+      70-99 -> 1970-1999
+    */
+    match = texte.match(
+      /^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{2})$/
+    );
+
+    if (match) {
+
+      const yy = Number(match[3]);
+      const year = yy <= 69 ? 2000 + yy : 1900 + yy;
+
+      return makeUTCDate(
+        year,
+        Number(match[2]),
+        Number(match[1])
+      );
+    }
+
+    /*
+      Dernier recours : parseur natif.
+    */
+    const parsed = new Date(texte);
+
+    if (isNaN(parsed.getTime())) {
+      return null;
+    }
+
+    return new Date(Date.UTC(
+      parsed.getUTCFullYear(),
+      parsed.getUTCMonth(),
+      parsed.getUTCDate()
+    ));
+  }
+
+
+  /*
+    Crée une date UTC et vérifie qu'elle existe réellement.
+    Par exemple 31/02 sera refusé.
+  */
+
+  function makeUTCDate(year, month, day) {
+
+    const date = new Date(Date.UTC(
+      year,
+      month - 1,
+      day
+    ));
+
+    if (
+      date.getUTCFullYear() !== year ||
+      date.getUTCMonth() !== month - 1 ||
+      date.getUTCDate() !== day
+    ) {
+      return null;
+    }
+
+    return date;
+  }
+
+
+  /*
+    ==================================================
+    SEMAINE ISO
+    lundi -> dimanche
+    ==================================================
+  */
+
+  function getISOWeekInfo(date) {
+
+    /*
+      On travaille entièrement en UTC.
+    */
+    const d = new Date(Date.UTC(
+      date.getUTCFullYear(),
+      date.getUTCMonth(),
+      date.getUTCDate()
+    ));
+
+    let day = d.getUTCDay();
+
+    /*
+      Dimanche 0 -> 7
+    */
+    if (day === 0) {
+      day = 7;
+    }
+
+    /*
+      Jeudi de la semaine ISO :
+      c'est lui qui détermine l'année ISO.
+    */
+    d.setUTCDate(
+      d.getUTCDate() + 4 - day
+    );
+
+    const isoYear = d.getUTCFullYear();
+
+    const yearStart = new Date(Date.UTC(
+      isoYear,
+      0,
+      1
+    ));
+
+    const week = Math.ceil(
+      (
+        (
+          d.getTime() - yearStart.getTime()
+        ) / 86400000
+        + 1
+      ) / 7
+    );
+
+    const monday = getMondayOfISOWeek(
+      isoYear,
+      week
+    );
+
+    const sunday = new Date(monday);
+    sunday.setUTCDate(
+      sunday.getUTCDate() + 6
+    );
+
+    return {
+      year: isoYear,
+      week: week,
+      key:
+        isoYear +
+        "-" +
+        String(week).padStart(2, "0"),
+      monday: monday,
+      sunday: sunday
+    };
+  }
+
+
+  /*
+    ==================================================
+    LUNDI D'UNE SEMAINE ISO
+    ==================================================
+  */
+
+  function getMondayOfISOWeek(year, week) {
+
+    const january4 = new Date(Date.UTC(
+      year,
+      0,
+      4
+    ));
+
+    const day = january4.getUTCDay() || 7;
+
+    const mondayWeek1 = new Date(january4);
+
+    mondayWeek1.setUTCDate(
+      january4.getUTCDate() - day + 1
+    );
+
+    const monday = new Date(mondayWeek1);
+
+    monday.setUTCDate(
+      mondayWeek1.getUTCDate() +
+      (week - 1) * 7
+    );
+
+    return monday;
+  }
+
+
+  /*
+    ==================================================
+    FORMAT JJ/MM
+    ==================================================
+  */
+
+  function formatDayMonth(date) {
+
+    const day = String(
+      date.getUTCDate()
+    ).padStart(2, "0");
+
+    const month = String(
+      date.getUTCMonth() + 1
+    ).padStart(2, "0");
+
+    return day + "/" + month;
+  }
+
+
+  /*
+    ==================================================
+    FORMAT JJ/MM/AA
+    ==================================================
+  */
+
+  function formatFullDate(date) {
+
+    if (!date) {
+      return "";
+    }
+
+    const day = String(
+      date.getUTCDate()
+    ).padStart(2, "0");
+
+    const month = String(
+      date.getUTCMonth() + 1
+    ).padStart(2, "0");
+
+    const year = String(
+      date.getUTCFullYear()
+    ).slice(-2);
+
+    return day + "/" + month + "/" + year;
+  }
+
+
+  /*
+    ==================================================
+    LISTE DES SEMAINES
+    ==================================================
+  */
+
+  function getAvailableWeeks() {
+
+    const weeks = new Map();
+
+    allRecords.forEach(function(record) {
+
+      /*
+        Une semaine n'est créée QUE si Date_de_saisie
+        a pu être lue et convertie correctement.
+      */
+      if (
+        !record._weekKey ||
+        !record._date
+      ) {
+        return;
+      }
+
+      if (!weeks.has(record._weekKey)) {
+
+        weeks.set(
+          record._weekKey,
+          getISOWeekInfo(record._date)
+        );
+      }
+    });
+
+    /*
+      Semaine la plus récente en premier.
+    */
+    return Array
+      .from(weeks.values())
+      .sort(function(a, b) {
+
+        if (a.year !== b.year) {
+          return b.year - a.year;
+        }
+
+        return b.week - a.week;
+      });
+  }
+
+
+  /*
+    ==================================================
+    AFFICHAGE SÉLECTEUR SEMAINE
+    ==================================================
+  */
+
+  function renderWeekFilter() {
+
+    const select =
+      document.getElementById("week-filter");
+
+    const weeks = getAvailableWeeks();
+
+    const validKeys =
+      weeks.map(item => item.key);
+
+    if (
+      selectedWeek !== "all" &&
+      !validKeys.includes(selectedWeek)
+    ) {
+      selectedWeek = "all";
+    }
+
+    let html = `
+      <option value="all">
+        Toutes les semaines
+      </option>
+    `;
+
+    weeks.forEach(function(info) {
+
+      const selected =
+        selectedWeek === info.key
+          ? "selected"
+          : "";
+
+      const label =
+        "S" +
+        info.week +
+        " — " +
+        formatDayMonth(info.monday) +
+        " au " +
+        formatDayMonth(info.sunday);
+
+      html += `
+        <option
+          value="${escapeHtml(info.key)}"
+          ${selected}
+        >
+          ${escapeHtml(label)}
+        </option>
+      `;
+    });
+
+    select.innerHTML = html;
+  }
+
+
+  /*
+    ==================================================
+    CHANGEMENT DE SEMAINE
+    ==================================================
+  */
+
+  function setWeek(value) {
+
+    selectedWeek = value;
+    currentPage = 1;
+
+    renderTable();
+  }
+
+
+
+  /*
+    ==================================================
+    FILTRE DATE EXACTE
+    ==================================================
+  */
+
+  function formatDateKey(date) {
+
+    if (!date) {
+      return "";
+    }
+
+    const year = date.getUTCFullYear();
+    const month = String(
+      date.getUTCMonth() + 1
+    ).padStart(2, "0");
+    const day = String(
+      date.getUTCDate()
+    ).padStart(2, "0");
+
+    return `${year}-${month}-${day}`;
+  }
+
+
+  function getAvailableDates() {
+
+    const dates = new Map();
+
+    allRecords.forEach(function(record) {
+
+      if (!record._date || !record._dateKey) {
+        return;
+      }
+
+      if (!dates.has(record._dateKey)) {
+        dates.set(record._dateKey, record._date);
+      }
+    });
+
+    return Array
+      .from(dates.entries())
+      .sort(function(a, b) {
+        return b[0].localeCompare(a[0]);
+      });
+  }
+
+
+  function renderDateFilter() {
+
+    const select =
+      document.getElementById("date-filter");
+
+    if (!select) {
+      return;
+    }
+
+    const dates = getAvailableDates();
+
+    const validKeys =
+      dates.map(item => item[0]);
+
+    if (
+      selectedDate !== "all" &&
+      !validKeys.includes(selectedDate)
+    ) {
+      selectedDate = "all";
+    }
+
+    let html = `
+      <option value="all">
+        Toutes les dates
+      </option>
+    `;
+
+    dates.forEach(function(item) {
+
+      const key = item[0];
+      const date = item[1];
+
+      const selected =
+        selectedDate === key
+          ? "selected"
+          : "";
+
+      const label =
+        String(date.getUTCDate()).padStart(2, "0") +
+        "/" +
+        String(date.getUTCMonth() + 1).padStart(2, "0") +
+        "/" +
+        date.getUTCFullYear();
+
+      html += `
+        <option
+          value="${escapeHtml(key)}"
+          ${selected}
+        >
+          ${escapeHtml(label)}
+        </option>
+      `;
+    });
+
+    select.innerHTML = html;
+  }
+
+
+  function setDateFilter(value) {
+
+    selectedDate = value;
+    currentPage = 1;
+
+    renderTable();
+  }
+
+
+  /*
+    ==================================================
+    RECHERCHE TEXTUELLE
+    ==================================================
+  */
+
+  function normalizeSearch(value) {
+
+    return String(
+      value === null || value === undefined
+        ? ""
+        : value
+    )
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .trim();
+  }
+
+
+  function setSearch(value) {
+
+    searchText = normalizeSearch(value);
+    currentPage = 1;
+
+    renderTable();
+  }
+
+
+  /*
+    ==================================================
+    DÉPARTEMENTS DISPONIBLES
+    ==================================================
+  */
+
+  function getDepartments() {
+
+    const departments = allRecords
+      .map(record => record._departement)
+      .filter(Boolean);
+
+    const unique = [...new Set(departments)];
+
+    unique.sort(function(a, b) {
+      return Number(a) - Number(b);
+    });
+
+    return unique;
+  }
+
+
+  /*
+    ==================================================
+    BOUTONS DÉPARTEMENT
+    ==================================================
+  */
+
+  function renderDepartmentFilters() {
+
+    const target =
+      document.getElementById("department-filters");
+
+    const departments =
+      getDepartments();
+
+    let html = `
+      <button
+        type="button"
+        class="department-btn ${
+          selectedDepartment === "all"
+            ? "active"
+            : ""
+        }"
+        onclick="setDepartment('all')"
+      >
+        Tous
+      </button>
+    `;
+
+    departments.forEach(function(departement) {
+
+      html += `
+        <button
+          type="button"
+          class="department-btn ${
+            selectedDepartment === departement
+              ? "active"
+              : ""
+          }"
+          onclick="setDepartment('${escapeJsString(departement)}')"
+        >
+          ${escapeHtml(departement)}
+        </button>
+      `;
+    });
+
+    target.innerHTML = html;
+  }
+
+
+  /*
+    ==================================================
+    CHANGEMENT DÉPARTEMENT
+    ==================================================
+  */
+
+  function setDepartment(departement) {
+
+    selectedDepartment = departement;
+    currentPage = 1;
+
+    renderDegreeFilters();
+    renderDepartmentFilters();
+    renderLevelFilters();
+    renderTable();
+  }
+
+
+  /*
+    ==================================================
+    FILTRE DEGRÉ
+    ==================================================
+  */
+
+  function renderDegreeFilters() {
+
+    const target =
+      document.getElementById("degree-filters");
+
+    if (!target) {
+      return;
+    }
+
+    const degrees = [
+      { value: "all", label: "Tous" },
+      { value: "1er", label: "1er" },
+      { value: "2nd", label: "2nd" }
+    ];
+
+    target.innerHTML = degrees.map(function(item) {
+
+      const active =
+        selectedDegree === item.value
+          ? "active"
+          : "";
+
+      return `
+        <button
+          type="button"
+          class="department-btn ${active}"
+          onclick="setDegree('${item.value}')"
+        >
+          ${item.label}
+        </button>
+      `;
+    }).join("");
+  }
+
+
+  function setDegree(degree) {
+
+    selectedDegree = degree;
+    currentPage = 1;
+
+    renderDegreeFilters();
+    renderTable();
+  }
+
+
+  /*
+    ==================================================
+    FILTRE NIVEAU
+    ==================================================
+  */
+
+  function renderLevelFilters() {
+
+    const target =
+      document.getElementById("level-filters");
+
+    if (!target) {
+      return;
+    }
+
+    const levels = [
+      { value: "all", label: "Tous" },
+      { value: "2", label: "2" },
+      { value: "3", label: "3" }
+    ];
+
+    target.innerHTML = levels.map(function(item) {
+
+      const active =
+        selectedLevel === item.value
+          ? "active"
+          : "";
+
+      return `
+        <button
+          type="button"
+          class="department-btn ${active}"
+          onclick="setLevel('${item.value}')"
+        >
+          ${item.label}
+        </button>
+      `;
+    }).join("");
+  }
+
+
+  function setLevel(level) {
+
+    selectedLevel = level;
+    currentPage = 1;
+
+    renderLevelFilters();
+    renderTable();
+  }
+
+
+  /*
+    ==================================================
+    FILTRES COMBINÉS
+    ==================================================
+  */
+
+  function getFilteredRecords() {
+
+    return allRecords.filter(function(record) {
+
+      const departmentOk =
+        selectedDepartment === "all" ||
+        record._departement === selectedDepartment;
+
+      const weekOk =
+        selectedWeek === "all" ||
+        record._weekKey === selectedWeek;
+
+      const dateOk =
+        selectedDate === "all" ||
+        record._dateKey === selectedDate;
+
+      const levelOk =
+        selectedLevel === "all" ||
+        record._niveau === selectedLevel;
+
+      const degreeOk =
+        selectedDegree === "all" ||
+        record._degre === selectedDegree;
+
+      const searchableText = normalizeSearch([
+        record[FIELD.NUMERO_FE],
+        record[FIELD.ID_NOM],
+        record[FIELD.VILLE],
+        record[FIELD.RESUME],
+        record._departement,
+        record._niveau,
+        Array.isArray(record._typeFait)
+          ? record._typeFait.join(" ")
+          : ""
+      ].join(" "));
+
+      const searchOk =
+        !searchText ||
+        searchableText.includes(searchText);
+
+      return (
+        departmentOk &&
+        weekOk &&
+        dateOk &&
+        levelOk &&
+        degreeOk &&
+        searchOk
+      );
+    });
+  }
+
+
+  /*
+    ==================================================
+    TABLEAU
+    ==================================================
+  */
+
+  function renderTable() {
+
+    const tableContainer =
+      document.getElementById("table1");
+
+    const filteredRecords =
+      getFilteredRecords();
+
+    if (filteredRecords.length === 0) {
+
+      tableContainer.innerHTML = `
+        <div class="empty-table">
+          Aucun fait à afficher avec ces filtres.
+        </div>
+      `;
+
+      renderPagination(filteredRecords);
+      return;
+    }
+
+    const startIndex =
+      (currentPage - 1) * PAGE_SIZE;
+
+    const endIndex =
+      startIndex + PAGE_SIZE;
+
+    const visibleRecords =
+      filteredRecords.slice(
+        startIndex,
+        endIndex
+      );
+
+    let html = "<table>";
+
+    /*
+      EN-TÊTE
+    */
+    html += "<thead><tr>";
+
+    COLUMNS.forEach(function(column) {
+      html +=
+        "<th>" +
+        escapeHtml(column.label) +
+        "</th>";
+    });
+
+    html += "</tr></thead>";
+
+    /*
+      LIGNES
+    */
+    html += "<tbody>";
+
+    visibleRecords.forEach(function(record) {
+
+      html += "<tr>";
+
+      COLUMNS.forEach(function(column) {
+
+        /*
+          Colonnes calculées avec rendu stylisé.
+        */
+        if (column.id === "_niveau") {
+
+          html +=
+            '<td class="level-cell">' +
+            renderLevelBadge(record._niveau) +
+            "</td>";
+
+          return;
+        }
+
+        if (column.id === "_typeFait") {
+
+          html +=
+            '<td class="type-cell">' +
+            renderFactBadges(record._typeFait, record._niveau) +
+            "</td>";
+
+          return;
+        }
+
+        if (column.id === FIELD.RESUME) {
+
+          const resume = formatValue(
+            record[FIELD.RESUME],
+            FIELD.RESUME
+          );
+
+          html +=
+            '<td class="summary-cell" title="' +
+            escapeHtml(resume) +
+            '">' +
+            escapeHtml(resume) +
+            "</td>";
+
+          return;
+        }
+
+        if (column.id === "_dateDuFait") {
+
+          html +=
+            '<td class="fact-date-cell">' +
+            escapeHtml(record._dateDuFait || "") +
+            "</td>";
+
+          return;
+        }
+
+
+        let value;
+
+        if (column.id === FIELD.DATE_SAISIE) {
+
+          /*
+            On affiche la même date normalisée que celle
+            utilisée par les filtres semaine et date.
+          */
+          value = formatFullDate(record._date);
+        }
+
+        else if (column.id === FIELD.VILLE) {
+
+          const ville = formatValue(
+            record[FIELD.VILLE],
+            FIELD.VILLE
+          );
+
+          value =
+            ville && record._departement
+              ? `${ville} (${record._departement})`
+              : ville;
+        }
+
+        else {
+          value = formatValue(
+            record[column.id],
+            column.id
+          );
+        }
+
+        html +=
+          "<td>" +
+          escapeHtml(value) +
+          "</td>";
+      });
+
+      html += "</tr>";
+    });
+
+    html += "</tbody>";
+    html += "</table>";
+
+    tableContainer.innerHTML = html;
+
+    renderPagination(filteredRecords);
+  }
+
+
+  /*
+    ==================================================
+    NOTE BLANCHE
+    ==================================================
+
+    Une note du mardi au vendredi affiche les faits saisis
+    la veille. Il n'y a aucune Note Blanche le samedi ni le
+    dimanche : la note du lundi regroupe les faits saisis le
+    vendredi, le samedi et le dimanche précédents.
+
+    La première note possible reste celle du 03/09/2026,
+    qui affiche donc les faits saisis le 02/09/2026.
+  */
+
+  const WHITE_NOTE_FIRST_DATE_KEY = "2026-09-03";
+  const WHITE_NOTE_SCHOOL_YEAR_END_KEY = "2027-07-02";
+
+  /*
+    Académie de Montpellier = zone C pour l'année scolaire 2026-2027.
+
+    Une Note Blanche n'est pas générée :
+    - le samedi et le dimanche ;
+    - pendant les vacances scolaires de la zone C ;
+    - les jours fériés nationaux ;
+    - le vendredi 7 mai 2027, journée sans classe prévue au calendrier scolaire.
+
+    À la reprise, la première Note Blanche regroupe tous les faits saisis
+    depuis la dernière Note Blanche ouvrée jusqu'à la veille incluse.
+  */
+  const WHITE_NOTE_SCHOOL_BREAKS = Object.freeze([
+    /* Toussaint : reprise le 02/11/2026. */
+    ["2026-10-17", "2026-11-01"],
+
+    /* Noël : reprise le 04/01/2027. */
+    ["2026-12-19", "2027-01-03"],
+
+    /* Hiver - zone C : reprise le 22/02/2027. */
+    ["2027-02-06", "2027-02-21"],
+
+    /* Printemps - zone C : reprise le 19/04/2027. */
+    ["2027-04-03", "2027-04-18"],
+
+    /* Vacances d'été à compter du 03/07/2027. */
+    ["2027-07-03", "9999-12-31"]
+  ]);
+
+  const WHITE_NOTE_PUBLIC_HOLIDAYS = new Set([
+    "2026-11-01", /* Toussaint */
+    "2026-11-11", /* Armistice */
+    "2026-12-25", /* Noël */
+    "2027-01-01", /* Jour de l'An */
+    "2027-03-29", /* Lundi de Pâques */
+    "2027-05-01", /* Fête du Travail */
+    "2027-05-06", /* Ascension */
+    "2027-05-08", /* Victoire 1945 */
+    "2027-05-17", /* Lundi de Pentecôte */
+    "2027-07-14", /* Fête nationale */
+    "2027-08-15"  /* Assomption */
+  ]);
+
+  const WHITE_NOTE_EXTRA_CLOSED_DAYS = new Set([
+    "2027-05-07" /* Classes vaquées dans les zones A, B et C. */
+  ]);
+
+
+  function addDaysUTC(date, days) {
+
+    const result = new Date(Date.UTC(
+      date.getUTCFullYear(),
+      date.getUTCMonth(),
+      date.getUTCDate()
+    ));
+
+    result.setUTCDate(result.getUTCDate() + days);
+    return result;
+  }
+
+
+  function isDateKeyInRange(dateKey, startKey, endKey) {
+    return dateKey >= startKey && dateKey <= endKey;
+  }
+
+
+  function isWhiteNoteSchoolBreak(date) {
+    if (!date) return false;
+
+    const key = formatDateKey(date);
+
+    return WHITE_NOTE_SCHOOL_BREAKS.some(function(range) {
+      return isDateKeyInRange(key, range[0], range[1]);
+    });
+  }
+
+
+  function isWhiteNoteOperationalDay(date) {
+    if (!date) return false;
+
+    const key = formatDateKey(date);
+    const day = date.getUTCDay();
+
+    if (key < WHITE_NOTE_FIRST_DATE_KEY) return false;
+    if (key > WHITE_NOTE_SCHOOL_YEAR_END_KEY) return false;
+    if (day === 0 || day === 6) return false;
+    if (isWhiteNoteSchoolBreak(date)) return false;
+    if (WHITE_NOTE_PUBLIC_HOLIDAYS.has(key)) return false;
+    if (WHITE_NOTE_EXTRA_CLOSED_DAYS.has(key)) return false;
+
+    return true;
+  }
+
+
+  function getFactDate(record) {
+
+    if (!record || !record._dateDuFait) {
+      return null;
+    }
+
+    return parseGristDate(record._dateDuFait);
+  }
+
+
+  function isSameUTCDate(a, b) {
+
+    if (!a || !b) {
+      return false;
+    }
+
+    return formatDateKey(a) === formatDateKey(b);
+  }
+
+
+  function isWhiteNoteDayFact(record) {
+
+    const factDate = getFactDate(record);
+
+    return Boolean(
+      record &&
+      record._date &&
+      factDate &&
+      isSameUTCDate(record._date, factDate)
+    );
+  }
+
+
+  function isWhiteNoteUpdate(record) {
+
+    const factDate = getFactDate(record);
+
+    if (!record || !record._date || !factDate) {
+      return false;
+    }
+
+    return (
+      formatDateKey(factDate) !== record._dateKey &&
+      factDate.getTime() < record._date.getTime()
+    );
+  }
+
+
+  function getFactTimingLabel(record) {
+    if (isWhiteNoteDayFact(record)) {
+      return "fait du jour";
+    }
+
+    if (isWhiteNoteUpdate(record)) {
+      return "fait d\'actualisation";
+    }
+
+    return "";
+  }
+
+  function getWhiteNoteDateForRecordDate(recordDate) {
+
+    if (!recordDate) {
+      return null;
+    }
+
+    /*
+      Un fait est rattaché à la prochaine journée où une Note Blanche
+      peut réellement être produite. Cela gère d'un seul coup les
+      week-ends, vacances scolaires, jours fériés et journées fermées.
+    */
+    let candidate = addDaysUTC(recordDate, 1);
+
+    while (formatDateKey(candidate) <= WHITE_NOTE_SCHOOL_YEAR_END_KEY) {
+      if (isWhiteNoteOperationalDay(candidate)) {
+        return candidate;
+      }
+
+      candidate = addDaysUTC(candidate, 1);
+    }
+
+    return null;
+  }
+
+
+  function getPreviousWhiteNoteOperationalDay(noteDate) {
+
+    if (!noteDate) {
+      return null;
+    }
+
+    let candidate = addDaysUTC(noteDate, -1);
+
+    /*
+      Pour la toute première Note Blanche, le 03/09/2026 doit reprendre
+      uniquement les faits du 02/09/2026, même si cette date précède le
+      seuil de création des Notes Blanches.
+    */
+    const firstNoteDate = parseGristDate(WHITE_NOTE_FIRST_DATE_KEY);
+    if (firstNoteDate && isSameUTCDate(noteDate, firstNoteDate)) {
+      return candidate;
+    }
+
+    while (candidate.getUTCFullYear() >= 2026) {
+      if (isWhiteNoteOperationalDay(candidate)) {
+        return candidate;
+      }
+
+      candidate = addDaysUTC(candidate, -1);
+    }
+
+    return null;
+  }
+
+
+  function getWhiteNoteSourceDates(noteDate) {
+
+    if (!noteDate || !isWhiteNoteOperationalDay(noteDate)) {
+      return [];
+    }
+
+    const previousNoteDate = getPreviousWhiteNoteOperationalDay(noteDate);
+
+    if (!previousNoteDate) {
+      return [];
+    }
+
+    const dates = [];
+    let current = new Date(previousNoteDate.getTime());
+    const endKey = formatDateKey(addDaysUTC(noteDate, -1));
+
+    while (formatDateKey(current) <= endKey) {
+      dates.push(new Date(current.getTime()));
+      current = addDaysUTC(current, 1);
+    }
+
+    return dates;
+  }
+
+
+  function getWhiteNoteSourceDateLabel(noteDate) {
+
+    const dates = getWhiteNoteSourceDates(noteDate);
+
+    if (dates.length === 0) return "";
+
+    if (dates.length === 1) {
+      return "du " + formatLongDate(dates[0]);
+    }
+
+    return "du " + formatLongDate(dates[0]) +
+      " au " + formatLongDate(dates[dates.length - 1]);
+  }
+
+
+  function isWhiteNoteDisplayableRecord(record, department) {
+
+    /*
+      Une Note Blanche ne doit exister que si elle contient au moins
+      un FE réellement affichable dans l'un des deux tableaux.
+      Cela évite notamment de créer une note vide à partir d'une ligne
+      dont le degré n'a pas pu être identifié.
+    */
+    return Boolean(
+      record &&
+      record._date &&
+      record._departement === department &&
+      (record._degre === "1er" || record._degre === "2nd")
+    );
+  }
+
+
+  function getWhiteNoteCalendarDates(department) {
+
+    /*
+      Le sélecteur ne propose QUE les jours pour lesquels une
+      Note Blanche existe réellement dans le département choisi.
+
+      Chaque fait est rattaché à la prochaine journée de Note Blanche
+      réellement ouverte. Il n'y a donc aucune note le week-end, pendant
+      les vacances scolaires de la zone C, les jours fériés, ni le
+      vendredi 7 mai 2027.
+
+      À la reprise, une seule Note Blanche regroupe tous les faits saisis
+      depuis la dernière journée de Note Blanche jusqu'à la veille.
+    */
+    if (!department) {
+      return [];
+    }
+
+    const dates = new Map();
+
+    allRecords.forEach(function(record) {
+
+      if (!isWhiteNoteDisplayableRecord(record, department)) {
+        return;
+      }
+
+      const noteDate = getWhiteNoteDateForRecordDate(record._date);
+
+      if (!noteDate) {
+        return;
+      }
+
+      const noteKey = formatDateKey(noteDate);
+
+      if (noteKey < WHITE_NOTE_FIRST_DATE_KEY) {
+        return;
+      }
+
+      if (!dates.has(noteKey)) {
+        dates.set(noteKey, noteDate);
+      }
+    });
+
+    /*
+      Important : un fait antérieur à la période réellement couverte par
+      une note peut malgré tout être projeté vers cette date par
+      getWhiteNoteDateForRecordDate(). On vérifie donc ici qu'au moins un
+      FE du département appartient réellement aux dates sources de la note.
+      Cela empêche les Notes Blanches vides d'apparaître dans le sélecteur.
+    */
+    return Array
+      .from(dates.entries())
+      .filter(function(entry) {
+        const noteDate = entry[1];
+        const sourceDateKeys = new Set(
+          getWhiteNoteSourceDates(noteDate).map(formatDateKey)
+        );
+
+        return allRecords.some(function(record) {
+          return (
+            isWhiteNoteDisplayableRecord(record, department) &&
+            sourceDateKeys.has(record._dateKey)
+          );
+        });
+      })
+      .sort(function(a, b) {
+        return a[0].localeCompare(b[0]);
+      });
+  }
+
+
+  function getWhiteNoteDayFactDates(department) {
+
+    /*
+      La numérotation suit exactement les dates réellement présentes
+      dans le sélecteur : 1, 2, 3... sans trou.
+    */
+    return getWhiteNoteCalendarDates(department);
+  }
+
+
+  function getWhiteNoteNumber(noteKey, department) {
+
+    const dates = getWhiteNoteDayFactDates(department);
+    const index = dates.findIndex(item => item[0] === noteKey);
+
+    return index === -1 ? "" : index + 1;
+  }
+
+
+  function hasWhiteNoteForDate(noteKey, department) {
+
+    return getWhiteNoteNumber(noteKey, department) !== "";
+  }
+
+
+  function formatLongDate(date) {
+
+    if (!date) {
+      return "";
+    }
+
+    return String(date.getUTCDate()).padStart(2, "0") +
+      "/" +
+      String(date.getUTCMonth() + 1).padStart(2, "0") +
+      "/" +
+      date.getUTCFullYear();
+  }
+
+
+  function setWhiteNoteDepartment(department) {
+
+    selectedWhiteNoteDepartment = department;
+    renderWhiteNote();
+  }
+
+
+  function setWhiteNoteDate(noteDateKey) {
+
+    selectedWhiteNoteDate = noteDateKey;
+    renderWhiteNote();
+  }
+
+
+  function getWhiteNoteRecords() {
+
+    if (!selectedWhiteNoteDate || !selectedWhiteNoteDepartment) {
+      return [];
+    }
+
+    const noteDate = parseGristDate(selectedWhiteNoteDate);
+
+    if (!noteDate) {
+      return [];
+    }
+
+    const sourceDateKeys = new Set(
+      getWhiteNoteSourceDates(noteDate).map(formatDateKey)
+    );
+
+    return allRecords.filter(function(record) {
+      return (
+        isWhiteNoteDisplayableRecord(record, selectedWhiteNoteDepartment) &&
+        sourceDateKeys.has(record._dateKey)
+      );
+    });
+  }
+
+
+  function getWhiteNoteCounts(records) {
+
+    const counts = {
+      dayN2: 0,
+      dayN3: 0,
+      updateN2: 0,
+      updateN3: 0,
+      totalN2: 0,
+      totalN3: 0
+    };
+
+    records.forEach(function(record) {
+
+      if (record._niveau === "2") {
+        counts.totalN2++;
+
+        if (isWhiteNoteDayFact(record)) {
+          counts.dayN2++;
+        }
+        else if (isWhiteNoteUpdate(record)) {
+          counts.updateN2++;
+        }
+      }
+
+      if (record._niveau === "3") {
+        counts.totalN3++;
+
+        if (isWhiteNoteDayFact(record)) {
+          counts.dayN3++;
+        }
+        else if (isWhiteNoteUpdate(record)) {
+          counts.updateN3++;
+        }
+      }
+    });
+
+    return counts;
+  }
+
+
+  function renderWhiteNoteDegree(degree, label, records) {
+
+    const degreeRecords = records
+      .filter(function(record) {
+        return record._degre === degree;
+      })
+      .sort(function(a, b) {
+        /* Dans les Notes Blanches, afficher les niveaux 3 en premier. */
+        const levelA = String(a._niveau || "");
+        const levelB = String(b._niveau || "");
+
+        if (levelA === "3" && levelB !== "3") return -1;
+        if (levelB === "3" && levelA !== "3") return 1;
+        return 0;
+      });
+
+    const counts = getWhiteNoteCounts(degreeRecords);
+
+    let html = `
+      <div class="white-note-degree">
+        <div class="white-note-recap">
+          <p class="white-note-recap-title">
+            Récapitulatif des faits d'établissement du ${degree === "1er" ? "premier degré" : "second degré"}
+          </p>
+
+          <div class="white-note-stats-line">
+            <p class="white-note-counts">
+              ${counts.dayN2 <= 1 ? "Fait du jour" : "Faits du jour"} (N2) : ${formatNonZeroCount(counts.dayN2)}
+              -
+              <em>${counts.updateN2 <= 1 ? "Fait d'actualisation" : "Faits d'actualisation"} (N2) : ${formatNonZeroCount(counts.updateN2)}</em>
+            </p>
+
+            <p class="white-note-counts level-3-text">
+              ${counts.dayN3 <= 1 ? "Fait du jour" : "Faits du jour"} (N3) : ${formatNonZeroCount(counts.dayN3)}
+              -
+              <em>${counts.updateN3 <= 1 ? "Fait d'actualisation" : "Faits d'actualisation"} (N3) : ${formatNonZeroCount(counts.updateN3)}</em>
+            </p>
+
+            <p class="white-note-total">
+              Total ${counts.totalN2 <= 1 ? "fait" : "faits"} N2 : ${formatNonZeroCount(counts.totalN2)}
+              &nbsp;&nbsp; Total ${counts.totalN3 <= 1 ? "fait" : "faits"} N3 : ${formatNonZeroCount(counts.totalN3)}
+            </p>
+          </div>
+        </div>
+    `;
+
+    if (degreeRecords.length === 0) {
+
+      html += `
+        <div class="white-note-table-wrap">
+          <div class="white-note-empty">
+            Aucun fait du ${escapeHtml(label)} pour cette veille.
+          </div>
+        </div>
+      </div>
+      `;
+
+      return html;
+    }
+
+    html += `
+      <div class="white-note-table-wrap">
+        <table class="white-note-table">
+          <thead>
+            <tr>
+              <th>Niveau</th>
+              <th>Résumé</th>
+              <th>Type de fait</th>
+              <th>Etablissement</th>
+            </tr>
+          </thead>
+          <tbody>
+    `;
+
+    degreeRecords.forEach(function(record) {
+
+      const resume = formatValue(
+        record[FIELD.RESUME],
+        FIELD.RESUME
+      );
+
+      const nom = formatValue(
+        record[FIELD.ID_NOM],
+        FIELD.ID_NOM
+      );
+
+      const ville = formatValue(
+        record[FIELD.VILLE],
+        FIELD.VILLE
+      );
+
+      const nomVille = [nom, ville]
+        .filter(Boolean)
+        .join(" — ");
+
+      html += `
+        <tr>
+          <td class="level-cell">
+            ${renderLevelBadge(record._niveau)}
+          </td>
+          <td class="summary-cell" title="${escapeHtml(resume)}">
+            ${escapeHtml(resume)}${getFactTimingLabel(record) ? ` <em>(${escapeHtml(getFactTimingLabel(record))})</em>` : ""}
+          </td>
+          <td class="type-cell">
+            ${renderFactBadges(record._typeFait, record._niveau)}
+          </td>
+          <td>
+            ${escapeHtml(nomVille)}
+          </td>
+        </tr>
+      `;
+    });
+
+    html += `
+          </tbody>
+        </table>
+      </div>
+    </div>
+    `;
+
+    return html;
+  }
+
+
+  function renderWhiteNote() {
+
+    const departmentSelect =
+      document.getElementById("white-note-department");
+
+    const dateSelect =
+      document.getElementById("white-note-date");
+
+    const title =
+      document.getElementById("white-note-title");
+
+    const period =
+      document.getElementById("white-note-period");
+
+    const content =
+      document.getElementById("white-note-content");
+
+    const downloadButton =
+      document.getElementById("white-note-download");
+
+    if (
+      !departmentSelect ||
+      !dateSelect ||
+      !title ||
+      !period ||
+      !content
+    ) {
+      return;
+    }
+
+    const departments = getDepartments();
+
+    if (
+      !selectedWhiteNoteDepartment ||
+      !departments.includes(selectedWhiteNoteDepartment)
+    ) {
+      selectedWhiteNoteDepartment =
+        selectedDepartment !== "all" && departments.includes(selectedDepartment)
+          ? selectedDepartment
+          : (departments.includes("34") ? "34" : (departments[0] || ""));
+    }
+
+    const calendarDates = getWhiteNoteCalendarDates(selectedWhiteNoteDepartment);
+
+    if (
+      !selectedWhiteNoteDate ||
+      !calendarDates.some(item => item[0] === selectedWhiteNoteDate)
+    ) {
+      selectedWhiteNoteDate =
+        calendarDates.length > 0
+          ? calendarDates[calendarDates.length - 1][0]
+          : "";
+    }
+
+    departmentSelect.innerHTML = departments.length
+      ? departments.map(function(department) {
+          const selected =
+            department === selectedWhiteNoteDepartment
+              ? "selected"
+              : "";
+
+          return `
+            <option value="${escapeHtml(department)}" ${selected}>
+              ${escapeHtml(department)}
+            </option>
+          `;
+        }).join("")
+      : '<option value="">Aucun département</option>';
+
+    dateSelect.innerHTML = calendarDates.length
+      ? calendarDates.slice().reverse().map(function(item) {
+          const noteKey = item[0];
+          const noteDate = item[1];
+          const number = getWhiteNoteNumber(
+            noteKey,
+            selectedWhiteNoteDepartment
+          );
+          const selected =
+            noteKey === selectedWhiteNoteDate
+              ? "selected"
+              : "";
+
+          const prefix = number
+            ? `Note n°${number} — `
+            : "";
+
+          return `
+            <option value="${escapeHtml(noteKey)}" ${selected}>
+              ${prefix}${escapeHtml(formatLongDate(noteDate))}
+            </option>
+          `;
+        }).join("")
+      : '<option value="">Aucune date disponible</option>';
+
+    if (!selectedWhiteNoteDate || !selectedWhiteNoteDepartment) {
+
+      title.textContent = "Note Blanche";
+      period.textContent = "";
+      content.innerHTML = `
+        <div class="white-note-empty">
+          Aucune Note Blanche disponible pour ce département.
+        </div>
+      `;
+      if (downloadButton) downloadButton.disabled = true;
+      return;
+    }
+
+    const noteDate = parseGristDate(selectedWhiteNoteDate);
+    const sourceDateLabel = getWhiteNoteSourceDateLabel(noteDate);
+    const noteNumber = getWhiteNoteNumber(
+      selectedWhiteNoteDate,
+      selectedWhiteNoteDepartment
+    );
+
+    /*
+      Sécurité : ce cas ne devrait pas se produire puisque le sélecteur
+      ne contient que les dates pour lesquelles une note existe.
+    */
+    if (!noteNumber) {
+
+      title.textContent = "Note Blanche";
+      period.textContent = "";
+      content.innerHTML = `
+        <div class="white-note-empty">
+          Aucune Note Blanche disponible pour ce département.
+        </div>
+      `;
+      if (downloadButton) downloadButton.disabled = true;
+      return;
+    }
+
+    const records = getWhiteNoteRecords();
+
+    title.textContent =
+      "Note Blanche n°" +
+      noteNumber +
+      " - DSDEN." +
+      selectedWhiteNoteDepartment;
+
+    period.innerHTML =
+      escapeHtml(formatLongDate(noteDate)) +
+      " — <strong>" +
+      records.length +
+      "</strong> faits saisis " +
+      escapeHtml(sourceDateLabel);
+
+    content.innerHTML =
+      renderWhiteNoteDegree("1er", "1er degré", records) +
+      renderWhiteNoteDegree("2nd", "2nd degré", records);
+
+    if (downloadButton) downloadButton.disabled = false;
+  }
+
+
+  /*
+    Nettoyage spécifique à jsPDF.
+    Les polices standard de jsPDF (Helvetica) ne gèrent pas toujours
+    correctement certains caractères typographiques Unicode, notamment
+    les tirets insécables. On les remplace uniquement dans le PDF.
+  */
+  function cleanPdfText(value) {
+    return String(value ?? "")
+      .normalize("NFC")
+      // Tirets typographiques / insécables -> tiret ASCII
+      .replace(/[\u2010\u2011\u2012\u2013\u2014\u2212]/g, "-")
+      // Apostrophes typographiques -> apostrophe simple
+      .replace(/[\u2018\u2019\u201A\u201B]/g, "'")
+      // Guillemets typographiques -> guillemets ASCII
+      .replace(/[\u201C\u201D\u201E\u201F]/g, '"')
+      // Espaces Unicode -> espace normal
+      .replace(/[\u00A0\u1680\u2000-\u200A\u202F\u205F\u3000]/g, " ")
+      // Caractères invisibles / directionnels
+      .replace(/[\u200B-\u200F\u202A-\u202E\u2060-\u206F\uFEFF]/g, "")
+      // Tabulations et retours à la ligne
+      .replace(/[\t\r\n]+/g, " ")
+      // Espaces multiples
+      .replace(/ {2,}/g, " ")
+      .trim();
+  }
+
+
+  async function downloadSelectedWhiteNotePdf() {
+
+    const button = document.getElementById("white-note-download");
+
+    if (!selectedWhiteNoteDepartment || !selectedWhiteNoteDate) {
+      return;
+    }
+
+    /*
+      On génère désormais le PDF directement avec jsPDF au lieu de
+      transformer le HTML avec html2canvas/html2pdf. Dans un widget Grist
+      chargé dans une iframe, html2canvas peut capturer une surface vide,
+      ce qui expliquait les PDF blancs malgré un contenu visible à l'écran.
+    */
+    const JsPdfConstructor =
+      window.jspdf && window.jspdf.jsPDF
+        ? window.jspdf.jsPDF
+        : (window.jsPDF || null);
+
+    if (!JsPdfConstructor) {
+      alert("Le module PDF n'a pas pu être chargé. Vérifiez votre connexion puis réessayez.");
+      return;
+    }
+
+    const noteNumber = getWhiteNoteNumber(
+      selectedWhiteNoteDate,
+      selectedWhiteNoteDepartment
+    );
+
+    if (!noteNumber) return;
+
+    const noteDate = parseGristDate(selectedWhiteNoteDate);
+    const sourceDateLabel = getWhiteNoteSourceDateLabel(noteDate);
+    const records = getWhiteNoteRecords();
+
+    const filename =
+      "EMAS " +
+      selectedWhiteNoteDepartment +
+      "." +
+      noteNumber +
+      " année 2026-2027.pdf";
+
+    if (button) {
+      button.disabled = true;
+      button.textContent = "...";
+    }
+
+    try {
+      const doc = new JsPdfConstructor({
+        orientation: "landscape",
+        unit: "mm",
+        format: "a4"
+      });
+
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const marginX = 10;
+      const marginTop = 10;
+      const marginBottom = 14;
+      const contentWidth = pageWidth - marginX * 2;
+      const orange = [181, 71, 8];
+      const orangeBg = [255, 244, 229];
+      const orangeBorder = [253, 176, 34];
+      const grayBorder = [208, 213, 221];
+      const grayBg = [242, 244, 247];
+      const textColor = [52, 64, 84];
+      let y = marginTop;
+
+      function setNormal(size) {
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(size || 9);
+        doc.setTextColor.apply(doc, textColor);
+      }
+
+      function setBold(size) {
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(size || 9);
+        doc.setTextColor.apply(doc, textColor);
+      }
+
+      function ensureSpace(requiredHeight) {
+        if (y + requiredHeight <= pageHeight - marginBottom) return;
+        doc.addPage("a4", "landscape");
+        y = marginTop;
+      }
+
+      function drawHeader() {
+        setBold(16);
+        doc.text(
+          "Note Blanche n°" + noteNumber + " - DSDEN." + selectedWhiteNoteDepartment,
+          marginX,
+          y + 5
+        );
+        y += 9;
+
+        setNormal(9.5);
+        const periodText =
+          formatLongDate(noteDate) +
+          " - " +
+          records.length +
+          " faits saisis " +
+          sourceDateLabel;
+        doc.text(periodText, marginX, y + 3);
+        y += 9;
+      }
+
+      function drawStats(label, degreeRecords) {
+        const counts = getWhiteNoteCounts(degreeRecords);
+        ensureSpace(20);
+
+        setBold(10.5);
+        doc.text(
+          "Récapitulatif des faits d'établissement du " +
+            (label === "1er degré" ? "premier degré" : "second degré"),
+          marginX,
+          y + 4
+        );
+        y += 8;
+
+        /* Dans les statistiques PDF, seul un nombre non nul est en gras. */
+        function drawPdfStatParts(parts, startX, baselineY, color) {
+          let x = startX;
+          const activeColor = color || textColor;
+
+          parts.forEach(function(part) {
+            doc.setFont("helvetica", part.bold ? "bold" : "normal");
+            doc.setFontSize(8.8);
+            doc.setTextColor.apply(doc, activeColor);
+            doc.text(String(part.text), x, baselineY);
+            x += doc.getTextWidth(String(part.text));
+          });
+        }
+
+        function statNumber(value) {
+          return { text: String(value), bold: Number(value) !== 0 };
+        }
+
+        drawPdfStatParts([
+          { text: (counts.dayN2 <= 1 ? "Fait du jour" : "Faits du jour") + " (N2) : ", bold: false },
+          statNumber(counts.dayN2),
+          { text: " - " + (counts.updateN2 <= 1 ? "Fait d'actualisation" : "Faits d'actualisation") + " (N2) : ", bold: false },
+          statNumber(counts.updateN2)
+        ], marginX, y + 3, textColor);
+
+        drawPdfStatParts([
+          { text: (counts.dayN3 <= 1 ? "Fait du jour" : "Faits du jour") + " (N3) : ", bold: false },
+          statNumber(counts.dayN3),
+          { text: " - " + (counts.updateN3 <= 1 ? "Fait d'actualisation" : "Faits d'actualisation") + " (N3) : ", bold: false },
+          statNumber(counts.updateN3)
+        ], marginX + 92, y + 3, orange);
+
+        drawPdfStatParts([
+          { text: "Total " + (counts.totalN2 <= 1 ? "fait" : "faits") + " N2 : ", bold: false },
+          statNumber(counts.totalN2),
+          { text: "   Total " + (counts.totalN3 <= 1 ? "fait" : "faits") + " N3 : ", bold: false },
+          statNumber(counts.totalN3)
+        ], marginX + 198, y + 3, textColor);
+
+        y += 8;
+      }
+
+      const colWidths = [24, 118, 62, contentWidth - 24 - 118 - 62];
+      const headers = ["Niveau", "Résumé", "Type de fait", "Etablissement"];
+
+      function drawTableHeader() {
+        const headerHeight = 8;
+        let x = marginX;
+        doc.setFillColor(247, 248, 250);
+        doc.setDrawColor.apply(doc, grayBorder);
+        doc.setLineWidth(0.2);
+
+        headers.forEach(function(header, index) {
+          /* Tous les intitulés reprennent exactement le style de « Niveau ». */
+          doc.setFillColor(247, 248, 250);
+          doc.setDrawColor.apply(doc, grayBorder);
+          doc.rect(x, y, colWidths[index], headerHeight, "FD");
+
+          setBold(8.5);
+          doc.text(
+            header,
+            x + colWidths[index] / 2,
+            y + 5.2,
+            { align: "center" }
+          );
+          x += colWidths[index];
+        });
+        y += headerHeight;
+      }
+
+      function drawLevelBadge(level, x, rowY, rowHeight) {
+        const isN3 = String(level) === "3";
+        const badgeText = String(level || "-");
+        const badgeWidth = 10;
+        const badgeHeight = 6;
+        /* Centre le badge dans la colonne Niveau, horizontalement et verticalement. */
+        const bx = x + (colWidths[0] - badgeWidth) / 2;
+        const by = rowY + Math.max(1.3, (rowHeight - badgeHeight) / 2);
+
+        if (isN3) {
+          doc.setFillColor.apply(doc, orangeBg);
+          doc.setDrawColor.apply(doc, orangeBorder);
+          doc.setTextColor.apply(doc, orange);
+        } else {
+          doc.setFillColor.apply(doc, grayBg);
+          doc.setDrawColor.apply(doc, grayBorder);
+          doc.setTextColor.apply(doc, textColor);
+        }
+
+        doc.roundedRect(bx, by, badgeWidth, badgeHeight, 1, 1, "FD");
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(7.2);
+        doc.text(badgeText, bx + badgeWidth / 2, by + 4.1, { align: "center" });
+      }
+
+      function drawDegreeTable(degree, label) {
+        const degreeRecords = records
+          .filter(function(record) {
+            return record._degre === degree;
+          })
+          .sort(function(a, b) {
+            const levelA = String(a._niveau || "");
+            const levelB = String(b._niveau || "");
+            if (levelA === "3" && levelB !== "3") return -1;
+            if (levelB === "3" && levelA !== "3") return 1;
+            return 0;
+          });
+
+        drawStats(label, degreeRecords);
+
+        if (degreeRecords.length === 0) {
+          ensureSpace(10);
+          setNormal(9);
+          doc.text("Aucun fait du " + label + " pour cette période.", marginX, y + 4);
+          y += 10;
+          return;
+        }
+
+        ensureSpace(18);
+        drawTableHeader();
+
+        degreeRecords.forEach(function(record) {
+          const resume = formatValue(record[FIELD.RESUME], FIELD.RESUME);
+          const timing = getFactTimingLabel(record);
+          const summaryText = cleanPdfText(
+            resume + (timing ? " (" + timing + ")" : "")
+          );
+
+          const nom = formatValue(record[FIELD.ID_NOM], FIELD.ID_NOM);
+          const ville = formatValue(record[FIELD.VILLE], FIELD.VILLE);
+
+          /* PDF uniquement : retire l'identifiant établissement placé au début
+             de ID_et_Nom (ex. "0342066L - LYCEE ..."). L'identifiant peut
+             avoir une longueur variable ; on ne retire que le premier bloc
+             alphanumérique commençant par un chiffre et suivi d'un séparateur. */
+          const pdfEstablishmentName = String(nom || "").replace(
+            /^\s*[0-9][A-Z0-9]{2,20}\s*[-–—]\s*/i,
+            ""
+          ).trim();
+
+          const establishmentText = cleanPdfText(
+            [pdfEstablishmentName, ville]
+              .filter(Boolean)
+              .join(" - ")
+          );
+          /* Libellés spécifiques au PDF : pour AttPers, on affiche uniquement
+             la nature des violences (sauf AttPers seul). */
+          function getPdfFactLabel(type) {
+            const labels = {
+              "AttPers": "Atteintes aux personnes",
+              "AttPers: VP": "Violences physiques",
+              "AttPers: VS": "Violences sexuelles",
+              "AttPers: VV": "Violences verbales",
+              "AttPers: VP + VS": "Violences physiques et sexuelles",
+              "AttPers: VP + VV": "Violences physiques et verbales",
+              "AttPers: VS + VV": "Violences sexuelles et verbales",
+              "AttPers: VP + VS + VV": "Violences physiques, sexuelles et verbales"
+            };
+
+            return labels[type] || getFullFactLabel(type);
+          }
+
+          const typeText = cleanPdfText(
+            Array.isArray(record._typeFait)
+              ? record._typeFait.map(function(type) {
+                  return getPdfFactLabel(type);
+                }).join(" & ")
+              : ""
+          );
+
+          setNormal(7.8);
+          const summaryLines = doc.splitTextToSize(summaryText, colWidths[1] - 4);
+          const typeLines = doc.splitTextToSize(typeText || "-", colWidths[2] - 4);
+          const establishmentLines = doc.splitTextToSize(establishmentText || "-", colWidths[3] - 4);
+          const maxLines = Math.max(
+            1,
+            summaryLines.length,
+            typeLines.length,
+            establishmentLines.length
+          );
+          const rowHeight = Math.max(9, maxLines * 4.1 + 4);
+
+          if (y + rowHeight > pageHeight - marginBottom) {
+            doc.addPage("a4", "landscape");
+            y = marginTop;
+            drawTableHeader();
+          }
+
+          const rowY = y;
+          let x = marginX;
+          doc.setDrawColor.apply(doc, grayBorder);
+          doc.setLineWidth(0.2);
+
+          colWidths.forEach(function(width) {
+            doc.rect(x, rowY, width, rowHeight);
+            x += width;
+          });
+
+          drawLevelBadge(record._niveau, marginX, rowY, rowHeight);
+
+          setNormal(7.8);
+          doc.text(summaryLines, marginX + colWidths[0] + 2, rowY + 5);
+
+          /* Type de fait : poids normal ; le niveau 3 conserve l'orange. */
+          doc.setFont("helvetica", "normal");
+          doc.setFontSize(7.8);
+          if (String(record._niveau || "") === "3") {
+            doc.setTextColor.apply(doc, orange);
+          } else {
+            doc.setTextColor.apply(doc, textColor);
+          }
+          doc.text(
+            typeLines,
+            marginX + colWidths[0] + colWidths[1] + 2,
+            rowY + 5
+          );
+
+          /* Etablissement : poids et couleur normaux. */
+          doc.setFont("helvetica", "normal");
+          doc.setFontSize(7.8);
+          doc.setTextColor.apply(doc, textColor);
+          doc.text(
+            establishmentLines,
+            marginX + colWidths[0] + colWidths[1] + colWidths[2] + 2,
+            rowY + 5
+          );
+
+          y += rowHeight;
+        });
+
+        y += 7;
+      }
+
+      drawHeader();
+      drawDegreeTable("1er", "1er degré");
+      drawDegreeTable("2nd", "2nd degré");
+
+      /* Pied de page discret sur chaque page du PDF. */
+      const totalPdfPages = doc.getNumberOfPages();
+      for (let pageIndex = 1; pageIndex <= totalPdfPages; pageIndex += 1) {
+        doc.setPage(pageIndex);
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(6.8);
+        doc.setTextColor(128, 128, 128);
+
+        doc.text(
+          "Page " + pageIndex + " / " + totalPdfPages,
+          pageWidth / 2,
+          pageHeight - 5,
+          { align: "center" }
+        );
+      }
+
+      doc.save(filename);
+    } catch (error) {
+      console.error("Erreur lors de la génération de la Note Blanche en PDF :", error);
+      alert("Impossible de générer le PDF pour le moment.");
+    } finally {
+      if (button) {
+        button.disabled = false;
+        button.textContent = "PDF";
+      }
+    }
+  }
+
+
+
+  /*
+    ==================================================
+    PAGINATION
+    ==================================================
+  */
+
+  function renderPagination(records) {
+
+    const pagination =
+      document.getElementById("pagination");
+
+    const totalRecords =
+      records.length;
+
+    if (totalRecords === 0) {
+
+      pagination.innerHTML = `
+        <div class="pagination-info">
+          0 fait
+        </div>
+      `;
+
+      return;
+    }
+
+    const totalPages = Math.max(
+      1,
+      Math.ceil(totalRecords / PAGE_SIZE)
+    );
+
+    if (currentPage > totalPages) {
+      currentPage = totalPages;
+    }
+
+    const firstRow =
+      ((currentPage - 1) * PAGE_SIZE) + 1;
+
+    const lastRow = Math.min(
+      currentPage * PAGE_SIZE,
+      totalRecords
+    );
+
+    let buttons = "";
+    let ellipsisBefore = false;
+    let ellipsisAfter = false;
+
+    for (
+      let page = 1;
+      page <= totalPages;
+      page++
+    ) {
+
+      const closeToCurrent =
+        Math.abs(page - currentPage) <= 2;
+
+      const edgePage =
+        page === 1 ||
+        page === totalPages;
+
+      if (closeToCurrent || edgePage) {
+
+        buttons += `
+          <button
+            type="button"
+            class="page-btn ${
+              page === currentPage
+                ? "active"
+                : ""
+            }"
+            onclick="goToPage(${page})"
+          >
+            ${page}
+          </button>
+        `;
+
+        continue;
+      }
+
+      if (
+        page < currentPage &&
+        !ellipsisBefore
+      ) {
+
+        buttons += `
+          <span class="pagination-info">…</span>
+        `;
+
+        ellipsisBefore = true;
+      }
+
+      if (
+        page > currentPage &&
+        !ellipsisAfter
+      ) {
+
+        buttons += `
+          <span class="pagination-info">…</span>
+        `;
+
+        ellipsisAfter = true;
+      }
+    }
+
+    pagination.innerHTML = `
+      <div class="pagination-controls">
+
+        <button
+          type="button"
+          class="page-btn"
+          onclick="goToPage(${currentPage - 1})"
+          ${
+            currentPage === 1
+              ? "disabled"
+              : ""
+          }
+        >
+          ← Précédent
+        </button>
+
+        ${buttons}
+
+        <button
+          type="button"
+          class="page-btn"
+          onclick="goToPage(${currentPage + 1})"
+          ${
+            currentPage === totalPages
+              ? "disabled"
+              : ""
+          }
+        >
+          Suivant →
+        </button>
+
+      </div>
+
+      <div class="pagination-info">
+        ${firstRow}–${lastRow}
+        sur
+        ${totalRecords}
+        faits
+      </div>
+    `;
+  }
+
+
+  /*
+    ==================================================
+    CHANGEMENT PAGE
+    ==================================================
+  */
+
+  function goToPage(page) {
+
+    const filteredRecords =
+      getFilteredRecords();
+
+    const totalPages = Math.max(
+      1,
+      Math.ceil(
+        filteredRecords.length / PAGE_SIZE
+      )
+    );
+
+    if (
+      page < 1 ||
+      page > totalPages
+    ) {
+      return;
+    }
+
+    currentPage = page;
+
+    renderTable();
+
+    const table =
+      document.getElementById("table1");
+
+    if (table) {
+      table.scrollTop = 0;
+      table.scrollLeft = 0;
+    }
+  }
+
+
+  /*
+    ==================================================
+    FORMAT DES VALEURS
+    ==================================================
+  */
+
+  function formatValue(
+    value,
+    columnId = ""
+  ) {
+
+    if (
+      value === null ||
+      value === undefined ||
+      value === ""
+    ) {
+      return "";
+    }
+
+    /*
+      Numéro FE
+    */
+    if (columnId === FIELD.NUMERO_FE) {
+
+      const numero =
+        getNumeroFE(value);
+
+      return numero
+        ? String(numero)
+        : String(value);
+    }
+
+    /*
+      Listes Grist
+    */
+    if (Array.isArray(value)) {
+
+      if (value[0] === "L") {
+        return value
+          .slice(1)
+          .join(", ");
+      }
+
+      return value.join(", ");
+    }
+
+    /*
+      Objet
+    */
+    if (typeof value === "object") {
+
+      try {
+        return JSON.stringify(value);
+      }
+
+      catch {
+        return String(value);
+      }
+    }
+
+    return String(value);
+  }
+
+
+  /*
+    ==================================================
+    PROTECTION HTML
+    ==================================================
+  */
+
+  function escapeHtml(value) {
+
+    return String(
+      value === null || value === undefined
+        ? ""
+        : value
+    )
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+  }
+
+
+  /*
+    Protection minimale si une valeur est injectée
+    dans un onclick entre apostrophes.
+  */
+
+  function escapeJsString(value) {
+
+    return String(value)
+      .replaceAll("\\", "\\\\")
+      .replaceAll("'", "\\'");
+  }
+
+
+  loadDocumentationData();
+
+</script>
+
+</body>
+
+</html>
