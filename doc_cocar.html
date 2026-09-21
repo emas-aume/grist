@@ -5657,18 +5657,49 @@ function n3Date(record){
   return d ? formatDateFR(d) : String(raw || "");
 }
 
+function risLevel(record){
+  return normalizeLevel(record?._niveau || record?.Niveau || record?.[FIELD.NIVEAU]);
+}
+
+function risWeekInfo(record){
+  const date = record?._date instanceof Date
+    ? record._date
+    : parseGristDate(record?.Date_de_saisie || record?.[FIELD.DATE_SAISIE]);
+
+  return date ? getISOWeekInfo(date) : null;
+}
+
+function risDepartment(record){
+  return String(
+    record?._departement ||
+    normalizeDepartment(
+      record?.Departement || record?.[FIELD.DEPARTEMENT],
+      record?.UAI || record?.[FIELD.UAI]
+    ) ||
+    ""
+  );
+}
+
+function risDegree(record){
+  return normalizeDegree(
+    record?._degre || record?.Degre || record?.[FIELD.DEGRE]
+  );
+}
+
 function getRisWeeks(){
   const map = new Map();
 
   for(const r of (allRecords || [])){
-    if(String(r._niveau || r.Niveau || "").trim() !== "3") continue;
-    if(!r._weekKey) continue;
+    if(risLevel(r) !== "3") continue;
 
-    if(!map.has(r._weekKey)){
-      map.set(r._weekKey,{
-        key: r._weekKey,
-        year: r._weekYear || "",
-        week: Number(r._weekNumber || String(r._weekKey).match(/(\d+)$/)?.[1] || 0)
+    const info = risWeekInfo(r);
+    if(!info?.key) continue;
+
+    if(!map.has(info.key)){
+      map.set(info.key,{
+        key: info.key,
+        year: info.year,
+        week: Number(info.week || 0)
       });
     }
   }
@@ -5685,15 +5716,24 @@ function ensureRisWeekSelector(){
   const weeks = getRisWeeks();
   const previous = select.value;
 
+  if(!weeks.length){
+    select.innerHTML = '<option value="">Aucune semaine</option>';
+    select.disabled = true;
+    return "";
+  }
+
+  select.disabled = false;
   select.innerHTML = weeks.map(w =>
     `<option value="${escapeN3(w.key)}">S${w.week} — ${w.year}</option>`
   ).join("");
 
   if(previous && weeks.some(w => w.key === previous)){
     select.value = previous;
+  } else {
+    select.value = weeks[0].key;
   }
 
-  return select.value || (weeks[0]?.key || "");
+  return select.value;
 }
 
 function renderPreparationRIS(){
@@ -5703,12 +5743,17 @@ function renderPreparationRIS(){
   const select = document.getElementById("risWeekSelect");
   let risSelectedWeek = select?.value || ensureRisWeekSelector();
 
-  let rows = (allRecords || []).filter(
-    r => String(r._niveau || r.Niveau || "").trim() === "3"
-  );
+  let rows = (allRecords || []).filter(r => risLevel(r) === "3");
+
+  if(!rows.length){
+    const title = document.getElementById("risTitle");
+    if(title) title.textContent = "Préparation RIS";
+    host.innerHTML = '<div class="n3-empty">Aucun fait de niveau 3 disponible dans FElignes.</div>';
+    return;
+  }
 
   if(risSelectedWeek){
-    rows = rows.filter(r => r._weekKey === risSelectedWeek);
+    rows = rows.filter(r => risWeekInfo(r)?.key === risSelectedWeek);
   }
 
   const selectedInfo = getRisWeeks().find(w => w.key === risSelectedWeek);
@@ -5731,7 +5776,7 @@ function renderPreparationRIS(){
   let output = "";
 
   for(const [code,label] of order){
-    const deptRows = rows.filter(r => String(r._departement || "") === code);
+    const deptRows = rows.filter(r => risDepartment(r) === code);
 
     output += `<div class="n3-dept">${label}</div>`;
 
@@ -5739,14 +5784,10 @@ function renderPreparationRIS(){
       output += `<div class="n3-degree">${degree} degré</div>`;
 
       const degreeRows = deptRows
-        .filter(r =>
-          String(r._degre || "").toLowerCase().startsWith(
-            degree === "1er" ? "1" : "2"
-          )
-        )
+        .filter(r => risDegree(r) === degree)
         .sort((a,b) => {
-          const da = parseGristDate(a.Date_du_fait || a.Date_de_saisie)?.getTime() || 0;
-          const db = parseGristDate(b.Date_du_fait || b.Date_de_saisie)?.getTime() || 0;
+          const da = parseGristDate(a.Date_du_fait || a[FIELD.DATE_FAIT] || a.Date_de_saisie || a[FIELD.DATE_SAISIE])?.getTime() || 0;
+          const db = parseGristDate(b.Date_du_fait || b[FIELD.DATE_FAIT] || b.Date_de_saisie || b[FIELD.DATE_SAISIE])?.getTime() || 0;
           return db - da;
         });
 
