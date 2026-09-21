@@ -163,8 +163,9 @@ function sourceStatus(f){
   const raw=String(f?.Statut||"").trim();
   if(!raw)return "Non attribué";
   const n=norm(raw);
+  if(n.includes("non attrib")||n==="n/a"||n==="na")return "Non attribué";
   if(n.includes("termine")||n.includes("cloture"))return "Terminé";
-  if(n.includes("cours")||n.includes("attrib"))return "En cours";
+  if(n.includes("en cours"))return "En cours";
   return raw;
 }
 function statusOf(f){
