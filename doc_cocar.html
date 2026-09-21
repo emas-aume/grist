@@ -909,7 +909,7 @@
 
     <p class="muted">
       Cette page est indépendante du centre opérationnel et lit directement
-      la table normalisée FE26_27 afin de limiter le temps de chargement.
+      la table normalisée FElignes afin de limiter le temps de chargement.
     </p>
 
   </section>
@@ -1095,7 +1095,7 @@
 
     <div id="white-note-content">
       <div class="white-note-empty">
-        Les Notes Blanches seront disponibles dès réception des données FE26_27.
+        Les Notes Blanches seront disponibles dès réception des données FElignes.
       </div>
     </div>
 
@@ -1130,7 +1130,7 @@
     </div>
 
     <div id="brq-content">
-      <div class="brq-empty">Les BRQ seront disponibles dès réception des données FE26_27.</div>
+      <div class="brq-empty">Les BRQ seront disponibles dès réception des données FElignes.</div>
     </div>
 
   </section>
@@ -1237,11 +1237,11 @@
     CHARGEMENT OPTIMISÉ DE LA DOCUMENTATION
     ==================================================
 
-    La page lit directement FE26_27. Elle ne dépend pas de la table
+    La page lit directement FElignes. Elle ne dépend pas de la table
     à laquelle le widget est lié et ne charge pas FE25_26 au démarrage.
   */
 
-  const DATA_TABLE = "FE26_27";
+  const DATA_TABLE = "FElignes";
   let dataLoadStarted = false;
 
   function gristTableToRows(table) {
@@ -1284,7 +1284,7 @@
   async function loadDocumentationData() {
     if (dataLoadStarted) return;
     dataLoadStarted = true;
-    showDiagnostic("Connexion à FE26_27…", "");
+    showDiagnostic("Connexion à FElignes…", "");
 
     try {
       const table = await grist.docApi.fetchTable(DATA_TABLE);
@@ -1356,7 +1356,7 @@
 
       showDiagnostic(
         "Connexion réussie : " + allRecords.length +
-        " faits chargés depuis FE26_27.",
+        " faits chargés depuis FElignes.",
         "ok"
       );
     }
@@ -1364,7 +1364,7 @@
       console.error(error);
       dataLoadStarted = false;
       showDiagnostic(
-        "Erreur de chargement de FE26_27 : " +
+        "Erreur de chargement de FElignes : " +
         (error && error.message ? error.message : String(error)),
         "error"
       );
