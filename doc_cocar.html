@@ -887,7 +887,18 @@
     }
 
 
-  </style>
+  
+    /* PRÉPARATION RIS */
+    .niveau3-content { margin-top: 8px; }
+    .n3-dept { margin: 28px 0 12px; font-size: 18px; font-weight: 800; }
+    .n3-degree { margin: 20px 0 12px; font-size: 16px; font-weight: 800; }
+    .n3-fact { padding: 0 0 20px; margin: 0 0 20px; border-bottom: 1px solid var(--line); }
+    .n3-fact:last-child { border-bottom: 0; }
+    .n3-fact h3 { margin: 0 0 10px; font-size: 15px; line-height: 1.45; }
+    .n3-fact p { margin: 7px 0; line-height: 1.55; white-space: pre-wrap; }
+    .n3-empty { color: var(--muted); margin: 8px 0 18px; font-style: italic; }
+
+</style>
 
 </head>
 
@@ -1136,6 +1147,30 @@
   </section>
 
 
+
+  <!-- PRÉPARATION RIS -->
+  <section class="section" id="niveau3View">
+
+    <div class="brq-header">
+      <div>
+        <h2 id="risTitle" class="brq-title">Préparation RIS</h2>
+        <p class="brq-source-period">Vue hebdomadaire des faits d’établissement de niveau 3 pour la préparation du RIS.</p>
+      </div>
+
+      <div class="brq-controls">
+        <div class="brq-control">
+          <label for="risWeekSelect">Semaine</label>
+          <div class="brq-period-row">
+            <select id="risWeekSelect" class="brq-select" onchange="renderPreparationRIS()"></select>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="niveau3Content" class="niveau3-content"></div>
+
+  </section>
+
 </div>
 
 
@@ -1353,6 +1388,8 @@
       renderTable();
       renderWhiteNote();
       renderBRQ();
+      ensureRisWeekSelector();
+      renderPreparationRIS();
 
       showDiagnostic(
         "Connexion réussie : " + allRecords.length +
@@ -5596,6 +5633,150 @@
       .replaceAll("\\", "\\\\")
       .replaceAll("'", "\\'");
   }
+
+
+
+function escapeN3(value){
+  return String(value ?? "")
+    .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+    .replace(/"/g,"&quot;").replace(/'/g,"&#039;");
+}
+
+function n3Field(record, names){
+  for(const name of names){
+    if(record[name] !== undefined && record[name] !== null && String(record[name]).trim() !== ""){
+      return String(record[name]).trim();
+    }
+  }
+  return "";
+}
+
+function n3Date(record){
+  const raw = record.Date_du_fait || record._dateDuFait || record.Date_de_saisie || "";
+  const d = parseGristDate(raw);
+  return d ? formatDateFR(d) : String(raw || "");
+}
+
+function getRisWeeks(){
+  const map = new Map();
+
+  for(const r of (allRecords || [])){
+    if(String(r._niveau || r.Niveau || "").trim() !== "3") continue;
+    if(!r._weekKey) continue;
+
+    if(!map.has(r._weekKey)){
+      map.set(r._weekKey,{
+        key: r._weekKey,
+        year: r._weekYear || "",
+        week: Number(r._weekNumber || String(r._weekKey).match(/(\d+)$/)?.[1] || 0)
+      });
+    }
+  }
+
+  return [...map.values()].sort((a,b) =>
+    Number(b.year) - Number(a.year) || Number(b.week) - Number(a.week)
+  );
+}
+
+function ensureRisWeekSelector(){
+  const select = document.getElementById("risWeekSelect");
+  if(!select) return "";
+
+  const weeks = getRisWeeks();
+  const previous = select.value;
+
+  select.innerHTML = weeks.map(w =>
+    `<option value="${escapeN3(w.key)}">S${w.week} — ${w.year}</option>`
+  ).join("");
+
+  if(previous && weeks.some(w => w.key === previous)){
+    select.value = previous;
+  }
+
+  return select.value || (weeks[0]?.key || "");
+}
+
+function renderPreparationRIS(){
+  const host = document.getElementById("niveau3Content");
+  if(!host) return;
+
+  const select = document.getElementById("risWeekSelect");
+  let risSelectedWeek = select?.value || ensureRisWeekSelector();
+
+  let rows = (allRecords || []).filter(
+    r => String(r._niveau || r.Niveau || "").trim() === "3"
+  );
+
+  if(risSelectedWeek){
+    rows = rows.filter(r => r._weekKey === risSelectedWeek);
+  }
+
+  const selectedInfo = getRisWeeks().find(w => w.key === risSelectedWeek);
+  const title = document.getElementById("risTitle");
+
+  if(title){
+    title.textContent = selectedInfo
+      ? `Préparation RIS S${selectedInfo.week}`
+      : "Préparation RIS";
+  }
+
+  const order = [
+    ["48","LOZÈRE"],
+    ["30","GARD"],
+    ["34","HÉRAULT"],
+    ["11","AUDE"],
+    ["66","PYRÉNÉES-ORIENTALES"]
+  ];
+
+  let output = "";
+
+  for(const [code,label] of order){
+    const deptRows = rows.filter(r => String(r._departement || "") === code);
+
+    output += `<div class="n3-dept">${label}</div>`;
+
+    for(const degree of ["1er","2nd"]){
+      output += `<div class="n3-degree">${degree} degré</div>`;
+
+      const degreeRows = deptRows
+        .filter(r =>
+          String(r._degre || "").toLowerCase().startsWith(
+            degree === "1er" ? "1" : "2"
+          )
+        )
+        .sort((a,b) => {
+          const da = parseGristDate(a.Date_du_fait || a.Date_de_saisie)?.getTime() || 0;
+          const db = parseGristDate(b.Date_du_fait || b.Date_de_saisie)?.getTime() || 0;
+          return db - da;
+        });
+
+      if(!degreeRows.length){
+        output += `<div class="n3-empty">Aucun fait de niveau 3.</div>`;
+        continue;
+      }
+
+      for(const r of degreeRows){
+        const etab = n3Field(r,["Etablissement"]) || "Établissement non renseigné";
+        const ville = n3Field(r,["Ville"]) || "Ville non renseignée";
+        const numero = n3Field(r,["Numero_FE"]) || "";
+        const fait = n3Field(r,["Resume_du_fait","Résumé_du_fait","Resume"]);
+        const suite = n3Field(r,["Suivi_etablissement","Suite_etablissement"]);
+        const emas = n3Field(r,["Accompagnement_EMAS","Traitement_EMAS","Traitement_emas"]);
+
+        output += `
+          <article class="n3-fact">
+            <h3>${escapeN3(etab)} – ${escapeN3(ville)} – ${escapeN3(n3Date(r))} – FE n°${escapeN3(numero)}</h3>
+            <p><strong>Fait :</strong> ${escapeN3(fait || "Non renseigné")}</p>
+            <p><strong>Suite établissement :</strong> ${escapeN3(suite || "Non renseignée")}</p>
+            <p><strong>Traitement EMAS :</strong> ${escapeN3(emas || "Non renseigné")}</p>
+          </article>`;
+      }
+    }
+  }
+
+  host.innerHTML = output ||
+    '<div class="n3-empty">Aucun fait de niveau 3 pour cette semaine.</div>';
+}
 
 
   loadDocumentationData();
