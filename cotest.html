@@ -87,7 +87,7 @@ select{background-color:#fff!important;color-scheme:light!important;}
 </section>
 </main>
 <div id="appModal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="appModalTitle"><div id="appModalBox" class="modal-box"><div id="appModalTitle" class="modal-title"></div><div id="appModalMessage" class="modal-message"></div><div id="appModalActions" class="modal-actions"></div></div></div>
-<!-- CO-EMAS V27 — fallback FE26_27 vers SUIVI pour statut/équipier/suivi -->
+<!-- CO-EMAS V28 — reset conservant une ligne SUIVI pour bloquer le fallback FE26_27 -->
 <script>
 "use strict";
 const T={CUR:"FE26_27_2",OLD:"FE25_26",SUIVI:"SUIVI_FE26_27",EQ:"EQUIPIERS",ETAB:"ETABLISSEMENTS",ACT_D1:"ACTIVITE_D1_EMS34_48",ACT_D2:"ACTIVITE_D2_EMS34_48"};
@@ -497,15 +497,21 @@ async function removeActivityForFact(f){
 async function resetFollowup(){
   if(!selected||selected._source===T.OLD)return;
   const numero=Number(selected.Numero_FE);
-  const ok=await showModal({title:"Remettre le suivi à zéro ?",message:`Le suivi du FE ${numero} sera supprimé de SUIVI_FE26_27 et sa ligne sera retirée du tableau Activité D1/D2.\n\nLe fait d’établissement d’origine ne sera pas supprimé.`,type:"error",confirmText:"Remettre à zéro",cancelText:"Annuler"});
+  const ok=await showModal({title:"Remettre le suivi à zéro ?",message:`Le suivi du FE ${numero} sera remis à zéro dans SUIVI_FE26_27 et sa ligne sera retirée du tableau Activité D1/D2.\n\nLe fait d’établissement d’origine ne sera pas modifié.`,type:"error",confirmText:"Remettre à zéro",cancelText:"Annuler"});
   if(!ok)return;
   const btn=$("resetFollowup");btn.disabled=true;$("save").disabled=true;$("toggleDone").disabled=true;
   try{
     const suivis=await api(T.SUIVI,{filter:{Numero_FE:[numero]},limit:50});
-    if(suivis.length)await grist.docApi.applyUserActions(suivis.map(r=>["RemoveRecord",T.SUIVI,r.id]));
-    let removedActivity=0;try{removedActivity=await removeActivityForFact(selected)}catch(e){await showModal({title:"Réinitialisation partielle",message:`Le suivi a été supprimé, mais la ligne Activité n'a pas pu être retirée : ${e.message}`,type:"error"})}
-    selectedSuivi=null;suiviMap.delete(numero);renderOps();$("detailStatus").innerHTML=badgeStatus("Non attribué");render();
-    await showModal({title:"Suivi remis à zéro",message:`Le FE ${numero} est de nouveau non attribué.${removedActivity?" La ligne Activité a également été supprimée.":""}`,type:"success"});
+    if(suivis.length>1)throw new Error(`Doublon SUIVI détecté pour le FE ${numero}. Réinitialisation bloquée.`);
+    const resetFields={Equipier:null,Statut:"Non attribué",Suivi_etablissement:"",Accompagnement_EMAS:"",Notes_informations:"",Eleve_suivi:"",Securisation:gristChoiceList([]),Prevention:gristChoiceList([]),Accompagnement:gristChoiceList([]),Formation:gristChoiceList([]),Representation_Partenariat:gristChoiceList([]),Date_traitement_EMS:null,Derniere_modification:Math.floor(Date.now()/1000)};
+    if(suivis.length)await grist.docApi.applyUserActions([["UpdateRecord",T.SUIVI,suivis[0].id,resetFields]]);
+    else await grist.docApi.applyUserActions([["AddRecord",T.SUIVI,null,{Numero_FE:numero,...resetFields}]]);
+    let removedActivity=0;
+    try{removedActivity=await removeActivityForFact(selected)}
+    catch(e){await showModal({title:"Réinitialisation partielle",message:`Le suivi a été remis à zéro, mais la ligne Activité n'a pas pu être retirée : ${e.message}`,type:"error"})}
+    await loadSingleSuivi(selected);
+    renderOps();$("detailStatus").innerHTML=badgeStatus("Non attribué");render();
+    await showModal({title:"Suivi remis à zéro",message:`Le FE ${numero} est de nouveau non attribué. La ligne SUIVI est conservée afin d'empêcher le retour des anciennes données de FE26_27.${removedActivity?" La ligne Activité a également été supprimée.":""}`,type:"success"});
   }catch(e){await showModal({title:"Réinitialisation impossible",message:e.message,type:"error"})}
   finally{btn.disabled=false;$("save").disabled=false;$("toggleDone").disabled=false}
 }
