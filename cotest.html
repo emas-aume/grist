@@ -1,5 +1,6 @@
 
 
+
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -65,7 +66,7 @@ select{background-color:#fff!important;color-scheme:light!important;}
  <div id="opsCard" class="card"><div class="sectiontitle"><h2>Suivi opérationnel</h2><span id="saveMeta" class="muted"></span></div>
   <div class="editgrid">
    <div class="field"><label>Équipier</label><select id="equipier"></select></div>
-   <div class="field"><label>Statut</label><select id="editStatus"><option>Non attribué</option><option>En cours</option><option>Terminé</option></select></div>
+   <div class="field"><label>Statut</label><select id="editStatus"><option>Non attribué</option><option>En cours</option></select></div>
    <div class="field"><label>Suivi établissement</label><textarea id="suivi"></textarea></div>
    <div class="field"><label>Traitement / accompagnement EMAS</label><textarea id="emas"></textarea></div>
    <div class="field span2"><label>Notes et informations internes</label><textarea id="notes"></textarea></div>
@@ -90,7 +91,7 @@ select{background-color:#fff!important;color-scheme:light!important;}
 </section>
 </main>
 <div id="appModal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="appModalTitle"><div id="appModalBox" class="modal-box"><div id="appModalTitle" class="modal-title"></div><div id="appModalMessage" class="modal-message"></div><div id="appModalActions" class="modal-actions"></div></div></div>
-<!-- CO-EMAS V36 — badges origine, suivi source, filtre équipier, navigation établissement -->
+<!-- CO-EMAS V37 — hardening ACL, fallback SUIVI, archives -->
 <script>
 "use strict";
 const T={CUR:"FE26_27_2",OLD:"FE25_26",OLD2:"FE24_25",SUIVI:"SUIVI_FE26_27",EQ:"EQUIPIERS",ETAB:"ETABLISSEMENTS",ACT_D1:"ACTIVITE_D1_EMS34_48",ACT_D2:"ACTIVITE_D2_EMS34_48",SUIVI_ETAB:"SUIVI_ETABLISSEMENTS"};
@@ -387,7 +388,7 @@ function filtered(){
     if(status!=="all"&&st!==status)return false;
 
     if(equipier!=="all"){
-      const effectiveRef=su?.Equipier??equipierRef(f.Equipier);
+      const effectiveRef=su ? su.Equipier : equipierRef(f.Equipier);
        const ref=effectiveRef?String(effectiveRef):"";
       if(equipier==="unassigned"){if(ref)return false}
       else if(ref!==equipier)return false;
@@ -405,7 +406,7 @@ function filtered(){
     return true;
   });
 }
-function render(){let a=filtered(),pages=Math.max(1,Math.ceil(a.length/PAGE));page=Math.min(page,pages);let slice=a.slice((page-1)*PAGE,page*PAGE);$("body").innerHTML=slice.length?slice.map(f=>{let su=suiviMap.get(Number(f.Numero_FE));let eq=isArchivedFact(f)?(f.Equipier||"N/A"):eqName(su?.Equipier??f.Equipier);return `<tr><td>${dateFR(f.Date_de_saisie)}</td><td><span class="badge ${String(f.Niveau)==="3"?"b3":""}">${esc(f.Niveau||"—")}</span></td><td>${factTypeBadges(f.Types_de_fait,f.Niveau)}</td><td><button class="etab-link" data-etab-from-fe="${f._source}:${f.id}">${esc(f.Etablissement||"—")}</button></td><td>${esc(f.Ville||"—")}</td><td>${esc(f.Departement||"—")}</td><td>${badgeStatus(statusOf(f))}</td><td>${equipierBadge(eq)}</td><td>${esc(f.Numero_FE)}</td><td><button class="btn open-btn" data-open="${f._source}:${f.id}">Ouvrir</button></td></tr>`}).join(""):'<tr><td colspan="10" class="loading">Aucun résultat.</td></tr>';document.querySelectorAll("[data-open]").forEach(b=>b.onclick=()=>openFact(b.dataset.open));document.querySelectorAll("[data-etab-from-fe]").forEach(b=>b.onclick=()=>openEstablishmentFromFact(b.dataset.etabFromFe));$("count").textContent=a.length+" résultat(s) dans les données actuellement chargées";$("pageInfo").textContent=`Page ${page} / ${pages}`;$("prev").disabled=page<=1;$("next").disabled=page>=pages}
+function render(){let a=filtered(),pages=Math.max(1,Math.ceil(a.length/PAGE));page=Math.min(page,pages);let slice=a.slice((page-1)*PAGE,page*PAGE);$("body").innerHTML=slice.length?slice.map(f=>{let su=suiviMap.get(Number(f.Numero_FE));let eq=isArchivedFact(f)?(f.Equipier||"N/A"):eqName(su ? su.Equipier : f.Equipier);return `<tr><td>${dateFR(f.Date_de_saisie)}</td><td><span class="badge ${String(f.Niveau)==="3"?"b3":""}">${esc(f.Niveau||"—")}</span></td><td>${factTypeBadges(f.Types_de_fait,f.Niveau)}</td><td><button class="etab-link" data-etab-from-fe="${f._source}:${f.id}">${esc(f.Etablissement||"—")}</button></td><td>${esc(f.Ville||"—")}</td><td>${esc(f.Departement||"—")}</td><td>${badgeStatus(statusOf(f))}</td><td>${equipierBadge(eq)}</td><td>${esc(f.Numero_FE)}</td><td><button class="btn open-btn" data-open="${f._source}:${f.id}">Ouvrir</button></td></tr>`}).join(""):'<tr><td colspan="10" class="loading">Aucun résultat.</td></tr>';document.querySelectorAll("[data-open]").forEach(b=>b.onclick=()=>openFact(b.dataset.open));document.querySelectorAll("[data-etab-from-fe]").forEach(b=>b.onclick=()=>openEstablishmentFromFact(b.dataset.etabFromFe));$("count").textContent=a.length+" résultat(s) dans les données actuellement chargées";$("pageInfo").textContent=`Page ${page} / ${pages}`;$("prev").disabled=page<=1;$("next").disabled=page>=pages}
 function openEstablishmentFromFact(key){etabReturnTarget="detail";let [source,id]=key.split(":");let f=rows.find(x=>x._source===source&&x.id===Number(id));if(!f)return;selected=f;let ref=Number(f.UAI);let e=etabMap.get(ref);if(!e){notice("Établissement introuvable dans ETABLISSEMENTS.","error");return}selectedEtab=e;$("listView").classList.add("hidden");$("detailView").classList.add("hidden");openEstablishment(e,ref)}
 function info(label,val,cls=""){return `<div class="info ${cls}"><span class="label">${esc(label)}</span><div class="value">${esc(val||"—")}</div></div>`}
 async function openFact(key){let [source,id]=key.split(":");selected=rows.find(x=>x._source===source&&x.id===Number(id));if(!selected){let got=await api(source,{filter:{Numero_FE:[Number(key)]},limit:1});selected=got[0]}if(!selected)return;$("listView").classList.add("hidden");$("etabView").classList.add("hidden");$("detailView").classList.remove("hidden");const origin=factOriginLabel(selected);const detailLevel=displayLevel(selected.Niveau);$("title").innerHTML=`FE n°${esc(selected.Numero_FE)} — <span class="${detailLevel==="3"?"event-level3":""}">Niveau ${esc(detailLevel)}</span>${origin?` <span class="fact-origin-badge ${origin.cls}">${esc(origin.label)}</span>`:""}`;$("subtitle").textContent=`${dateFR(selected.Date_de_saisie)} — ${selected.Etablissement||"Établissement non renseigné"} — ${selected.Ville||""} — ${selected.Departement||""}`;let authorParts=[];if(selected.Redacteur)authorParts.push(String(selected.Redacteur).trim());if(selected.Courriel_redacteur)authorParts.push(String(selected.Courriel_redacteur).trim());$("detailAuthor").textContent=authorParts.length?`Rédigé par ${authorParts.join(", ")}`:"Rédacteur non renseigné";$("detailStatus").innerHTML=badgeStatus(statusOf(selected));const archived=[T.OLD,T.OLD2].includes(source);const sourceParts=[];const detailedTypes=selected.Types_de_fait_structure||selected.Types_de_fait;if(String(detailedTypes||"").trim())sourceParts.push(`<div class="info span4"><span class="label">Types de fait détaillés</span><div class="detail-type-wrap">${structuredTypeBadges(detailedTypes)}</div></div>`);if(String(selected.Resume_du_fait||"").trim())sourceParts.push(info("Résumé du fait",selected.Resume_du_fait,"span4"));if(String(selected.Expose_des_faits||"").trim())sourceParts.push(info("Exposé des faits",selected.Expose_des_faits,"span4"));$("sourceGrid").innerHTML=sourceParts.join("");if(archived){$("opsCard").classList.remove("hidden");const archivedParts=[];const archivedEquipier=String(selected.Equipier||"").trim();if(archivedEquipier&&!norm(archivedEquipier).includes("non attrib")&&archivedEquipier!=="—")archivedParts.push(info("Équipier",selected.Equipier));if(selected.Date_traitement_EMS)archivedParts.push(info("Date traitement EMAS",dateFR(selected.Date_traitement_EMS)));if(String(selected.Suivi_etablissement||"").trim()&&!norm(selected.Suivi_etablissement).includes("non renseigne"))archivedParts.push(info("Suivi établissement",selected.Suivi_etablissement,"span2"));if(String(selected.Accompagnement_EMAS||"").trim()&&!norm(selected.Accompagnement_EMAS).includes("non renseigne"))archivedParts.push(info("Accompagnement EMAS",selected.Accompagnement_EMAS,"span2"));$("opsCard").innerHTML=`<div class="sectiontitle"><h2>Suivi archivé</h2>${badgeStatus("Terminé")}</div>${archivedParts.length?`<div class="grid">${archivedParts.join("")}</div>`:'<div class="muted">Aucune information de suivi archivée.</div>'}`;return}await loadSingleSuivi(selected);renderOps()}
@@ -491,7 +492,6 @@ async function syncActivity(f,s){
   const table=degreeActivityTable(f);if(!table)throw new Error("Degré du FE non identifiable : synchronisation Activité impossible.");
   const e=etabMap.get(Number(f.UAI))||{};
   const numero=Number(f.Numero_FE);
-  await ensureChoiceListColumns(table);
   const cols=await activityColumns(table);
   const keyCol=activityCol(cols,"Nmr_FE_ou_Initiative","Nmr FE ou Initiative","N° FE ou Initiative","Numero_FE","Numéro FE");
   if(!keyCol)throw new Error("Colonne Nmr_FE_ou_Initiative introuvable dans "+table+".");
@@ -551,7 +551,7 @@ async function removeActivityForFact(f){
   return matches.length;
 }
 async function resetFollowup(){
-  if(!selected||selected._source===T.OLD)return;
+  if(!selected||isArchivedFact(selected))return;
   const numero=Number(selected.Numero_FE);
   const ok=await showModal({title:"Remettre le suivi à zéro ?",message:`Le suivi du FE ${numero} sera remis à zéro dans SUIVI_FE26_27 et sa ligne sera retirée du tableau Activité D1/D2.\n\nLe fait d’établissement d’origine ne sera pas modifié.`,type:"error",confirmText:"Remettre à zéro",cancelText:"Annuler"});
   if(!ok)return;
@@ -572,12 +572,11 @@ async function resetFollowup(){
   finally{btn.disabled=false;$("save").disabled=false;$("toggleDone").disabled=false}
 }
 async function persistOps(forcedStatus=null){
-  if(!selected||selected._source===T.OLD)return;
+  if(!selected||isArchivedFact(selected))return;
   const numero=Number(selected.Numero_FE);
   let eq=$("equipier").value?Number($("equipier").value):null;
   let st=forcedStatus||$("editStatus").value;if(!forcedStatus&&st!=="Terminé")st="En cours";
   let now=Math.floor(Date.now()/1000);
-  await ensureChoiceListColumns(T.SUIVI);
   let fields={Equipier:eq,Statut:st,Suivi_etablissement:$("suivi").value.trim(),Accompagnement_EMAS:$("emas").value.trim(),Notes_informations:$("notes").value.trim(),Eleve_suivi:$("eleveSuivi").value.trim(),Securisation:gristChoiceList(getChoiceBox("Securisation")),Prevention:gristChoiceList(getChoiceBox("Prevention")),Accompagnement:gristChoiceList(getChoiceBox("Accompagnement")),Formation:gristChoiceList(getChoiceBox("Formation")),Representation_Partenariat:gristChoiceList(getChoiceBox("Representation_Partenariat")),Derniere_modification:now};
   $("save").disabled=true;$("toggleDone").disabled=true;
   let suiviSaved=false;
