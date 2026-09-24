@@ -6,7 +6,7 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Centre opérationnel EMAS</title>
-<!-- BUILD: 2026-09-24-search-types-layout-v45 -->
+<!-- BUILD: 2026-09-24-taxonomy-paths-v47 -->
 <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
 <style>
 :root{--bg:#f5f7fa;--card:#fff;--text:#172033;--muted:#667085;--line:#e4e7ec;--blue:#2563eb;--blue2:#1d4ed8;--green:#067647;--greenbg:#ecfdf3;--amber:#b54708;--amberbg:#fffaeb;--red:#b42318;--redbg:#fef3f2;--gray:#f2f4f7;--r:14px}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:14px Inter,"Segoe UI",Arial,sans-serif}button,input,select,textarea{font:inherit}.page{max-width:1450px;margin:auto;padding:24px}.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:20px;margin-bottom:16px}.hidden{display:none!important}.muted{color:var(--muted)}h1{font-size:27px;margin:0 0 5px}h2{font-size:21px;margin:0}h3{font-size:16px;margin:0 0 12px}.top{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;flex-wrap:wrap}.pill{display:inline-flex;padding:6px 9px;border-radius:999px;background:#eef4ff;color:#175cd3;font-weight:700;font-size:12px}.periodbar{display:flex;gap:10px;align-items:end;flex-wrap:wrap;margin-top:18px}.periodbar .field{min-width:190px}.periodbar input,.periodbar select{width:100%;border:1px solid var(--line);border-radius:9px;background:#fff;padding:9px 11px;min-height:40px}.toolbar{display:grid;grid-template-columns:minmax(240px,1fr) repeat(5,minmax(125px,auto));gap:10px;margin-top:18px}.toolbar input,.toolbar select,.field input,.field select,.field textarea{width:100%;border:1px solid var(--line);border-radius:9px;background:#fff;padding:9px 11px;min-height:40px}.btn{border:1px solid var(--line);background:#fff;color:var(--text);border-radius:9px;padding:9px 13px;cursor:pointer}.btn:hover{background:#f8fafc}.btn.primary{background:var(--blue);border-color:var(--blue);color:#fff}.btn.primary:hover{background:var(--blue2)}.btn.finish{background:var(--green);border-color:var(--green);color:#fff}.btn.finish:hover{filter:brightness(.95)}.btn:disabled{opacity:.45;cursor:not-allowed}.btn.danger-outline{border-color:#fda29b;color:#b42318!important;background:#fff!important}.btn.danger-outline:hover{background:#fef3f2!important}.ops-actions{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-top:12px}.modal-backdrop{position:fixed;inset:0;background:rgba(16,24,40,.48);display:flex;align-items:center;justify-content:center;padding:20px;z-index:9999}.modal-box{width:min(520px,100%);background:#fff;border-radius:14px;box-shadow:0 24px 48px rgba(16,24,40,.24);padding:20px}.modal-title{font-size:18px;font-weight:800;margin:0 0 8px}.modal-message{color:#475467;white-space:pre-wrap;line-height:1.5}.modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:18px}.modal-box.error .modal-title{color:#b42318}.modal-box.success .modal-title{color:#067647}.actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.notice{padding:10px 12px;border-radius:9px;background:#f8fafc;color:var(--muted);margin-top:12px}.notice.error{background:var(--redbg);color:var(--red)}.notice.ok{background:var(--greenbg);color:var(--green)}.tablewrap{overflow:auto;border:1px solid var(--line);border-radius:11px}table{width:100%;border-collapse:collapse;min-width:1050px}th{background:#f8fafc;color:#475467;text-transform:uppercase;font-size:11px;letter-spacing:.03em;text-align:left;padding:11px;border-bottom:1px solid var(--line)}td{padding:11px;border-bottom:1px solid #eef0f3;vertical-align:middle}tbody tr:hover{background:#fafbfc}.badge{display:inline-flex;border-radius:999px;padding:6px 8px;font-size:12px;font-weight:700;background:var(--gray);color:#475467}.type-badges{display:flex;gap:5px;flex-wrap:wrap}.type-badge{display:inline-flex;border-radius:999px;padding:5px 7px;font-size:11px;font-weight:700;background:#f2f4f7;color:#344054}.type-badge.level3{background:#fff7ed;color:#b54708}.fact-origin-badge{display:inline-flex;border-radius:999px;padding:6px 9px;font-size:12px;font-weight:700;margin-left:7px}.fact-origin-badge.today,.fact-origin-badge.update{background:#f2f4f7;color:#667085}.equipier-badge{display:inline-flex;border-radius:999px;padding:6px 9px;font-size:12px;font-weight:700;background:#eef4ff;color:#175cd3}.equipier-badge.unassigned{background:#f2f4f7;color:#667085;font-weight:600}.b3{background:#fff7ed;color:#b54708}.done{background:var(--greenbg);color:var(--green)}.progress{background:var(--amberbg);color:var(--amber)}.waiting{background:var(--gray);color:#475467}.pagination{display:flex;justify-content:space-between;gap:10px;align-items:center;margin-top:13px;flex-wrap:wrap}.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}.info{background:#f8fafc;border-radius:10px;padding:11px}.info .label,.field label{display:block;color:var(--muted);font-size:11px;font-weight:800;text-transform:uppercase;margin-bottom:6px}.info .value{white-space:pre-wrap;overflow-wrap:anywhere}.span2{grid-column:span 2}.span4{grid-column:span 4}.sectiontitle{display:flex;justify-content:space-between;align-items:center;gap:10px;margin:18px 0 10px}.editgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.field textarea{min-height:120px;resize:vertical}.choicebox{border:1px solid var(--line);border-radius:10px;background:#fff;padding:10px 12px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 12px;min-height:44px}.field label.choiceitem{display:flex;gap:10px;align-items:flex-start;line-height:1.3;margin-bottom:0;text-transform:none;font-size:13px;font-weight:400;color:var(--text)}.choiceitem input{width:auto!important;min-height:0!important;margin:2px 0 0}.qualification-title{margin:18px 0 10px;font-size:15px}.treatment-date{font-size:12px;color:var(--muted);margin-top:8px}.etab-link{border:0;background:none;padding:0;color:var(--text);cursor:pointer;text-align:left;font-weight:400}.etab-link:hover{text-decoration:underline}.open-btn{color:var(--text)!important;background:#fff!important}.timeline{border-left:2px solid var(--line);margin-left:8px;padding-left:18px}.event{position:relative;padding:0 0 17px}.event:before{content:"";position:absolute;left:-23px;top:5px;width:8px;height:8px;border-radius:50%;background:var(--blue)}.event.old-school-year:before{background:#14532d}.school-year-separator{margin:24px 0 18px -18px;border-top:2px solid #d0d5dd;position:relative}.school-year-separator span{display:inline-block;position:relative;top:-11px;left:12px;background:#fff;padding:0 10px;font-weight:800;color:#344054;font-size:14px}.event-title{font-weight:700}.event-level3{color:#b54708}.history-types{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin:5px 0 6px}.history-type-badge{display:inline-flex;border-radius:999px;padding:5px 8px;font-size:11px;font-weight:700;background:#eef4ff;color:#175cd3}.history-type-badge.level3{background:#fff7ed;color:#b54708}.level-warning{display:inline-flex;align-items:center;margin-left:5px;color:#b54708;font-size:15px;line-height:1;vertical-align:-1px}.event-meta{color:var(--muted);font-size:12px;margin:3px 0}.detail-author{color:var(--muted);font-size:14px;margin-top:5px;line-height:1.45}.detail-type-wrap{display:flex;gap:6px;flex-wrap:wrap}.structured-types{display:flex;flex-direction:column;gap:8px;align-items:flex-start}.structured-type-group{display:flex;gap:6px;flex-wrap:wrap;width:100%}.structured-type-badge{display:inline-flex;max-width:100%;border-radius:999px;padding:6px 9px;font-size:12px;font-weight:700;background:#eef4ff;color:#175cd3;white-space:normal;line-height:1.35}.structured-type-badge.level3{background:#fff7ed;color:#b54708}.ambiance-card{position:relative}.ambiance-head{display:flex;align-items:center;justify-content:space-between;gap:12px}.ambiance-edit-btn{border:0;background:transparent;color:#667085;cursor:pointer;border-radius:8px;padding:7px 9px;font-size:18px;line-height:1}.ambiance-edit-btn:hover{background:#f2f4f7;color:#172033}.ambiance-text{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.55;margin-top:14px}.ambiance-empty{color:var(--muted);font-style:italic}.ambiance-meta{margin-top:10px;color:var(--muted);font-size:12px}.ambiance-editor{margin-top:14px}.ambiance-editor textarea{width:100%;min-height:130px;resize:vertical;border:1px solid var(--line);border-radius:9px;background:#fff;padding:10px 11px}.ambiance-editor-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:9px}.loading{padding:35px;text-align:center;color:var(--muted)}@media(max-width:900px){.toolbar{grid-template-columns:1fr 1fr}.grid,.editgrid{grid-template-columns:1fr 1fr}.span4{grid-column:span 2}}@media(max-width:600px){.page{padding:12px}.toolbar,.grid,.editgrid{grid-template-columns:1fr}.span2,.span4{grid-column:span 1}}
@@ -21,8 +21,8 @@ select{background-color:#fff!important;color-scheme:light!important;}
 #listView .tablewrap table{table-layout:fixed;min-width:1120px}
 #listView th:nth-child(1),#listView td:nth-child(1){width:88px}
 #listView th:nth-child(2),#listView td:nth-child(2){width:72px;text-align:center}
-#listView th:nth-child(3),#listView td:nth-child(3){width:285px}
-#listView th:nth-child(4),#listView td:nth-child(4){width:250px}
+#listView th:nth-child(3),#listView td:nth-child(3){width:250px}
+#listView th:nth-child(4),#listView td:nth-child(4){width:285px}
 #listView th:nth-child(5),#listView td:nth-child(5){width:145px}
 #listView th:nth-child(6),#listView td:nth-child(6){width:105px;white-space:nowrap}
 #listView th:nth-child(7),#listView td:nth-child(7){width:105px;white-space:nowrap}
@@ -39,7 +39,7 @@ select{background-color:#fff!important;color-scheme:light!important;}
 </style>
 </head><body><main class="page">
 <section id="listView" class="card">
- <div class="top"><div><h1>Centre opérationnel — EMAS</h1><div class="muted">Consultation et suivi des faits d’établissement — 34 et 48</div></div></div>
+ <div class="top"><div><h1>Bureau des légendes</h1><div class="muted">Car vous êtes des légendes. Consultation et suivi des faits d’établissement — 34 et 48</div></div></div>
  <div class="periodbar">
   <div class="field"><label>Jour</label><select id="daySelect"><option value="">Choisir un jour</option></select></div>
   <div class="field"><label>Semaine</label><select id="weekSelect"><option value="">Choisir une semaine</option></select></div>
@@ -90,7 +90,7 @@ select{background-color:#fff!important;color-scheme:light!important;}
 </section>
 </main>
 <div id="appModal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="appModalTitle"><div id="appModalBox" class="modal-box"><div id="appModalTitle" class="modal-title"></div><div id="appModalMessage" class="modal-message"></div><div id="appModalActions" class="modal-actions"></div></div></div>
-<!-- CO-EMAS V46 — recherche détaillée des atteintes + listing sans colonne département + dates FE explicites -->
+<!-- CO-EMAS V47 — reconstruction des arborescences Types_de_fait_structure selon la nomenclature FE -->
 <script>
 "use strict";
 const T={CUR:"FE26_27_2",OLD:"FE25_26",OLD2:"FE24_25",SUIVI:"SUIVI_FE26_27",EQ:"EQUIPIERS",ETAB:"ETABLISSEMENTS",ACT_D1:"ACTIVITE_D1_EMS34_48",ACT_D2:"ACTIVITE_D2_EMS34_48",SUIVI_ETAB:"SUIVI_ETABLISSEMENTS"};
@@ -213,29 +213,74 @@ function factTypeBadges(v,level){
   if(!out.length)add(String(v).split(/[;,]/)[0].trim().slice(0,24)||"Autre");
   return '<div class="type-badges">'+out.map(x=>`<span class="type-badge ${String(level)==="3"?"level3":""}">${esc(x)}</span>`).join("")+'</div>'
 }
+const FACT_TAXONOMY={
+  "Atteintes aux valeurs de la République":{
+    "Principe de laïcité":["Contestation d'enseignement ou enseignement non conforme au principe de laïcité","Refus d'activité scolaire ou d'exécuter un service","Suspicion de prosélytisme","Port de signes et tenues","Autres faits perturbant la vie de l'établissement"],
+    "Actes racistes et antisémites":[],"Suspicion de radicalisation":[],"Autres atteintes aux valeurs de la République":[]
+  },
+  "Atteintes aux personnes":{
+    "Violences verbales":["Menaces orales ou écrites","Violences verbales à caractère sexiste, homophobe","Autres violences verbales"],
+    "Violences physiques":["Vol avec ou sans violences","Extorsion et racket","Tentative d'homicide ou homicide","Jeux dangereux","Autres violences physiques"],
+    "Violences sexuelles":["Insultes à caractère sexuel","Attouchements, gestes, rapports imposés","Autres violences sexuelles"],
+    "Cyber-violences":["Happy slapping ou vidéolynchage","Menaces, intimidation","Prise et diffusion d'images non désirées","Usurpation d'identité","Autres cyberviolences"],
+    "Harcèlement ou suspicion de harcèlement":[],"Cyber-harcèlement":[],"Disparition, fuite, fugue":[],"Tentative de suicide ou suicide":[],
+    "Décès, maladies, accidents graves":["Décès","Accident","Maladie grave, intoxications alimentaires","Fuite produit toxique"],
+    "Autres atteintes aux personnes":[]
+  },
+  "Atteintes à la sécurité, au climat de l'établissement":{
+    "Intrusion":[],
+    "Port d'arme":["Arme blanche (couteau, sabre...)","Arme à feu (pistolet, carabine...)","Arme à feu factice","Taser","Gazeuse (lacrymo...)","Bombe artisanale","Bâton, batte...","Autres armes"],
+    "Usage d'arme":["Arme blanche (couteau, sabre...)","Arme à feu (pistolet, carabine...)","Arme à feu factice","Taser","Gazeuse (lacrymo...)","Bombe artisanale","Bâton, batte...","Paire de ciseaux","Autres armes"],
+    "Substances psychotropes":["Détention, consommation stupéfiants","Détention, consommation alcool","Trafic stupéfiants"],
+    "Perturbations au sein des établissements mettant en jeu la sécurité":[],"Autres atteintes à la sécurité, au climat de l'établissement":[]
+  },
+  "Atteintes aux biens":{"Incendie":[],"Dégradations":[],"Jets de projectile, caillassage":[],"Vols":[],"Autres atteintes aux biens":[]}
+};
+const FACT_ROOT_BY_NORM=new Map(Object.keys(FACT_TAXONOMY).map(x=>[norm(x),x]));
+const FACT_LEVEL2_BY_NORM=new Map();
+const FACT_LEVEL3_BY_PARENT=new Map();
+for(const [root,children] of Object.entries(FACT_TAXONOMY)){
+  for(const [parent,leaves] of Object.entries(children)){
+    FACT_LEVEL2_BY_NORM.set(norm(parent),{root,label:parent});
+    FACT_LEVEL3_BY_PARENT.set(norm(root)+"|"+norm(parent),new Map(leaves.map(x=>[norm(x),x])));
+  }
+}
+function splitStructuredFactPaths(value){
+  if(value===null||value===undefined||String(value).trim()==="")return[];
+  let rawItems=[];
+  if(Array.isArray(value))rawItems=(value[0]==="L"?value.slice(1):value).map(String);
+  else{
+    const raw=String(value).trim();
+    try{const parsed=JSON.parse(raw);if(Array.isArray(parsed))rawItems=(parsed[0]==="L"?parsed.slice(1):parsed).map(String)}catch(_){ }
+    if(!rawItems.length)rawItems=raw.split(/\r?\n|\s*\|+\s*|\s*;\s*/).filter(Boolean);
+  }
+  const out=[]; const add=parts=>{const clean=parts.filter(Boolean).join(" > ");if(clean&&!out.includes(clean))out.push(clean)};
+  for(const rawItem of rawItems){
+    const tokens=String(rawItem).split(/\s*>\s*/).map(x=>x.replace(/^[-•]\s*/,"").trim()).filter(Boolean);
+    let root=null,parent=null,path=[];
+    const flush=()=>{if(path.length)add(path);path=[];parent=null};
+    for(const token of tokens){
+      const n=norm(token),knownRoot=FACT_ROOT_BY_NORM.get(n),knownL2=FACT_LEVEL2_BY_NORM.get(n);
+      if(knownRoot){flush();root=knownRoot;path=[root];continue}
+      if(knownL2){
+        flush();root=knownL2.root;parent=knownL2.label;path=[root,parent];continue;
+      }
+      if(root&&parent){
+        const leaves=FACT_LEVEL3_BY_PARENT.get(norm(root)+"|"+norm(parent));
+        const leaf=leaves?.get(n);
+        if(leaf){path.push(leaf);continue}
+      }
+      // Valeur inconnue : on la conserve dans le chemin courant plutôt que de perdre l'information.
+      if(path.length)path.push(token);else add([token]);
+    }
+    flush();
+  }
+  return out;
+}
 function structuredTypeBadges(v,level){
-  if(v===null||v===undefined||String(v).trim()==="")return '<span class="muted">—</span>';
-  let raw=String(v).trim();
-  // Grist ChoiceList peut arriver sous la forme ["L", ...].
-  let items=[];
-  try{
-    const parsed=JSON.parse(raw);
-    if(Array.isArray(parsed))items=parsed.filter((x,i)=>!(i===0&&x==="L")).map(String);
-  }catch(_){ }
-  if(!items.length){
-    // Les chemins structurés sont normalement séparés par retours à la ligne / ; / ||.
-    items=raw.split(/\r?\n|\s*\|+\s*|\s*;\s*/).map(x=>x.trim()).filter(Boolean);
-  }
-  const groups=[];
-  for(const item of items){
-    const clean=item.replace(/^[-•]\s*/,"").trim();
-    if(!clean)continue;
-    const root=clean.split(/\s*>\s*/)[0].trim();
-    let g=groups.find(x=>x.root===root);
-    if(!g){g={root,items:[]};groups.push(g)}
-    if(!g.items.includes(clean))g.items.push(clean);
-  }
-  return '<div class="structured-types">'+groups.map(g=>'<div class="structured-type-group">'+g.items.map(x=>`<span class="structured-type-badge ${String(level)==="3"?"level3":""}">${esc(x)}</span>`).join('')+'</div>').join('')+'</div>';
+  const paths=splitStructuredFactPaths(v);
+  if(!paths.length)return '<span class="muted">—</span>';
+  return '<div class="structured-types">'+paths.map(x=>`<div class="structured-type-group"><span class="structured-type-badge ${String(level)==="3"?"level3":""}">${esc(x)}</span></div>`).join('')+'</div>';
 }
 function historyTypeCategories(f){
   const raw=String(f?.Types_de_fait_structure||f?.Types_de_fait||"").trim();
