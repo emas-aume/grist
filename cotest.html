@@ -8,7 +8,7 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Centre opérationnel EMAS</title>
-<!-- BUILD: 2026-09-24-fe-pdf-status-badge-v53 -->
+<!-- BUILD: 2026-09-24-fe-pdf-enriched-v54 -->
 <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
@@ -562,10 +562,18 @@ function renderOps(){if(!document.getElementById("save")){location.reload();retu
   !["","non attribue"].includes(norm(selectedSuivi.Statut))
 );$("saveMeta").textContent=s.Derniere_modification?`Dernière modification : ${dateTimeFR(s.Derniere_modification)}${s.Modifie_par?" — "+s.Modifie_par:""}`:(hasRealSuivi?"Suivi existant":(!selectedSuivi&&hasSourceFollowup(selected)?"Suivi existant — issu des données FE":"Aucun suivi enregistré"));let done=(s.Statut||"Non attribué")==="Terminé";$("toggleDone").textContent=done?"Réouvrir — En cours":"Terminé";$("toggleDone").classList.toggle("finish",!done);["equipier","editStatus","suivi","emas","notes","eleveSuivi"].forEach(id=>$(id).disabled=done);document.querySelectorAll("[data-choice-field]").forEach(cb=>cb.disabled=done);$("save").classList.toggle("hidden",done);$("resetFollowup").classList.toggle("hidden",done);markOpsClean()}
 function pdfTextValue(v){
-  if(v===null||v===undefined||String(v).trim()==="")return "Non renseigné";
+  if(v===null||v===undefined)return "";
   return String(v).replace(/\r/g,"").trim();
 }
-function pdfChoiceValue(v){const a=choiceValues(v);return a.length?a.join(" • "):"Non renseigné"}
+function pdfHasValue(v){
+  const x=norm(pdfTextValue(v));
+  return !!x && !["—","-","n/a","na","non renseigne","non renseignee","non renseignees","non attribue"].includes(x);
+}
+function pdfListValue(v){
+  const a=choiceValues(v).map(x=>String(x||"").trim()).filter(Boolean);
+  if(a.length)return a.join(" • ");
+  return pdfTextValue(v);
+}
 function currentPdfSuivi(){
   if(isArchivedFact(selected))return {
     Equipier:selected.Equipier||"",Statut:"Terminé",Suivi_etablissement:selected.Suivi_etablissement||"",Accompagnement_EMAS:selected.Accompagnement_EMAS||"",Notes_informations:selected.Notes_informations||"",Eleve_suivi:selected.Eleve_suivi||"",Date_traitement_EMS:selected.Date_traitement_EMS||null,
@@ -586,34 +594,79 @@ async function exportCurrentFePdf(){
   try{
     const doc=new C({orientation:"portrait",unit:"mm",format:"a4"});
     const W=doc.internal.pageSize.getWidth(),H=doc.internal.pageSize.getHeight(),mx=14,mt=13,mb=15,cw=W-mx*2;
-    const orange=[181,71,8],gray=[208,213,221],grayBg=[247,248,250],text=[52,64,84],muted=[102,112,133],blue=[37,99,235];let y=mt;
+    const orange=[181,71,8],orangeBg=[255,247,237],orangeBorder=[253,186,116],gray=[208,213,221],grayBg=[247,248,250],text=[52,64,84],muted=[102,112,133],blue=[23,92,211],blueBg=[238,244,255],blueBorder=[180,205,255],green=[6,118,71];let y=mt;
     const set=(bold=false,size=9,color=text)=>{doc.setFont("helvetica",bold?"bold":"normal");doc.setFontSize(size);doc.setTextColor.apply(doc,color)};
     const ensure=h=>{if(y+h<=H-mb)return;doc.addPage();y=mt};
     const line=(x1,y1,x2,y2,c=gray)=>{doc.setDrawColor.apply(doc,c);doc.line(x1,y1,x2,y2)};
     function section(title){ensure(13);y+=3;set(true,11,text);doc.text(title,mx,y+4);y+=7;line(mx,y,mx+cw,y);y+=4}
-    function field(label,value,opts={}){
-      const val=pdfTextValue(value),labelW=opts.labelW||42;set(true,8,muted);const lab=String(label).toUpperCase();
-      const lines=doc.splitTextToSize(val,cw-labelW-4);const h=Math.max(9,lines.length*4.2+4);ensure(h);
-      doc.setFillColor.apply(doc,grayBg);doc.roundedRect(mx,y,cw,h,1.5,1.5,"F");doc.text(lab,mx+3,y+5.5);set(false,8.6,text);doc.text(lines,mx+labelW,y+5.5);y+=h+2;
+    function field(label,value){
+      if(!pdfHasValue(value))return false;
+      const val=pdfTextValue(value),labelW=61,labelPad=3,gap=4;
+      const lab=String(label).toUpperCase();
+      set(true,7.6,muted);
+      const labelLines=doc.splitTextToSize(lab,labelW-labelPad*2);
+      set(false,8.6,text);
+      const valueLines=doc.splitTextToSize(val,cw-labelW-gap-3);
+      const lineH=3.9;
+      const h=Math.max(10,Math.max(labelLines.length,valueLines.length)*lineH+5);
+      ensure(h);
+      doc.setFillColor.apply(doc,grayBg);
+      doc.roundedRect(mx,y,cw,h,1.5,1.5,"F");
+      set(true,7.6,muted);
+      doc.text(labelLines,mx+labelPad,y+5.2);
+      set(false,8.6,text);
+      doc.text(valueLines,mx+labelW+gap,y+5.2);
+      y+=h+2;return true;
+    }
+    function factPill(path,isN3){
+      if(!pdfHasValue(path))return;
+      const fill=isN3?orangeBg:blueBg,stroke=isN3?orangeBorder:blueBorder,fg=isN3?orange:blue;
+      set(true,8.1,fg);const lines=doc.splitTextToSize(path,cw-10);const h=Math.max(8,lines.length*3.8+4);ensure(h+2);
+      doc.setFillColor.apply(doc,fill);doc.setDrawColor.apply(doc,stroke);doc.roundedRect(mx,y,cw,h,4,4,"FD");doc.text(lines,mx+5,y+5.2);y+=h+2;
+    }
+    function checkedQualification(label,values){
+      const items=choiceValues(values).map(x=>String(x||"").trim()).filter(Boolean);if(!items.length)return false;
+      ensure(8);set(true,8,muted);doc.text(String(label).toUpperCase(),mx,y+4);y+=7;
+      for(const item of items){
+        const lines=doc.splitTextToSize(item,cw-12),h=Math.max(6,lines.length*3.8+2);ensure(h+1);
+        doc.setDrawColor.apply(doc,green);doc.setLineWidth(.45);doc.roundedRect(mx+1,y+1,4,4,.6,.6,"S");
+        doc.line(mx+1.8,y+3,mx+2.8,y+4);doc.line(mx+2.8,y+4,mx+4.5,y+1.8);
+        set(false,8.6,text);doc.text(lines,mx+8,y+4.2);y+=h+1;
+      }
+      y+=1;return true;
     }
     function footer(){const n=doc.getNumberOfPages();for(let i=1;i<=n;i++){doc.setPage(i);set(false,6.8,[128,128,128]);doc.text("Page "+i+" / "+n,W/2,H-6,{align:"center"})}}
-    const level=displayLevel(selected.Niveau),su=currentPdfSuivi(),eq=isArchivedFact(selected)?pdfTextValue(su.Equipier):eqName(su.Equipier);
+    const level=displayLevel(selected.Niveau),su=currentPdfSuivi();
+    const rawEq=isArchivedFact(selected)?pdfTextValue(su.Equipier):eqName(su.Equipier),eq=pdfHasValue(rawEq)?rawEq:"";
     set(true,17,text);doc.text("Compte rendu EMAS 34",mx,y+5);y+=10;
     set(true,12,level==="3"?orange:text);doc.text("FE n°"+pdfTextValue(selected.Numero_FE)+" — Niveau "+pdfTextValue(level),mx,y+4);y+=7;
-    set(false,9,muted);const origin=factOriginLabel(selected);const meta=(origin?.cls==="update"?"Date de saisie : "+dateFR(selected.Date_de_saisie)+" — ":"")+"Date du fait : "+dateFR(selected.Date_du_fait)+" — "+pdfTextValue(selected.Etablissement)+" — "+pdfTextValue(selected.Ville)+" — "+pdfTextValue(selected.Departement);doc.text(doc.splitTextToSize(meta,cw),mx,y+3);y+=doc.splitTextToSize(meta,cw).length*4+4;
-    const author=[selected.Redacteur,selected.Courriel_redacteur].filter(v=>String(v||"").trim()).join(", ");if(author){set(false,8.5,muted);doc.text(doc.splitTextToSize("Rédigé par "+author,cw),mx,y+2);y+=6}
+    set(false,9,muted);const origin=factOriginLabel(selected);const meta=(origin?.cls==="update"?"Date de saisie : "+dateFR(selected.Date_de_saisie)+" — ":"")+"Date du fait : "+dateFR(selected.Date_du_fait)+" — "+[selected.Etablissement,selected.Ville,selected.Departement].filter(pdfHasValue).join(" — ");const metaLines=doc.splitTextToSize(meta,cw);doc.text(metaLines,mx,y+3);y+=metaLines.length*4+4;
+    const author=[selected.Redacteur,selected.Courriel_redacteur].filter(pdfHasValue).join(", ");if(author){set(false,8.5,muted);const a=doc.splitTextToSize("Rédigé par "+author,cw);doc.text(a,mx,y+2);y+=a.length*3.8+2}
+
     section("Fait établissement");
     const paths=splitStructuredFactPaths(selected.Types_de_fait_structure||selected.Types_de_fait||"");
-    field("Types de fait",paths.length?paths.join("\n"):selected.Types_de_fait||"Non renseigné");
-    if(String(selected.Resume_du_fait||"").trim())field("Résumé du fait",selected.Resume_du_fait);
-    if(String(selected.Expose_des_faits||"").trim())field("Exposé des faits",selected.Expose_des_faits);
-    section("Suivi opérationnel");
-    field("Équipier",eq);field("Statut",su.Statut||sourceStatus(selected));
-    field("Suivi établissement",su.Suivi_etablissement);field("Traitement / accompagnement EMAS",su.Accompagnement_EMAS);
-    field("Notes internes",su.Notes_informations);field("Élève suivi",su.Eleve_suivi);
-    field("Première prise en charge",su.Date_traitement_EMS?dateFR(su.Date_traitement_EMS):"Non renseigné");
-    section("Qualification de l’activité EMAS");
-    field("Sécurisation",pdfChoiceValue(su.Securisation));field("Prévention",pdfChoiceValue(su.Prevention));field("Accompagnement",pdfChoiceValue(su.Accompagnement));field("Formation",pdfChoiceValue(su.Formation));field("Représentation / Partenariat",pdfChoiceValue(su.Representation_Partenariat));
+    paths.forEach(p=>factPill(p,level==="3"));
+    field("Victime(s) présumée(s)",pdfListValue(selected.Victimes));
+    field("Auteur(s) présumé(s)",pdfListValue(selected.Auteurs_presumes));
+    field("Espace(s)",pdfListValue(selected.Espaces));
+    field("Résumé du fait",selected.Resume_du_fait);
+    field("Exposé des faits",selected.Expose_des_faits);
+
+    const followupFields=[];
+    if(pdfHasValue(eq))followupFields.push(["Équipier",eq]);
+    if(pdfHasValue(su.Statut))followupFields.push(["Statut",su.Statut]);
+    if(pdfHasValue(su.Suivi_etablissement))followupFields.push(["Suivi établissement",su.Suivi_etablissement]);
+    if(pdfHasValue(su.Accompagnement_EMAS))followupFields.push(["Traitement / accompagnement EMAS",su.Accompagnement_EMAS]);
+    if(pdfHasValue(su.Notes_informations))followupFields.push(["Notes internes",su.Notes_informations]);
+    if(pdfHasValue(su.Eleve_suivi))followupFields.push(["Élève suivi",su.Eleve_suivi]);
+    if(su.Date_traitement_EMS)followupFields.push(["Première prise en charge",dateFR(su.Date_traitement_EMS)]);
+    if(followupFields.length){section("Suivi opérationnel");followupFields.forEach(([l,v])=>field(l,v))}
+
+    const hasQualifications=[su.Securisation,su.Prevention,su.Accompagnement,su.Formation,su.Representation_Partenariat].some(v=>choiceValues(v).length);
+    if(hasQualifications){
+      section("Qualification de l’activité EMAS");
+      checkedQualification("Sécurisation",su.Securisation);checkedQualification("Prévention",su.Prevention);checkedQualification("Accompagnement",su.Accompagnement);checkedQualification("Formation",su.Formation);checkedQualification("Représentation / Partenariat",su.Representation_Partenariat);
+    }
     footer();doc.save("Compte rendu EMAS 34 - FE "+pdfTextValue(selected.Numero_FE)+".pdf");
   }catch(e){console.error("Erreur export PDF FE",e);showModal({title:"Erreur d’export",message:"Impossible de générer le PDF pour le moment.",confirmText:"OK",cancelText:null})}
   finally{if(btn){btn.disabled=false;btn.textContent="PDF"}}
