@@ -2,7 +2,6 @@
 
 
 
-
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -618,6 +617,31 @@ async function exportCurrentFePdf(){
       doc.text(valueLines,mx+labelW+gap,y+5.2);
       y+=h+2;return true;
     }
+    function compactRow(items){
+      const vals=(items||[]).filter(it=>pdfHasValue(it[1]));
+      if(!vals.length)return false;
+      const gap=3,boxW=(cw-gap*(vals.length-1))/vals.length,pad=3,lineH=3.7;
+      let prepared=[],maxH=0;
+      vals.forEach(([label,value])=>{
+        set(true,7.2,muted);const ll=doc.splitTextToSize(String(label).toUpperCase(),boxW-pad*2);
+        set(false,8.5,text);const vl=doc.splitTextToSize(pdfTextValue(value),boxW-pad*2);
+        const h=Math.max(14,ll.length*3.2+vl.length*lineH+6);maxH=Math.max(maxH,h);prepared.push({labelLines:ll,valueLines:vl});
+      });
+      ensure(maxH+2);
+      vals.forEach((it,i)=>{
+        const x=mx+i*(boxW+gap),d=prepared[i];
+        doc.setFillColor.apply(doc,grayBg);doc.setDrawColor.apply(doc,gray);doc.roundedRect(x,y,boxW,maxH,1.5,1.5,"FD");
+        set(true,7.2,muted);doc.text(d.labelLines,x+pad,y+4.5);
+        const valueY=y+4.5+d.labelLines.length*3.2+1;set(false,8.5,text);doc.text(d.valueLines,x+pad,valueY);
+      });
+      y+=maxH+3;return true;
+    }
+    function narrativeBlock(label,value){
+      if(!pdfHasValue(value))return false;
+      ensure(13);set(true,7.7,muted);doc.text(String(label).toUpperCase(),mx,y+4);y+=7;
+      set(false,8.7,text);const lines=doc.splitTextToSize(pdfTextValue(value),cw-8);const h=Math.max(9,lines.length*4+5);ensure(h);
+      doc.setFillColor.apply(doc,grayBg);doc.roundedRect(mx,y,cw,h,1.5,1.5,"F");doc.text(lines,mx+4,y+5.2);y+=h+3;return true;
+    }
     function factPill(path,isN3){
       if(!pdfHasValue(path))return;
       const fill=isN3?orangeBg:blueBg,stroke=isN3?orangeBorder:blueBorder,fg=isN3?orange:blue;
@@ -641,26 +665,23 @@ async function exportCurrentFePdf(){
     set(true,17,text);doc.text("Compte rendu EMAS 34",mx,y+5);y+=10;
     set(true,12,level==="3"?orange:text);doc.text("FE n°"+pdfTextValue(selected.Numero_FE)+" — Niveau "+pdfTextValue(level),mx,y+4);y+=7;
     set(false,9,muted);const origin=factOriginLabel(selected);const meta=(origin?.cls==="update"?"Date de saisie : "+dateFR(selected.Date_de_saisie)+" — ":"")+"Date du fait : "+dateFR(selected.Date_du_fait)+" — "+[selected.Etablissement,selected.Ville,selected.Departement].filter(pdfHasValue).join(" — ");const metaLines=doc.splitTextToSize(meta,cw);doc.text(metaLines,mx,y+3);y+=metaLines.length*4+4;
-    const author=[selected.Redacteur,selected.Courriel_redacteur].filter(pdfHasValue).join(", ");if(author){set(false,8.5,muted);const a=doc.splitTextToSize("Rédigé par "+author,cw);doc.text(a,mx,y+2);y+=a.length*3.8+2}
-
     section("Fait établissement");
     const paths=splitStructuredFactPaths(selected.Types_de_fait_structure||selected.Types_de_fait||"");
     paths.forEach(p=>factPill(p,level==="3"));
-    field("Victime(s) présumée(s)",pdfListValue(selected.Victimes));
-    field("Auteur(s) présumé(s)",pdfListValue(selected.Auteurs_presumes));
-    field("Espace(s)",pdfListValue(selected.Espaces));
-    field("Résumé du fait",selected.Resume_du_fait);
-    field("Exposé des faits",selected.Expose_des_faits);
+    compactRow([["Victime(s) présumée(s)",pdfListValue(selected.Victimes)],["Auteur(s) présumé(s)",pdfListValue(selected.Auteurs_presumes)]]);
+    if(pdfHasValue(pdfListValue(selected.Espaces)))compactRow([["Espace(s)",pdfListValue(selected.Espaces)]]);
+    narrativeBlock("Résumé du fait",selected.Resume_du_fait);
+    narrativeBlock("Exposé des faits",selected.Expose_des_faits);
 
-    const followupFields=[];
-    if(pdfHasValue(eq))followupFields.push(["Équipier",eq]);
-    if(pdfHasValue(su.Statut))followupFields.push(["Statut",su.Statut]);
-    if(pdfHasValue(su.Suivi_etablissement))followupFields.push(["Suivi établissement",su.Suivi_etablissement]);
-    if(pdfHasValue(su.Accompagnement_EMAS))followupFields.push(["Traitement / accompagnement EMAS",su.Accompagnement_EMAS]);
-    if(pdfHasValue(su.Notes_informations))followupFields.push(["Notes internes",su.Notes_informations]);
-    if(pdfHasValue(su.Eleve_suivi))followupFields.push(["Élève suivi",su.Eleve_suivi]);
-    if(su.Date_traitement_EMS)followupFields.push(["Première prise en charge",dateFR(su.Date_traitement_EMS)]);
-    if(followupFields.length){section("Suivi opérationnel");followupFields.forEach(([l,v])=>field(l,v))}
+    const hasFollowup=[eq,su.Statut,su.Date_traitement_EMS,su.Eleve_suivi,su.Suivi_etablissement,su.Accompagnement_EMAS,su.Notes_informations].some(pdfHasValue);
+    if(hasFollowup){
+      section("Suivi opérationnel");
+      compactRow([["Équipier",eq],["Statut",su.Statut],["Première prise en charge",su.Date_traitement_EMS?dateFR(su.Date_traitement_EMS):""]]);
+      if(pdfHasValue(su.Eleve_suivi))compactRow([["Élève suivi",su.Eleve_suivi]]);
+      narrativeBlock("Suivi établissement",su.Suivi_etablissement);
+      narrativeBlock("Traitement / accompagnement EMAS",su.Accompagnement_EMAS);
+      narrativeBlock("Notes internes",su.Notes_informations);
+    }
 
     const hasQualifications=[su.Securisation,su.Prevention,su.Accompagnement,su.Formation,su.Representation_Partenariat].some(v=>choiceValues(v).length);
     if(hasQualifications){
