@@ -5313,10 +5313,19 @@
       }
 
       /* La colonne Zone est ajoutée uniquement dans le PDF de la Note Blanche 34. */
-      const whiteNoteDepartmentNumber = Number(
-        String(selectedWhiteNoteDepartment || "").replace(/\D/g, "")
-      );
-      const isWhiteNote34 = whiteNoteDepartmentNumber === 34;
+      /* Détection NB34 renforcée : on ne dépend plus uniquement de la valeur
+         du <select>. Si les lignes exportées appartiennent au 34, la colonne
+         Zone est activée quoi qu'il arrive. */
+      const selectedWhiteNoteDepartmentDigits =
+        String(selectedWhiteNoteDepartment || "").match(/\d+/g);
+      const whiteNoteDepartmentNumber = selectedWhiteNoteDepartmentDigits
+        ? Number(selectedWhiteNoteDepartmentDigits.join(""))
+        : NaN;
+      const recordsAreDepartment34 = records.some(function(record) {
+        return String(record && record._departement || "").replace(/^0+/, "") === "34";
+      });
+      const isWhiteNote34 =
+        whiteNoteDepartmentNumber === 34 || recordsAreDepartment34;
       const colWidths = isWhiteNote34
         ? [20, 18, 108, 58, contentWidth - 20 - 18 - 108 - 58]
         : [24, 118, 62, contentWidth - 24 - 118 - 62];
@@ -5557,15 +5566,22 @@
               /* Petit logo centré dans la colonne, sans fond ni badge. */
               const maxLogoWidth = 8.5;
               const maxLogoHeight = 7.2;
-              /* Les deux fichiers sont proches du carré ; dimensions fixes
-                 pour éviter de dépendre des propriétés naturalWidth/naturalHeight
-                 qui n'existent pas sur une data URL. */
               const logoWidth = maxLogoWidth;
               const logoHeight = maxLogoHeight;
               const logoX = zoneX + (colWidths[1] - logoWidth) / 2;
               const logoY = rowY + (rowHeight - logoHeight) / 2;
 
               doc.addImage(zoneLogo, "PNG", logoX, logoY, logoWidth, logoHeight);
+            } else {
+              /* Sécurité : même si Git/Grist ne charge pas l'image, la colonne
+                 reste visible et permet de vérifier immédiatement le classement. */
+              setBold(7);
+              doc.text(
+                policeZone ? "ZPN" : "ZGN",
+                zoneX + colWidths[1] / 2,
+                rowY + rowHeight / 2 + 1.2,
+                { align: "center" }
+              );
             }
 
             summaryX += colWidths[1];
