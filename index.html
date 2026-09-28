@@ -945,6 +945,9 @@
       background:#fafafa;
     }
     .weekly-stats-table tbody tr:last-child td:first-child { background:#fafafa; }
+    .weekly-stats-table tr.weekly-stats-spacer td { height:10px; padding:0; border-left:none; border-right:none; background:#fff; }
+    .weekly-stats-table tr.weekly-stats-second td { font-weight:700; background:#fafafa; }
+    .weekly-stats-table tr.weekly-stats-detail td:first-child { padding-left:28px; color:var(--muted); }
     .weekly-stats-reading { margin-top:12px; padding:10px 14px; border-left:3px solid var(--line); background:#fafafa; border-radius:0 8px 8px 0; font-size:13px; line-height:1.55; color:var(--text); }
     .weekly-stats-establishments { margin-top:12px; padding:12px 14px; border:1px solid var(--line); border-radius:9px; background:#fafafa; }
     .weekly-stats-establishments-title { margin:0 0 8px; font-size:13px; font-weight:700; }
@@ -6188,9 +6191,15 @@
       activeDetails.get(key).facts++;
     });
     const totalFacts = weekFacts.length;
+    const secondActive = new Set([].concat(Array.from(data.college.active), Array.from(data.lycee.active)));
+    const second = {
+      total: data.college.total + data.lycee.total,
+      active: secondActive,
+      facts: data.college.facts + data.lycee.facts
+    };
     const totalKnownEtabs = categories.reduce(function(sum,cat){return sum+data[cat].total;},0);
     const totalActive = new Set(categories.flatMap(function(cat){return Array.from(data[cat].active);})).size;
-    return { department:department, data:data, totalFacts:totalFacts, totalKnownEtabs:totalKnownEtabs, totalActive:totalActive, activeDetails:Array.from(activeDetails.values()).sort(function(a,b){return b.facts-a.facts || a.name.localeCompare(b.name,"fr");}) };
+    return { department:department, data:data, second:second, totalFacts:totalFacts, totalKnownEtabs:totalKnownEtabs, totalActive:totalActive, activeDetails:Array.from(activeDetails.values()).sort(function(a,b){return b.facts-a.facts || a.name.localeCompare(b.name,"fr");}) };
   }
 
   function pct(num, den) { return den > 0 ? (100 * num / den) : 0; }
@@ -6200,25 +6209,31 @@
   function buildWeeklyStatsReading(stats) {
     if (!stats || !stats.totalFacts) return ["Aucun FE n’a été saisi dans le département sur la semaine."];
     const d = stats.data;
-    const lines = [];
     const configs = [
-      ["first", "1er degré"],
-      ["college", "Collèges"],
-      ["lycee", "Lycées"]
+      ["first", "1er degré", d.first],
+      ["second", "2nd degré", stats.second],
+      ["college", "Collèges", d.college],
+      ["lycee", "Lycées", d.lycee]
     ];
-    configs.forEach(function(item) {
-      const cat = item[0], label = item[1], row = d[cat];
-      if (!row || row.total <= 0) return;
-      lines.push(`${label} : ${formatPct(pct(row.active.size,row.total))} des établissements ont déclaré au moins un FE et représentent ${formatPct(pct(row.facts,stats.totalFacts))} des faits du département, avec ${row.facts} FE pour ${row.active.size} établissement${row.active.size > 1 ? "s" : ""} déclarant${row.active.size > 1 ? "s" : ""}, soit une moyenne de ${formatIntensity(row.facts,row.active.size)} FE par établissement déclarant.`);
-    });
-    return lines;
+    return configs.map(function(item) {
+      const label = item[1], row = item[2];
+      if (!row || row.total <= 0) return null;
+      return `${label} : ${formatPct(pct(row.active.size,row.total))} des établissements ont déclaré au moins un FE et représentent ${formatPct(pct(row.facts,stats.totalFacts))} des faits du département, avec ${row.facts} FE pour ${row.active.size} établissement${row.active.size > 1 ? "s" : ""} déclarant${row.active.size > 1 ? "s" : ""}, soit une moyenne de ${formatIntensity(row.facts,row.active.size)} FE par établissement déclarant.`;
+    }).filter(Boolean);
   }
 
   function renderWeeklyStatsDepartment(stats) {
     const labels={first:"1er degré",college:"Collèges",lycee:"Lycées"};
+    function rowHtml(label,d,className) {
+      return `<tr${className ? ` class="${className}"` : ""}><td>${label}</td><td>${d.total}</td><td>${d.active.size}</td><td>${formatPct(pct(d.active.size,d.total))}</td><td>${d.facts}</td><td>${formatPct(pct(d.facts,stats.totalFacts))}</td><td>${formatIntensity(d.facts,d.active.size)}</td></tr>`;
+    }
     let html=`<div class="weekly-stats-department"><p class="weekly-stats-department-title">DSDEN.${escapeHtml(stats.department)}</p>`;
     html += `<div class="weekly-stats-table-wrap"><table class="weekly-stats-table"><thead><tr><th>Catégorie</th><th>Établissements total</th><th>Établissements avec FE</th><th>Taux de couverture</th><th>Nombre de FE</th><th>Part des FE</th><th>Moy. FE / étab. déclarant</th></tr></thead><tbody>`;
-    ["first","college","lycee"].forEach(function(cat){ const d=stats.data[cat]; html += `<tr><td>${labels[cat]}</td><td>${d.total}</td><td>${d.active.size}</td><td>${formatPct(pct(d.active.size,d.total))}</td><td>${d.facts}</td><td>${formatPct(pct(d.facts,stats.totalFacts))}</td><td>${formatIntensity(d.facts,d.active.size)}</td></tr>`; });
+    html += rowHtml(labels.first, stats.data.first, "");
+    html += `<tr class="weekly-stats-spacer"><td colspan="7"></td></tr>`;
+    html += rowHtml("2nd degré", stats.second, "weekly-stats-second");
+    html += rowHtml(labels.college, stats.data.college, "weekly-stats-detail");
+    html += rowHtml(labels.lycee, stats.data.lycee, "weekly-stats-detail");
     html += `<tr><td>Total</td><td>${stats.totalKnownEtabs}</td><td>${stats.totalActive}</td><td>${formatPct(pct(stats.totalActive,stats.totalKnownEtabs))}</td><td>${stats.totalFacts}</td><td>${stats.totalFacts?"100 %":"0 %"}</td><td>${formatIntensity(stats.totalFacts,stats.totalActive)}</td></tr></tbody></table></div>`;
     const reading = buildWeeklyStatsReading(stats);
     if (reading.length) html += `<div class="weekly-stats-reading">${reading.map(function(line){ return `<div>${escapeHtml(line)}</div>`; }).join("")}</div>`;
@@ -6269,7 +6284,22 @@
         y+=8;
       }
       const deps=["34","30","66","11","48"].filter(function(d){return etabRecords.some(function(e){return getEtabDepartment(e)===d;}) || allRecords.some(function(r){return r._departement===d;});});
-      deps.forEach(function(dep,di){const st=buildWeeklyStats(dep);ensure(28);doc.setTextColor(31,41,55);doc.setFont("helvetica","bold");doc.setFontSize(10);doc.text("DSDEN."+dep,mx,y+3);y+=6;header(); const labels={first:"1er degré",college:"Collèges",lycee:"Lycées"}; ["first","college","lycee","total"].forEach(function(cat){let vals;if(cat==="total") vals=["Total",st.totalKnownEtabs,st.totalActive,formatPct(pct(st.totalActive,st.totalKnownEtabs)),st.totalFacts,st.totalFacts?"100 %":"0 %",formatIntensity(st.totalFacts,st.totalActive)];else{const d=st.data[cat];vals=[labels[cat],d.total,d.active.size,formatPct(pct(d.active.size,d.total)),d.facts,formatPct(pct(d.facts,st.totalFacts)),formatIntensity(d.facts,d.active.size)];}ensure(8);let x=mx;doc.setFont("helvetica",cat==="total"?"bold":"normal");doc.setFontSize(7.6);doc.setTextColor(31,41,55);vals.forEach(function(v,i){doc.setDrawColor(229,231,235);doc.rect(x,y,widths[i],8);doc.text(String(v),x+(i?widths[i]/2:2),y+5.1,i?{align:"center"}:undefined);x+=widths[i];});y+=8;});
+      deps.forEach(function(dep,di){const st=buildWeeklyStats(dep);ensure(38);doc.setTextColor(31,41,55);doc.setFont("helvetica","bold");doc.setFontSize(10);doc.text("DSDEN."+dep,mx,y+3);y+=6;header();
+        const labels={first:"1er degré",college:"Collèges",lycee:"Lycées"};
+        function pdfStatsRow(label,d,opts){
+          opts=opts||{}; ensure(8); let x=mx;
+          const vals=[label,d.total,d.active.size,formatPct(pct(d.active.size,d.total)),d.facts,formatPct(pct(d.facts,st.totalFacts)),formatIntensity(d.facts,d.active.size)];
+          if(opts.fill){doc.setFillColor(250,250,250);}
+          doc.setFont("helvetica",opts.bold?"bold":"normal");doc.setFontSize(7.6);doc.setTextColor(31,41,55);
+          vals.forEach(function(v,i){doc.setDrawColor(229,231,235);doc.rect(x,y,widths[i],8,opts.fill?"FD":undefined);doc.text(String(v),x+(i?widths[i]/2:(opts.indent?5:2)),y+5.1,i?{align:"center"}:undefined);x+=widths[i];}); y+=8;
+        }
+        pdfStatsRow(labels.first,st.data.first);
+        y+=3;
+        pdfStatsRow("2nd degré",st.second,{bold:true,fill:true});
+        pdfStatsRow(labels.college,st.data.college,{indent:true});
+        pdfStatsRow(labels.lycee,st.data.lycee,{indent:true});
+        const totalRow={total:st.totalKnownEtabs,active:{size:st.totalActive},facts:st.totalFacts};
+        pdfStatsRow("Total",totalRow,{bold:true});
         y+=4;
         const reading=buildWeeklyStatsReading(st);
         if(reading.length){
