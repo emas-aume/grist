@@ -945,7 +945,7 @@
       background:#fafafa;
     }
     .weekly-stats-table tbody tr:last-child td:first-child { background:#fafafa; }
-    .weekly-stats-table tr.weekly-stats-second td { font-weight:700; background:#fff; }
+    .weekly-stats-table tr.weekly-stats-second td { font-weight:400; background:#fff; }
     .weekly-stats-table tr.weekly-stats-detail td:first-child { padding-left:28px; color:var(--muted); }
     .weekly-stats-reading { margin-top:12px; padding:10px 14px; border-left:3px solid var(--line); background:#fafafa; border-radius:0 8px 8px 0; font-size:13px; line-height:1.55; color:var(--text); }
     .weekly-stats-establishments { margin-top:12px; padding:12px 14px; border:1px solid var(--line); border-radius:9px; background:#fafafa; }
@@ -6300,7 +6300,7 @@
           vals.forEach(function(v,i){doc.setDrawColor(229,231,235);doc.rect(x,y,widths[i],8,opts.fill?"FD":undefined);doc.text(String(v),x+(i?widths[i]/2:(opts.indent?5:2)),y+5.1,i?{align:"center"}:undefined);x+=widths[i];}); y+=8;
         }
         pdfStatsRow(labels.first,st.data.first);
-        pdfStatsRow("2nd degré",st.second,{bold:true});
+        pdfStatsRow("2nd degré",st.second);
         pdfStatsRow("dont Collèges",st.data.college,{indent:true});
         pdfStatsRow("dont Lycées",st.data.lycee,{indent:true});
         const totalRow={total:st.totalKnownEtabs,active:{size:st.totalActive},facts:st.totalFacts};
