@@ -5218,13 +5218,42 @@
         y += 9;
 
         setNormal(9.5);
-        const periodText =
-          formatLongDate(noteDate) +
-          " - " +
-          records.length +
-          " faits saisis " +
-          sourceDateLabel;
-        doc.text(periodText, marginX, y + 3);
+
+        /* NB 34 uniquement : ajoute le décompte ZGN / ZPN à la ligne de période. */
+        if (isWhiteNote34) {
+          const zpnCount = records.filter(function(record) {
+            return isPoliceZone34(record[FIELD.VILLE]);
+          }).length;
+          const zgnCount = records.length - zpnCount;
+
+          const periodParts = [
+            { text: formatLongDate(noteDate) + " - ", bold: false },
+            { text: String(records.length), bold: true },
+            { text: " faits saisis " + sourceDateLabel + " (", bold: false },
+            { text: String(zgnCount), bold: true },
+            { text: " ZGN et ", bold: false },
+            { text: String(zpnCount), bold: true },
+            { text: " ZPN)", bold: false }
+          ];
+
+          let periodX = marginX;
+          periodParts.forEach(function(part) {
+            doc.setFont("helvetica", part.bold ? "bold" : "normal");
+            doc.setFontSize(9.5);
+            doc.setTextColor.apply(doc, textColor);
+            doc.text(part.text, periodX, y + 3);
+            periodX += doc.getTextWidth(part.text);
+          });
+        } else {
+          const periodText =
+            formatLongDate(noteDate) +
+            " - " +
+            records.length +
+            " faits saisis " +
+            sourceDateLabel;
+          doc.text(periodText, marginX, y + 3);
+        }
+
         y += 9;
       }
 
@@ -5284,7 +5313,10 @@
       }
 
       /* La colonne Zone est ajoutée uniquement dans le PDF de la Note Blanche 34. */
-      const isWhiteNote34 = String(selectedWhiteNoteDepartment) === "34";
+      const whiteNoteDepartmentNumber = Number(
+        String(selectedWhiteNoteDepartment || "").replace(/\D/g, "")
+      );
+      const isWhiteNote34 = whiteNoteDepartmentNumber === 34;
       const colWidths = isWhiteNote34
         ? [20, 18, 108, 58, contentWidth - 20 - 18 - 108 - 58]
         : [24, 118, 62, contentWidth - 24 - 118 - 62];
@@ -5320,16 +5352,29 @@
         return policeZoneCities34.has(normalizeZoneCity(city));
       }
 
-      function loadPdfLogo(src) {
-        return new Promise(function(resolve) {
-          const img = new Image();
-          img.onload = function() { resolve(img); };
-          img.onerror = function() {
-            console.warn("Logo impossible à charger pour le PDF :", src);
-            resolve(null);
-          };
-          img.src = src;
-        });
+      async function loadPdfLogo(src) {
+        /*
+          Charge le fichier depuis le même dépôt que le widget puis le convertit
+          en data URL. jsPDF reçoit ainsi directement les octets de l'image :
+          on ne dépend pas du rendu d'une balise <img> dans l'iframe Grist.
+        */
+        try {
+          const absoluteUrl = new URL(src, window.location.href).href;
+          const response = await fetch(absoluteUrl, { cache: "no-store" });
+          if (!response.ok) {
+            throw new Error("HTTP " + response.status + " pour " + absoluteUrl);
+          }
+          const blob = await response.blob();
+          return await new Promise(function(resolve, reject) {
+            const reader = new FileReader();
+            reader.onload = function() { resolve(String(reader.result || "")); };
+            reader.onerror = function() { reject(reader.error || new Error("Lecture du logo impossible")); };
+            reader.readAsDataURL(blob);
+          });
+        } catch (error) {
+          console.warn("Logo impossible à charger pour le PDF :", src, error);
+          return null;
+        }
       }
 
       let policeLogo = null;
@@ -5512,14 +5557,11 @@
               /* Petit logo centré dans la colonne, sans fond ni badge. */
               const maxLogoWidth = 8.5;
               const maxLogoHeight = 7.2;
-              const naturalWidth = zoneLogo.naturalWidth || zoneLogo.width || 1;
-              const naturalHeight = zoneLogo.naturalHeight || zoneLogo.height || 1;
-              const ratio = Math.min(
-                maxLogoWidth / naturalWidth,
-                maxLogoHeight / naturalHeight
-              );
-              const logoWidth = naturalWidth * ratio;
-              const logoHeight = naturalHeight * ratio;
+              /* Les deux fichiers sont proches du carré ; dimensions fixes
+                 pour éviter de dépendre des propriétés naturalWidth/naturalHeight
+                 qui n'existent pas sur une data URL. */
+              const logoWidth = maxLogoWidth;
+              const logoHeight = maxLogoHeight;
               const logoX = zoneX + (colWidths[1] - logoWidth) / 2;
               const logoY = rowY + (rowHeight - logoHeight) / 2;
 
