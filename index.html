@@ -888,6 +888,36 @@
     }
 
 
+  
+
+    /* =========================
+       STATISTIQUES HEBDOMADAIRES ÉTABLISSEMENTS
+       ========================= */
+    .weekly-stats-header { display:flex; align-items:flex-end; justify-content:space-between; gap:18px; flex-wrap:wrap; margin-bottom:18px; }
+    .weekly-stats-title { margin-bottom:4px; }
+    .weekly-stats-controls { display:flex; align-items:flex-end; gap:12px; flex-wrap:wrap; }
+    .weekly-stats-control { display:flex; flex-direction:column; gap:6px; }
+    .weekly-stats-control label { font-size:12px; font-weight:600; color:var(--muted); }
+    .weekly-stats-select { min-width:280px; padding:9px 12px; border:1px solid var(--line); border-radius:8px; background:#fff; color:var(--text); font-size:14px; }
+    .weekly-stats-download-btn { height:38px; padding:0 14px; border:1px solid var(--primary); border-radius:8px; background:var(--primary); color:#fff; font:inherit; font-weight:600; cursor:pointer; }
+    .weekly-stats-download-btn:hover:not(:disabled) { background:var(--primary-hover); border-color:var(--primary-hover); }
+    .weekly-stats-download-btn:disabled { opacity:.45; cursor:not-allowed; }
+    .weekly-stats-note { margin:0 0 16px; color:var(--muted); font-size:13px; line-height:1.5; }
+    .weekly-stats-department { margin-top:24px; padding-top:22px; border-top:1px solid var(--line); }
+    .weekly-stats-department:first-child { margin-top:0; padding-top:0; border-top:none; }
+    .weekly-stats-department-title { margin:0 0 10px; font-size:16px; font-weight:700; }
+    .weekly-stats-table-wrap { overflow:auto; border:1px solid var(--line); border-radius:10px; }
+    .weekly-stats-table { min-width:860px; }
+    .weekly-stats-table th, .weekly-stats-table td { text-align:center; white-space:normal; }
+    .weekly-stats-table th:first-child, .weekly-stats-table td:first-child { text-align:left; min-width:150px; font-weight:600; }
+    .weekly-stats-table tbody tr:last-child td { font-weight:700; background:#fafafa; }
+    .weekly-stats-reading { margin-top:12px; padding:10px 14px; border-left:3px solid var(--line); background:#fafafa; border-radius:0 8px 8px 0; font-size:13px; line-height:1.55; color:var(--text); }
+    .weekly-stats-establishments { margin-top:12px; padding:12px 14px; border:1px solid var(--line); border-radius:9px; background:#fafafa; }
+    .weekly-stats-establishments-title { margin:0 0 8px; font-size:13px; font-weight:700; }
+    .weekly-stats-establishment-line { margin:4px 0; font-size:13px; line-height:1.45; }
+    .weekly-stats-empty { padding:14px 16px; border:1px solid var(--line); border-radius:9px; color:var(--muted); background:#fafafa; font-size:14px; }
+    @media (max-width:700px) { .weekly-stats-controls,.weekly-stats-control{width:100%;} .weekly-stats-select{width:100%;min-width:0;} }
+
   </style>
 
 </head>
@@ -1136,6 +1166,26 @@
 
   </section>
 
+  <!-- STATISTIQUES HEBDOMADAIRES ÉTABLISSEMENTS -->
+  <section class="section" id="weekly-stats-section">
+    <div class="weekly-stats-header">
+      <div>
+        <h2 id="weekly-stats-title" class="weekly-stats-title">Statistiques hebdomadaires des établissements</h2>
+        <p id="weekly-stats-period" class="white-note-period"></p>
+      </div>
+      <div class="weekly-stats-controls">
+        <div class="weekly-stats-control">
+          <label for="weekly-stats-week">Semaine</label>
+          <select id="weekly-stats-week" class="weekly-stats-select" onchange="setWeeklyStatsWeek(this.value)"></select>
+        </div>
+        <button id="weekly-stats-download" class="weekly-stats-download-btn" type="button" onclick="downloadWeeklyStatsPdf()" title="Exporter les statistiques de la semaine en PDF">PDF</button>
+      </div>
+    </div>
+    <p class="weekly-stats-note">Le taux de couverture correspond à la part des établissements de la catégorie ayant saisi au moins un FE dans la semaine. La part des FE indique le poids de la catégorie dans l'ensemble des FE du département. L'intensité correspond au nombre moyen de FE par établissement déclarant.</p>
+    <div id="weekly-stats-content"><div class="weekly-stats-empty">Chargement de la base ETAB et des faits d'établissement…</div></div>
+  </section>
+
+
 
 </div>
 
@@ -1193,6 +1243,10 @@
   let selectedWhiteNoteDate = "";
   let selectedBrqPeriod = "";
 
+  let etabRecords = [];
+  let etabLoadState = "loading";
+  let selectedWeeklyStatsWeek = "";
+
   const diagnostic = document.getElementById("diagnostic");
 
   /*
@@ -1218,6 +1272,8 @@
   grist.ready({
     requiredAccess: "read table"
   });
+
+  setTimeout(loadEtabTableForWeeklyStats, 0);
 
 
   /*
@@ -1255,6 +1311,7 @@
       renderTable();
       renderWhiteNote();
       renderBRQ();
+      renderWeeklyStats();
       return;
     }
 
@@ -1529,6 +1586,7 @@
       renderTable();
       renderWhiteNote();
       renderBRQ();
+      renderWeeklyStats();
     }
 
     setTimeout(processBatch, 0);
@@ -5928,6 +5986,246 @@
     return String(value)
       .replaceAll("\\", "\\\\")
       .replaceAll("'", "\\'");
+  }
+
+
+
+  /* ==================================================
+     STATISTIQUES HEBDOMADAIRES / BASE ETAB
+     ================================================== */
+  function tableDataToRows(tableData) {
+    if (!tableData || typeof tableData !== "object") return [];
+    const keys = Object.keys(tableData).filter(function(key) { return Array.isArray(tableData[key]); });
+    if (!keys.length) return [];
+    const length = Math.max.apply(null, keys.map(function(key) { return tableData[key].length; }));
+    const rows = [];
+    for (let i = 0; i < length; i++) {
+      const row = {};
+      keys.forEach(function(key) { row[key] = tableData[key][i]; });
+      rows.push(row);
+    }
+    return rows;
+  }
+
+  async function loadEtabTableForWeeklyStats() {
+    etabLoadState = "loading";
+    renderWeeklyStats();
+    try {
+      if (!grist.docApi || typeof grist.docApi.fetchTable !== "function") throw new Error("API Grist fetchTable indisponible");
+      const tableData = await grist.docApi.fetchTable("ETAB");
+      etabRecords = tableDataToRows(tableData).filter(function(row) {
+        return Object.values(row).some(function(value) { return value !== null && value !== undefined && String(value).trim() !== ""; });
+      });
+      etabLoadState = "ready";
+    } catch (error) {
+      console.error("Impossible de lire la table ETAB :", error);
+      etabRecords = [];
+      etabLoadState = "error";
+    }
+    renderWeeklyStats();
+  }
+
+  function normalizedObjectText(record) {
+    return Object.values(record || {}).map(function(value) {
+      if (Array.isArray(value)) return value.join(" ");
+      if (value === null || value === undefined || typeof value === "object") return "";
+      return String(value);
+    }).join(" ");
+  }
+
+  function extractUai(value) {
+    const match = String(value || "").toUpperCase().match(/\b(0\d{6}[A-Z])\b/);
+    return match ? match[1] : "";
+  }
+
+  function getEtabUai(row) {
+    const preferred = ["UAI", "uai", "RNE", "rne", "ID_et_Nom", "Id_et_Nom", "Identifiant", "Code_UAI", "code_uai"];
+    for (const key of preferred) if (key in (row || {})) { const u = extractUai(row[key]); if (u) return u; }
+    return extractUai(normalizedObjectText(row));
+  }
+
+  function getEtabDepartment(row) {
+    const uai = getEtabUai(row);
+    if (uai) return String(Number(uai.slice(0, 3)));
+    const preferred = ["Departement", "Département", "departement", "DPT", "Dept", "Code_departement"];
+    for (const key of preferred) {
+      if (!(key in (row || {}))) continue;
+      const m = String(row[key] || "").match(/\b(11|30|34|48|66)\b/);
+      if (m) return m[1];
+    }
+    return "";
+  }
+
+  function getEtabCategory(row) {
+    const text = normalizeText(normalizedObjectText(row));
+    if (/\bcollege\b/.test(text)) return "college";
+    if (/\blycee\b/.test(text) || /\blycee professionnel\b/.test(text) || /\berea\b/.test(text)) return "lycee";
+    if (/\becole\b/.test(text) || /\bmaternelle\b/.test(text) || /\belementaire\b/.test(text) || /\bprimaire\b/.test(text)) return "first";
+    return "other";
+  }
+
+  function getEtabCity(row) {
+    const keys = ["Ville", "ville", "Commune", "commune", "LIBELLE_COMMUNE", "Nom_commune"];
+    for (const key of keys) if (key in (row || {}) && String(row[key] || "").trim()) return String(row[key]).trim();
+    return "";
+  }
+
+  function getEtabName(row) {
+    const keys = ["Nom", "nom", "Nom_etablissement", "Etablissement", "Établissement", "Libelle", "Libellé", "ID_et_Nom"];
+    for (const key of keys) {
+      if (!(key in (row || {})) || !String(row[key] || "").trim()) continue;
+      return String(row[key]).replace(/^\s*0\d{6}[A-Z]\s*[-–—:]?\s*/i, "").trim();
+    }
+    const text = normalizedObjectText(row).trim();
+    return text || "Établissement non renseigné";
+  }
+
+  function getFactEstablishmentKey(record) {
+    const uai = extractUai(record && record[FIELD.ID_NOM]);
+    if (uai) return "UAI:" + uai;
+    return "TXT:" + normalizeText(String(record && record[FIELD.ID_NOM] || "") + "|" + String(record && record[FIELD.VILLE] || ""));
+  }
+
+  function getEtabKey(row) {
+    const uai = getEtabUai(row);
+    if (uai) return "UAI:" + uai;
+    return "TXT:" + normalizeText(getEtabName(row) + "|" + getEtabCity(row));
+  }
+
+  function getWeeklyStatsWeeks() {
+    const map = new Map();
+    allRecords.forEach(function(record) {
+      if (!record._weekKey || !record._date) return;
+      if (!map.has(record._weekKey)) {
+        const info = getISOWeekInfo(record._date);
+        if (!info) return;
+        const day = record._date.getDay() || 7;
+        const monday = new Date(record._date); monday.setDate(record._date.getDate() - day + 1);
+        const sunday = new Date(monday); sunday.setDate(monday.getDate() + 6);
+        map.set(record._weekKey, { key:record._weekKey, week:info.week, year:info.year, monday:monday, sunday:sunday });
+      }
+    });
+    return Array.from(map.values()).sort(function(a,b) { return b.key.localeCompare(a.key); });
+  }
+
+  function renderWeeklyStatsWeekOptions() {
+    const select = document.getElementById("weekly-stats-week");
+    if (!select) return;
+    const weeks = getWeeklyStatsWeeks();
+    if (!weeks.length) {
+      selectedWeeklyStatsWeek = "";
+      select.innerHTML = '<option value="">Aucune semaine disponible</option>';
+      return;
+    }
+    const values = weeks.map(function(w) { return w.key; });
+    if (!selectedWeeklyStatsWeek || !values.includes(selectedWeeklyStatsWeek)) selectedWeeklyStatsWeek = values[0];
+    select.innerHTML = weeks.map(function(w) {
+      return `<option value="${escapeHtml(w.key)}">S${w.week} - ${formatDayMonth(w.monday)} au ${formatDayMonth(w.sunday)}</option>`;
+    }).join("");
+    select.value = selectedWeeklyStatsWeek;
+  }
+
+  function setWeeklyStatsWeek(value) { selectedWeeklyStatsWeek = value; renderWeeklyStats(); }
+
+  function buildWeeklyStats(department) {
+    const weekFacts = allRecords.filter(function(record) { return record._weekKey === selectedWeeklyStatsWeek && record._departement === department; });
+    const deptEtabs = etabRecords.filter(function(row) { return getEtabDepartment(row) === department; });
+    const etabByKey = new Map();
+    deptEtabs.forEach(function(row) { const key=getEtabKey(row); if (key && !etabByKey.has(key)) etabByKey.set(key,row); });
+    const categories = ["first","college","lycee"];
+    const data = {};
+    categories.forEach(function(cat) { data[cat] = { total:0, active:new Set(), facts:0 }; });
+    etabByKey.forEach(function(row) { const cat=getEtabCategory(row); if (data[cat]) data[cat].total++; });
+
+    const activeDetails = new Map();
+    weekFacts.forEach(function(record) {
+      const key = getFactEstablishmentKey(record);
+      const etab = etabByKey.get(key);
+      let cat = etab ? getEtabCategory(etab) : (record._degre === "1" || record._degre === "1er degré" ? "first" : "other");
+      if (cat === "other") {
+        const txt = normalizeText(String(record[FIELD.ID_NOM] || ""));
+        if (/\bcollege\b/.test(txt)) cat="college"; else if (/\blycee\b/.test(txt)) cat="lycee"; else if (/\becole\b/.test(txt)) cat="first";
+      }
+      if (data[cat]) { data[cat].facts++; data[cat].active.add(key); }
+      if (!activeDetails.has(key)) activeDetails.set(key, { key:key, name:etab?getEtabName(etab):String(record[FIELD.ID_NOM]||"Établissement non renseigné").replace(/^\s*0\d{6}[A-Z]\s*[-–—:]?\s*/i,""), city:etab?getEtabCity(etab):String(record[FIELD.VILLE]||""), category:cat, facts:0 });
+      activeDetails.get(key).facts++;
+    });
+    const totalFacts = weekFacts.length;
+    const totalKnownEtabs = categories.reduce(function(sum,cat){return sum+data[cat].total;},0);
+    const totalActive = new Set(categories.flatMap(function(cat){return Array.from(data[cat].active);})).size;
+    return { department:department, data:data, totalFacts:totalFacts, totalKnownEtabs:totalKnownEtabs, totalActive:totalActive, activeDetails:Array.from(activeDetails.values()).sort(function(a,b){return b.facts-a.facts || a.name.localeCompare(b.name,"fr");}) };
+  }
+
+  function pct(num, den) { return den > 0 ? (100 * num / den) : 0; }
+  function formatPct(value) { return value.toLocaleString("fr-FR", { minimumFractionDigits:0, maximumFractionDigits:1 }) + " %"; }
+  function formatIntensity(facts, active) { return active > 0 ? (facts/active).toLocaleString("fr-FR", { minimumFractionDigits:1, maximumFractionDigits:1 }) : "0"; }
+
+  function buildWeeklyStatsReading(stats) {
+    if (!stats || !stats.totalFacts) return "Aucun FE n’a été saisi dans le département sur la semaine.";
+    const d = stats.data;
+    const sentences = [];
+    if (d.college.total > 0) sentences.push(`${formatPct(pct(d.college.active.size,d.college.total))} des collèges ont déclaré au moins un FE et représentent ${formatPct(pct(d.college.facts,stats.totalFacts))} des faits du département.`);
+    if (d.lycee.total > 0) sentences.push(`Les lycées présentent un taux de ${formatPct(pct(d.lycee.active.size,d.lycee.total))} d’établissements déclarants pour ${formatPct(pct(d.lycee.facts,stats.totalFacts))} des faits.`);
+    if (d.first.total > 0) sentences.push(`Le 1er degré regroupe ${formatPct(pct(d.first.facts,stats.totalFacts))} des faits de la semaine.`);
+    return sentences.slice(0,3).join(" ");
+  }
+
+  function renderWeeklyStatsDepartment(stats) {
+    const labels={first:"1er degré",college:"Collèges",lycee:"Lycées"};
+    let html=`<div class="weekly-stats-department"><p class="weekly-stats-department-title">DSDEN.${escapeHtml(stats.department)}</p>`;
+    html += `<div class="weekly-stats-table-wrap"><table class="weekly-stats-table"><thead><tr><th>Catégorie</th><th>Établissements total</th><th>Établissements avec FE</th><th>Taux de couverture</th><th>Nombre de FE</th><th>Part des FE</th><th>FE / étab. déclarant</th></tr></thead><tbody>`;
+    ["first","college","lycee"].forEach(function(cat){ const d=stats.data[cat]; html += `<tr><td>${labels[cat]}</td><td>${d.total}</td><td>${d.active.size}</td><td>${formatPct(pct(d.active.size,d.total))}</td><td>${d.facts}</td><td>${formatPct(pct(d.facts,stats.totalFacts))}</td><td>${formatIntensity(d.facts,d.active.size)}</td></tr>`; });
+    html += `<tr><td>Total</td><td>${stats.totalKnownEtabs}</td><td>${stats.totalActive}</td><td>${formatPct(pct(stats.totalActive,stats.totalKnownEtabs))}</td><td>${stats.totalFacts}</td><td>${stats.totalFacts?"100 %":"0 %"}</td><td>${formatIntensity(stats.totalFacts,stats.totalActive)}</td></tr></tbody></table></div>`;
+    const reading = buildWeeklyStatsReading(stats);
+    if (reading) html += `<div class="weekly-stats-reading">${escapeHtml(reading)}</div>`;
+    if (stats.activeDetails.length) {
+      html += `<div class="weekly-stats-establishments"><p class="weekly-stats-establishments-title">Établissements ayant saisi au moins un FE :</p>`;
+      stats.activeDetails.forEach(function(item){ html += `<p class="weekly-stats-establishment-line">${escapeHtml(item.name)}${item.city?" — "+escapeHtml(item.city):""} — <strong>${item.facts}</strong> ${item.facts>1?"faits":"fait"}</p>`; });
+      html += `</div>`;
+    } else html += `<div class="weekly-stats-empty" style="margin-top:12px">Aucun établissement n'a saisi de FE sur cette semaine.</div>`;
+    html += `</div>`; return html;
+  }
+
+  function renderWeeklyStats() {
+    const content=document.getElementById("weekly-stats-content"), period=document.getElementById("weekly-stats-period"), button=document.getElementById("weekly-stats-download");
+    if (!content) return;
+    renderWeeklyStatsWeekOptions();
+    if (etabLoadState === "loading") { content.innerHTML='<div class="weekly-stats-empty">Chargement de la base ETAB…</div>'; if(button)button.disabled=true; return; }
+    if (etabLoadState === "error") { content.innerHTML='<div class="weekly-stats-empty">Impossible de lire la table Grist « ETAB ». Vérifie que la table porte exactement ce nom et que le widget dispose d’un accès en lecture.</div>'; if(button)button.disabled=true; return; }
+    if (!selectedWeeklyStatsWeek) { content.innerHTML='<div class="weekly-stats-empty">Aucune semaine disponible.</div>'; if(button)button.disabled=true; return; }
+    const info=getWeeklyStatsWeeks().find(function(w){return w.key===selectedWeeklyStatsWeek;});
+    if(period) period.textContent=info?`Semaine ${info.week} — ${formatDayMonth(info.monday)} au ${formatDayMonth(info.sunday)}`:"";
+    const order=["34","30","66","11","48"]; const available=new Set(etabRecords.map(getEtabDepartment).filter(Boolean).concat(allRecords.map(function(r){return r._departement;}).filter(Boolean)));
+    const deps=order.filter(function(d){return available.has(d);});
+    content.innerHTML=deps.map(function(d){return renderWeeklyStatsDepartment(buildWeeklyStats(d));}).join("") || '<div class="weekly-stats-empty">Aucun département disponible.</div>';
+    if(button)button.disabled=false;
+  }
+
+  async function downloadWeeklyStatsPdf() {
+    const button=document.getElementById("weekly-stats-download"); if(!selectedWeeklyStatsWeek || etabLoadState!=="ready") return;
+    const C=window.jspdf&&window.jspdf.jsPDF?window.jspdf.jsPDF:(window.jsPDF||null); if(!C){alert("Bibliothèque PDF indisponible.");return;}
+    if(button){button.disabled=true;button.textContent="…";}
+    try {
+      const doc=new C({orientation:"landscape",unit:"mm",format:"a4"}); const pw=doc.internal.pageSize.getWidth(), ph=doc.internal.pageSize.getHeight(); const mx=12, mt=12, mb=12, cw=pw-mx*2; let y=mt;
+      const info=getWeeklyStatsWeeks().find(function(w){return w.key===selectedWeeklyStatsWeek;});
+      doc.setTextColor(31,41,55); doc.setFont("helvetica","bold"); doc.setFontSize(15); doc.text("Statistiques hebdomadaires des établissements",mx,y+4); y+=8;
+      doc.setFont("helvetica","normal"); doc.setFontSize(9); doc.setTextColor(102,112,133); doc.text(info?`Semaine ${info.week} — ${formatDayMonth(info.monday)} au ${formatDayMonth(info.sunday)}`:selectedWeeklyStatsWeek,mx,y+3); y+=9;
+      const widths=[38,35,38,38,30,32,40]; const headers=["Catégorie","Étab. total","Étab. avec FE","Taux couverture","Nombre FE","Part des FE","FE / étab. déclarant"];
+      function page(){doc.addPage("a4","landscape");y=mt;}
+      function ensure(h){if(y+h>ph-mb)page();}
+      function header(){let x=mx;doc.setFillColor(249,250,251);doc.setDrawColor(229,231,235);doc.setTextColor(71,84,103);doc.setFont("helvetica","bold");doc.setFontSize(7.6);headers.forEach(function(h,i){doc.rect(x,y,widths[i],8,"FD");doc.text(h,x+(i?widths[i]/2:2),y+5.1,i?{align:"center"}:undefined);x+=widths[i];});y+=8;}
+      const deps=["34","30","66","11","48"].filter(function(d){return etabRecords.some(function(e){return getEtabDepartment(e)===d;}) || allRecords.some(function(r){return r._departement===d;});});
+      deps.forEach(function(dep,di){const st=buildWeeklyStats(dep);ensure(28);doc.setTextColor(31,41,55);doc.setFont("helvetica","bold");doc.setFontSize(10);doc.text("DSDEN."+dep,mx,y+3);y+=6;header(); const labels={first:"1er degré",college:"Collèges",lycee:"Lycées"}; ["first","college","lycee","total"].forEach(function(cat){let vals;if(cat==="total") vals=["Total",st.totalKnownEtabs,st.totalActive,formatPct(pct(st.totalActive,st.totalKnownEtabs)),st.totalFacts,st.totalFacts?"100 %":"0 %",formatIntensity(st.totalFacts,st.totalActive)];else{const d=st.data[cat];vals=[labels[cat],d.total,d.active.size,formatPct(pct(d.active.size,d.total)),d.facts,formatPct(pct(d.facts,st.totalFacts)),formatIntensity(d.facts,d.active.size)];}ensure(8);let x=mx;doc.setFont("helvetica",cat==="total"?"bold":"normal");doc.setFontSize(7.6);doc.setTextColor(31,41,55);vals.forEach(function(v,i){doc.setDrawColor(229,231,235);doc.rect(x,y,widths[i],8);doc.text(String(v),x+(i?widths[i]/2:2),y+5.1,i?{align:"center"}:undefined);x+=widths[i];});y+=8;});
+        y+=4;
+        const reading=buildWeeklyStatsReading(st);
+        if(reading){doc.setFont("helvetica","normal");doc.setFontSize(7.5);doc.setTextColor(71,84,103);const readingLines=doc.splitTextToSize(reading,cw);const readingH=readingLines.length*3.8+2;ensure(readingH);doc.text(readingLines,mx,y+3);y+=readingH+2;}
+        ensure(8);doc.setFont("helvetica","bold");doc.setFontSize(8);doc.setTextColor(31,41,55);doc.text("Établissements ayant saisi au moins un FE :",mx,y+3);y+=5;doc.setFont("helvetica","normal");doc.setFontSize(7.5);
+        if(!st.activeDetails.length){doc.setTextColor(102,112,133);doc.text("Aucun établissement.",mx,y+3);y+=5;} else st.activeDetails.forEach(function(item){const line=`${item.name}${item.city?" — "+item.city:""} — ${item.facts} ${item.facts>1?"faits":"fait"}`;const lines=doc.splitTextToSize(line,cw);const h=lines.length*3.7+1;ensure(h);doc.setTextColor(31,41,55);doc.text(lines,mx,y+3);y+=h;});
+        y+=7;
+      });
+      const pages=doc.getNumberOfPages();for(let i=1;i<=pages;i++){doc.setPage(i);doc.setFont("helvetica","normal");doc.setFontSize(6.8);doc.setTextColor(128,128,128);doc.text(`Page ${i} / ${pages}`,pw/2,ph-5,{align:"center"});}
+      doc.save(`Statistiques établissements S${info?info.week:selectedWeeklyStatsWeek} année 2026-2027.pdf`);
+    } catch(error){console.error("Erreur PDF statistiques hebdomadaires :",error);alert("Impossible de générer le PDF des statistiques pour le moment.");} finally {if(button){button.disabled=false;button.textContent="PDF";}}
   }
 
 </script>
