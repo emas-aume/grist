@@ -6168,10 +6168,15 @@
   function setWeeklyStatsWeek(value) { selectedWeeklyStatsWeek = value; renderWeeklyStats(); }
 
   function buildWeeklyStats(department) {
-    const weekFacts = allRecords.filter(function(record) { return record._weekKey === selectedWeeklyStatsWeek && record._departement === department; });
-    const deptEtabs = etabRecords.filter(function(row) { return getEtabDepartment(row) === department; });
+    const isAcademy = department === "ACADEMIE";
+    const weekFacts = allRecords.filter(function(record) {
+      return record._weekKey === selectedWeeklyStatsWeek && (isAcademy || record._departement === department);
+    });
+    const scopedEtabs = etabRecords.filter(function(row) {
+      return isAcademy ? ["11","30","34","48","66"].includes(getEtabDepartment(row)) : getEtabDepartment(row) === department;
+    });
     const etabByKey = new Map();
-    deptEtabs.forEach(function(row) { const key=getEtabKey(row); if (key && !etabByKey.has(key)) etabByKey.set(key,row); });
+    scopedEtabs.forEach(function(row) { const key=getEtabKey(row); if (key && !etabByKey.has(key)) etabByKey.set(key,row); });
     const categories = ["first","college","lycee"];
     const data = {};
     categories.forEach(function(cat) { data[cat] = { total:0, active:new Set(), facts:0 }; });
@@ -6199,7 +6204,7 @@
     };
     const totalKnownEtabs = categories.reduce(function(sum,cat){return sum+data[cat].total;},0);
     const totalActive = new Set(categories.flatMap(function(cat){return Array.from(data[cat].active);})).size;
-    return { department:department, data:data, second:second, totalFacts:totalFacts, totalKnownEtabs:totalKnownEtabs, totalActive:totalActive, activeDetails:Array.from(activeDetails.values()).sort(function(a,b){return b.facts-a.facts || a.name.localeCompare(b.name,"fr");}) };
+    return { department:department, isAcademy:isAcademy, data:data, second:second, totalFacts:totalFacts, totalKnownEtabs:totalKnownEtabs, totalActive:totalActive, activeDetails:Array.from(activeDetails.values()).sort(function(a,b){return b.facts-a.facts || a.name.localeCompare(b.name,"fr");}) };
   }
 
   function pct(num, den) { return den > 0 ? (100 * num / den) : 0; }
@@ -6207,7 +6212,7 @@
   function formatIntensity(facts, active) { return active > 0 ? (facts/active).toLocaleString("fr-FR", { minimumFractionDigits:1, maximumFractionDigits:1 }) : "0"; }
 
   function buildWeeklyStatsReading(stats) {
-    if (!stats || !stats.totalFacts) return ["Aucun FE n’a été saisi dans le département sur la semaine."];
+    if (!stats || !stats.totalFacts) return [stats && stats.isAcademy ? "Aucun FE n’a été saisi dans l’académie sur la semaine." : "Aucun FE n’a été saisi dans le département sur la semaine."];
     const d = stats.data;
     const configs = [
       ["first", "1er degré", d.first],
@@ -6218,7 +6223,7 @@
     return configs.map(function(item) {
       const label = item[1], row = item[2];
       if (!row || row.total <= 0) return null;
-      return `${label} : ${formatPct(pct(row.active.size,row.total))} des établissements ont déclaré au moins un FE et représentent ${formatPct(pct(row.facts,stats.totalFacts))} des faits du département, avec ${row.facts} FE pour ${row.active.size} établissement${row.active.size > 1 ? "s" : ""} déclarant${row.active.size > 1 ? "s" : ""}, soit une moyenne de ${formatIntensity(row.facts,row.active.size)} FE par établissement déclarant.`;
+      return `${label} : ${formatPct(pct(row.active.size,row.total))} des établissements ont déclaré au moins un FE et représentent ${formatPct(pct(row.facts,stats.totalFacts))} ${stats.isAcademy ? "des faits de l’académie" : "des faits du département"}, avec ${row.facts} FE pour ${row.active.size} établissement${row.active.size > 1 ? "s" : ""} déclarant${row.active.size > 1 ? "s" : ""}, soit une moyenne de ${formatIntensity(row.facts,row.active.size)} FE par établissement déclarant.`;
     }).filter(Boolean);
   }
 
@@ -6227,7 +6232,8 @@
     function rowHtml(label,d,className) {
       return `<tr${className ? ` class="${className}"` : ""}><td>${label}</td><td>${d.total}</td><td>${d.active.size}</td><td>${formatPct(pct(d.active.size,d.total))}</td><td>${d.facts}</td><td>${formatPct(pct(d.facts,stats.totalFacts))}</td><td>${formatIntensity(d.facts,d.active.size)}</td></tr>`;
     }
-    let html=`<div class="weekly-stats-department"><p class="weekly-stats-department-title">DSDEN.${escapeHtml(stats.department)}</p>`;
+    const title = stats.isAcademy ? "ACADEMIE DE MONTPELLIER" : "DSDEN." + escapeHtml(stats.department);
+    let html=`<div class="weekly-stats-department"><p class="weekly-stats-department-title">${title}</p>`;
     html += `<div class="weekly-stats-table-wrap"><table class="weekly-stats-table"><thead><tr><th>Catégorie</th><th>Établissements total</th><th>Établissements avec FE</th><th>Taux de couverture</th><th>Nombre de FE</th><th>Part des FE</th><th>Moy. FE / étab. déclarant</th></tr></thead><tbody>`;
     html += rowHtml(labels.first, stats.data.first, "");
     html += `<tr class="weekly-stats-spacer"><td colspan="7"></td></tr>`;
@@ -6251,7 +6257,8 @@
     if(period) period.textContent=info?`Semaine ${info.week} — ${formatDayMonth(info.monday)} au ${formatDayMonth(info.sunday)}`:"";
     const order=["34","30","66","11","48"]; const available=new Set(etabRecords.map(getEtabDepartment).filter(Boolean).concat(allRecords.map(function(r){return r._departement;}).filter(Boolean)));
     const deps=order.filter(function(d){return available.has(d);});
-    content.innerHTML=deps.map(function(d){return renderWeeklyStatsDepartment(buildWeeklyStats(d));}).join("") || '<div class="weekly-stats-empty">Aucun département disponible.</div>';
+    const academyHtml = renderWeeklyStatsDepartment(buildWeeklyStats("ACADEMIE"));
+    content.innerHTML=academyHtml + deps.map(function(d){return renderWeeklyStatsDepartment(buildWeeklyStats(d));}).join("");
     if(button)button.disabled=false;
   }
 
@@ -6284,7 +6291,8 @@
         y+=8;
       }
       const deps=["34","30","66","11","48"].filter(function(d){return etabRecords.some(function(e){return getEtabDepartment(e)===d;}) || allRecords.some(function(r){return r._departement===d;});});
-      deps.forEach(function(dep,di){const st=buildWeeklyStats(dep);ensure(38);doc.setTextColor(31,41,55);doc.setFont("helvetica","bold");doc.setFontSize(10);doc.text("DSDEN."+dep,mx,y+3);y+=6;header();
+      const scopes=["ACADEMIE"].concat(deps);
+      scopes.forEach(function(dep,di){const st=buildWeeklyStats(dep);ensure(38);doc.setTextColor(31,41,55);doc.setFont("helvetica","bold");doc.setFontSize(10);doc.text(st.isAcademy ? "ACADEMIE DE MONTPELLIER" : "DSDEN."+dep,mx,y+3);y+=6;header();
         const labels={first:"1er degré",college:"Collèges",lycee:"Lycées"};
         function pdfStatsRow(label,d,opts){
           opts=opts||{}; ensure(8); let x=mx;
