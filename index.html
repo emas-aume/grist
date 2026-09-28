@@ -1,5 +1,6 @@
 
 
+
 <!DOCTYPE html>
 <html lang="fr">
 
@@ -5282,8 +5283,64 @@
         y += 8;
       }
 
-      const colWidths = [24, 118, 62, contentWidth - 24 - 118 - 62];
-      const headers = ["Niveau", "Résumé", "Type de fait", "Etablissement"];
+      /* La colonne Zone est ajoutée uniquement dans le PDF de la Note Blanche 34. */
+      const isWhiteNote34 = String(selectedWhiteNoteDepartment) === "34";
+      const colWidths = isWhiteNote34
+        ? [20, 18, 108, 58, contentWidth - 20 - 18 - 108 - 58]
+        : [24, 118, 62, contentWidth - 24 - 118 - 62];
+      const headers = isWhiteNote34
+        ? ["Niveau", "Zone", "Résumé", "Type de fait", "Etablissement"]
+        : ["Niveau", "Résumé", "Type de fait", "Etablissement"];
+
+      /* Communes classées ici en zone Police nationale pour la NB 34.
+         La comparaison ignore les accents, la casse et les espaces.
+         "AGDE" est accepté en plus de "ADGE" pour couvrir l'orthographe de la commune. */
+      const policeZoneCities34 = new Set([
+        "montpellier",
+        "beziers",
+        "sete",
+        "frontignan",
+        "adge",
+        "agde",
+        "lattes",
+        "perols"
+      ]);
+
+      function normalizeZoneCity(value) {
+        return String(value || "")
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, " ")
+          .replace(/\s+/g, " ")
+          .trim();
+      }
+
+      function isPoliceZone34(city) {
+        return policeZoneCities34.has(normalizeZoneCity(city));
+      }
+
+      function loadPdfLogo(src) {
+        return new Promise(function(resolve) {
+          const img = new Image();
+          img.onload = function() { resolve(img); };
+          img.onerror = function() {
+            console.warn("Logo impossible à charger pour le PDF :", src);
+            resolve(null);
+          };
+          img.src = src;
+        });
+      }
+
+      let policeLogo = null;
+      let gendarmerieLogo = null;
+
+      if (isWhiteNote34) {
+        [policeLogo, gendarmerieLogo] = await Promise.all([
+          loadPdfLogo("img/logopolicenationale.png"),
+          loadPdfLogo("img/logogendarmerie.png")
+        ]);
+      }
 
       function drawTableHeader() {
         const headerHeight = 8;
@@ -5410,10 +5467,14 @@
               : ""
           );
 
+          const summaryColIndex = isWhiteNote34 ? 2 : 1;
+          const typeColIndex = isWhiteNote34 ? 3 : 2;
+          const establishmentColIndex = isWhiteNote34 ? 4 : 3;
+
           setNormal(7.8);
-          const summaryLines = doc.splitTextToSize(summaryText, colWidths[1] - 4);
-          const typeLines = doc.splitTextToSize(typeText || "-", colWidths[2] - 4);
-          const establishmentLines = doc.splitTextToSize(establishmentText || "-", colWidths[3] - 4);
+          const summaryLines = doc.splitTextToSize(summaryText, colWidths[summaryColIndex] - 4);
+          const typeLines = doc.splitTextToSize(typeText || "-", colWidths[typeColIndex] - 4);
+          const establishmentLines = doc.splitTextToSize(establishmentText || "-", colWidths[establishmentColIndex] - 4);
           const maxLines = Math.max(
             1,
             summaryLines.length,
@@ -5440,8 +5501,36 @@
 
           drawLevelBadge(record._niveau, marginX, rowY, rowHeight);
 
+          let summaryX = marginX + colWidths[0];
+
+          if (isWhiteNote34) {
+            const zoneX = marginX + colWidths[0];
+            const policeZone = isPoliceZone34(ville);
+            const zoneLogo = policeZone ? policeLogo : gendarmerieLogo;
+
+            if (zoneLogo) {
+              /* Petit logo centré dans la colonne, sans fond ni badge. */
+              const maxLogoWidth = 8.5;
+              const maxLogoHeight = 7.2;
+              const naturalWidth = zoneLogo.naturalWidth || zoneLogo.width || 1;
+              const naturalHeight = zoneLogo.naturalHeight || zoneLogo.height || 1;
+              const ratio = Math.min(
+                maxLogoWidth / naturalWidth,
+                maxLogoHeight / naturalHeight
+              );
+              const logoWidth = naturalWidth * ratio;
+              const logoHeight = naturalHeight * ratio;
+              const logoX = zoneX + (colWidths[1] - logoWidth) / 2;
+              const logoY = rowY + (rowHeight - logoHeight) / 2;
+
+              doc.addImage(zoneLogo, "PNG", logoX, logoY, logoWidth, logoHeight);
+            }
+
+            summaryX += colWidths[1];
+          }
+
           setNormal(7.8);
-          doc.text(summaryLines, marginX + colWidths[0] + 2, rowY + 5);
+          doc.text(summaryLines, summaryX + 2, rowY + 5);
 
           /* Type de fait : poids normal ; le niveau 3 conserve l'orange. */
           doc.setFont("helvetica", "normal");
@@ -5451,21 +5540,15 @@
           } else {
             doc.setTextColor.apply(doc, textColor);
           }
-          doc.text(
-            typeLines,
-            marginX + colWidths[0] + colWidths[1] + 2,
-            rowY + 5
-          );
+          const typeX = summaryX + colWidths[summaryColIndex];
+          doc.text(typeLines, typeX + 2, rowY + 5);
 
           /* Etablissement : poids et couleur normaux. */
           doc.setFont("helvetica", "normal");
           doc.setFontSize(7.8);
           doc.setTextColor.apply(doc, textColor);
-          doc.text(
-            establishmentLines,
-            marginX + colWidths[0] + colWidths[1] + colWidths[2] + 2,
-            rowY + 5
-          );
+          const establishmentX = typeX + colWidths[typeColIndex];
+          doc.text(establishmentLines, establishmentX + 2, rowY + 5);
 
           y += rowHeight;
         });
