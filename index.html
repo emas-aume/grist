@@ -1270,7 +1270,10 @@
   */
 
   grist.ready({
-    requiredAccess: "read table"
+    // Les statistiques hebdomadaires lisent la table ETAB en plus de la table
+    // source du widget. Grist exige donc un accès au document complet pour
+    // permettre grist.docApi.fetchTable("ETAB").
+    requiredAccess: "full"
   });
 
   setTimeout(loadEtabTableForWeeklyStats, 0);
