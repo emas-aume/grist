@@ -3417,17 +3417,32 @@
   });
 
   function getAvailableWeeks() {
-    /* Le sélecteur est construit depuis le calendrier scolaire de la table,
-       pas depuis les FE déjà chargés. Aucun chargement annuel nécessaire. */
+    /* Une année sélectionnée = son année scolaire uniquement.
+       Pour l'année en cours, on ne propose pas les semaines futures.
+       Pour une année archivée, toute la période septembre -> août reste accessible.
+       Cette liste est calculée localement : aucune lecture massive des FE. */
     const period = SCHOOL_YEAR_BY_TABLE[selectedTableData];
     if (!period) return [];
-    let d = getMondayUtc(parseGristDate(period.start));
-    const end = parseGristDate(period.end);
+
+    const schoolStart = parseGristDate(period.start);
+    const schoolEnd = parseGristDate(period.end);
+    if (!schoolStart || !schoolEnd) return [];
+
+    const now = new Date();
+    const todayUtc = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
+    const effectiveEnd = todayUtc < schoolEnd && todayUtc >= schoolStart ? todayUtc : schoolEnd;
+
+    let d = getMondayUtc(schoolStart);
     const out = [];
     const seen = new Set();
-    while (d && d <= end) {
+    while (d && d <= effectiveEnd) {
       const info = getISOWeekInfo(d);
-      if (!seen.has(info.key)) { seen.add(info.key); out.push(info); }
+      /* On garde la semaine qui chevauche le 1er septembre, mais jamais une
+         semaine entièrement antérieure ou postérieure à l'année scolaire. */
+      if (info.sunday >= schoolStart && info.monday <= effectiveEnd && !seen.has(info.key)) {
+        seen.add(info.key);
+        out.push(info);
+      }
       d = addDaysUTC(d, 7);
     }
     return out.sort(function(a,b){ return b.monday - a.monday; });
