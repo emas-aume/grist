@@ -984,6 +984,8 @@
   .analytics-table{width:100%;border-collapse:collapse;font-size:11px}.analytics-table th,.analytics-table td{padding:9px 10px;border-bottom:1px solid #e7ebf0;text-align:left}.analytics-table th{background:#f8fafc;color:#475569}.analytics-table .num{text-align:right}
   @media(max-width:900px){.analytics-kpis{grid-template-columns:repeat(2,1fr)}.analytics-grid{grid-template-columns:1fr}.analytics-wide{grid-column:auto}}
 
+
+    .analytics-week-separator{stroke:#dbe3ef;stroke-width:1;stroke-dasharray:3 4;vector-effect:non-scaling-stroke}
 </style>
 
 </head>
@@ -1276,7 +1278,7 @@
     <div id="analytics-status" class="analytics-status">Ouvrez l’onglet pour charger les statistiques.</div>
     <div id="analytics-kpis" class="analytics-kpis"></div>
     <div class="analytics-grid">
-      <div class="analytics-card analytics-wide"><h3>Évolution hebdomadaire des FE</h3><div id="analytics-trend"></div></div>
+      <div class="analytics-card analytics-wide"><h3>Évolution quotidienne des FE</h3><div id="analytics-trend"></div></div>
       <div class="analytics-card" id="analytics-types-card"><h3>Typologies principales</h3><div id="analytics-types"></div></div>
       <div class="analytics-card" id="analytics-territories-card"><h3>Répartition territoriale</h3><div id="analytics-territories"></div></div>
       <div class="analytics-card analytics-wide" id="analytics-dept-trend-card"><h3>Évolution hebdomadaire par département</h3><div id="analytics-dept-trend"></div></div>
@@ -5842,13 +5844,55 @@
   function analyticsIsViolence(r){const t=normalizeText(String(r[FIELD.TYPES_STRUCTURE]||r[FIELD.TYPES]||''));return t.includes('violence')||t.includes('harcelement')||t.includes('homicide')||t.includes('racket')||t.includes('extorsion');}
   function analyticsTotalEstablishments(){return etabRecords.filter(e=>{if(analyticsDepartment!=='all'&&getEtabDepartment(e)!==analyticsDepartment)return false;if(analyticsDegree!=='all'){const c=getEtabCategory(e),d=c==='first'?'1er':(c==='college'||c==='lycee'?'2nd':'');if(d!==analyticsDegree)return false;}return true;}).length;}
   function renderAnalyticsBars(id,entries){const e=document.getElementById(id);if(!e)return;if(!entries.length){e.innerHTML='<div class="analytics-empty">Aucune donnée sur la période.</div>';return;}const max=Math.max(...entries.map(x=>x[1]))||1;e.innerHTML='<div class="analytics-bars">'+entries.map(x=>`<div class="analytics-bar-row"><div>${escapeHtml(x[0])}</div><div class="analytics-bar-track"><div class="analytics-bar-fill" style="width:${Math.max(2,x[1]/max*100).toFixed(1)}%"></div></div><div class="analytics-bar-value">${x[1]}</div></div>`).join('')+'</div>';}
-  function renderAnalyticsTrend(rows){const e=document.getElementById('analytics-trend');if(!e)return;const m=new Map();rows.forEach(r=>{if(r._weekKey)m.set(r._weekKey,(m.get(r._weekKey)||0)+1)});const a=[...m.entries()].sort((x,y)=>x[0].localeCompare(y[0]));if(!a.length){e.innerHTML='<div class="analytics-empty">Aucun FE sur la période.</div>';return;}const W=900,H=210,p=34,max=Math.max(...a.map(x=>x[1]))||1,step=a.length>1?(W-p*2)/(a.length-1):0,pts=a.map((x,i)=>[p+i*step,H-p-(x[1]/max)*(H-p*2),x]),path=pts.map((x,i)=>(i?'L':'M')+x[0].toFixed(1)+' '+x[1].toFixed(1)).join(' ');e.innerHTML=`<div class="analytics-line-wrap"><svg class="analytics-line-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"><line class="analytics-line-grid" x1="${p}" y1="${H-p}" x2="${W-p}" y2="${H-p}"/><path class="analytics-line-path" d="${path}"/>${pts.map((x,i)=>`<circle class="analytics-line-dot" cx="${x[0]}" cy="${x[1]}" r="3"><title>${x[2][0]} : ${x[2][1]} FE</title></circle><text class="analytics-line-value" x="${x[0]}" y="${Math.max(11,x[1]-8)}" text-anchor="middle">${x[2][1]}</text>${(i===0||i===pts.length-1||i%Math.ceil(pts.length/8)===0)?`<text class="analytics-line-label" x="${x[0]}" y="${H-8}" text-anchor="middle">${x[2][0].replace(/^\d{4}-W/,'S')}</text>`:''}`).join('')}</svg></div>`;}
+  function analyticsChartDays(){
+    return analyticsDateKeys();
+  }
+  function analyticsWeekLabelForDay(dayKey){
+    const d=parseGristDate(dayKey);if(!d)return '';
+    const info=getISOWeekInfo(d);return info?'S'+String(info.week).padStart(2,'0'):'';
+  }
+  function analyticsSmoothPath(points){
+    if(!points.length)return '';
+    if(points.length===1)return `M${points[0][0].toFixed(1)} ${points[0][1].toFixed(1)}`;
+    let d=`M${points[0][0].toFixed(1)} ${points[0][1].toFixed(1)}`;
+    for(let i=0;i<points.length-1;i++){
+      const p0=points[Math.max(0,i-1)],p1=points[i],p2=points[i+1],p3=points[Math.min(points.length-1,i+2)];
+      const c1x=p1[0]+(p2[0]-p0[0])/6,c1y=p1[1]+(p2[1]-p0[1])/6;
+      const c2x=p2[0]-(p3[0]-p1[0])/6,c2y=p2[1]-(p3[1]-p1[1])/6;
+      d+=` C${c1x.toFixed(1)} ${c1y.toFixed(1)},${c2x.toFixed(1)} ${c2y.toFixed(1)},${p2[0].toFixed(1)} ${p2[1].toFixed(1)}`;
+    }
+    return d;
+  }
+  function analyticsWeekMarkers(days,W,p){
+    if(!days.length)return '';
+    const step=days.length>1?(W-p*2)/(days.length-1):0;
+    return days.map((day,i)=>{
+      const d=parseGristDate(day);if(!d)return '';
+      const monday=d.getUTCDay()===1;
+      if(!monday && i!==0)return '';
+      const x=p+i*step,label=analyticsWeekLabelForDay(day);
+      return `<line class="analytics-week-separator" x1="${x}" y1="12" x2="${x}" y2="${W>0?190:190}"/><text class="analytics-line-label" x="${x+3}" y="202" text-anchor="start">${label}</text>`;
+    }).join('');
+  }
+  function renderAnalyticsTrend(rows){
+    const e=document.getElementById('analytics-trend');if(!e)return;
+    const days=analyticsChartDays();if(!days.length){e.innerHTML='<div class="analytics-empty">Aucune période disponible.</div>';return;}
+    const counts=new Map(days.map(d=>[d,0]));rows.forEach(r=>{if(r._dateKey&&counts.has(r._dateKey))counts.set(r._dateKey,(counts.get(r._dateKey)||0)+1)});
+    const W=900,H=230,p=38,max=Math.max(1,...days.map(d=>counts.get(d)||0)),step=days.length>1?(W-p*2)/(days.length-1):0;
+    const pts=days.map((d,i)=>[p+i*step,H-p-((counts.get(d)||0)/max)*(H-p*2),d,counts.get(d)||0]);
+    const path=analyticsSmoothPath(pts);
+    const weekMarks=days.map((day,i)=>{const dt=parseGristDate(day);if(!dt)return'';if(dt.getUTCDay()!==1&&i!==0)return'';const x=p+i*step;return `<line class="analytics-week-separator" x1="${x}" y1="12" x2="${x}" y2="${H-p}"/><text class="analytics-line-label" x="${x+3}" y="${H-8}" text-anchor="start">${analyticsWeekLabelForDay(day)}</text>`}).join('');
+    e.innerHTML=`<div class="analytics-line-wrap"><svg class="analytics-line-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"><line class="analytics-line-grid" x1="${p}" y1="${H-p}" x2="${W-p}" y2="${H-p}"/>${weekMarks}<path class="analytics-line-path" d="${path}"/>${pts.map(x=>`<circle class="analytics-line-dot" cx="${x[0]}" cy="${x[1]}" r="2.7"><title>${formatFullDate(parseGristDate(x[2]))} : ${x[3]} FE</title></circle>${x[3]>0?`<text class="analytics-line-value" x="${x[0]}" y="${Math.max(11,x[1]-7)}" text-anchor="middle">${x[3]}</text>`:''}`).join('')}</svg></div>`;
+  }
   function renderAnalyticsMultiDeptTrend(id,rows,violenceOnly){
-    const e=document.getElementById(id);if(!e)return;const deps=['11','30','34','48','66'],weeks=[...new Set(rows.map(r=>r._weekKey).filter(Boolean))].sort();if(!weeks.length){e.innerHTML='<div class="analytics-empty">Aucune donnée sur la période.</div>';return;}
-    const data={};deps.forEach(d=>data[d]=new Map());rows.forEach(r=>{if(violenceOnly&&!analyticsIsViolence(r))return;const d=analyticsResolveDepartment(r);if(!deps.includes(d)||!r._weekKey)return;data[d].set(r._weekKey,(data[d].get(r._weekKey)||0)+1);});
-    const max=Math.max(1,...deps.flatMap(d=>weeks.map(w=>data[d].get(w)||0))),W=900,H=230,p=38,step=weeks.length>1?(W-p*2)/(weeks.length-1):0,colors=['#2563eb','#dc2626','#16a34a','#9333ea','#ea580c'];
-    const paths=deps.map((d,di)=>{const pts=weeks.map((w,i)=>[p+i*step,H-p-((data[d].get(w)||0)/max)*(H-p*2),data[d].get(w)||0]);const path=pts.map((x,i)=>(i?'L':'M')+x[0].toFixed(1)+' '+x[1].toFixed(1)).join(' ');return `<path d="${path}" fill="none" stroke="${colors[di]}" stroke-width="2.4" vector-effect="non-scaling-stroke"/>${pts.map(x=>`<circle cx="${x[0]}" cy="${x[1]}" r="2.5" fill="${colors[di]}"><title>${d} : ${x[2]} FE</title></circle>`).join('')}`}).join('');
-    e.innerHTML=`<div class="analytics-legend">${deps.map((d,i)=>`<span><i style="background:${colors[i]}"></i>${d}</span>`).join('')}</div><div class="analytics-line-wrap"><svg class="analytics-line-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"><line class="analytics-line-grid" x1="${p}" y1="${H-p}" x2="${W-p}" y2="${H-p}"/>${paths}${weeks.map((w,i)=>(i===0||i===weeks.length-1||i%Math.ceil(weeks.length/8)===0)?`<text class="analytics-line-label" x="${p+i*step}" y="${H-8}" text-anchor="middle">${w.replace(/^\d{4}-W/,'S')}</text>`:'').join('')}</svg></div>`;
+    const e=document.getElementById(id);if(!e)return;
+    const deps=['11','30','34','48','66'],days=analyticsChartDays();if(!days.length){e.innerHTML='<div class="analytics-empty">Aucune donnée sur la période.</div>';return;}
+    const data={};deps.forEach(d=>data[d]=new Map(days.map(day=>[day,0])));
+    rows.forEach(r=>{if(violenceOnly&&!analyticsIsViolence(r))return;const d=analyticsResolveDepartment(r),day=r._dateKey;if(!deps.includes(d)||!day||!data[d].has(day))return;data[d].set(day,(data[d].get(day)||0)+1);});
+    const max=Math.max(1,...deps.flatMap(d=>days.map(day=>data[d].get(day)||0))),W=900,H=250,p=40,step=days.length>1?(W-p*2)/(days.length-1):0,colors=['#2563eb','#dc2626','#16a34a','#9333ea','#ea580c'];
+    const paths=deps.map((d,di)=>{const pts=days.map((day,i)=>[p+i*step,H-p-((data[d].get(day)||0)/max)*(H-p*2),data[d].get(day)||0,day]);const path=analyticsSmoothPath(pts);return `<path d="${path}" fill="none" stroke="${colors[di]}" stroke-width="2.2" vector-effect="non-scaling-stroke"/>${pts.map(x=>`<circle cx="${x[0]}" cy="${x[1]}" r="2" fill="${colors[di]}"><title>${d} — ${formatFullDate(parseGristDate(x[4]))} : ${x[2]} FE${violenceOnly?' de violence':''}</title></circle>`).join('')}`}).join('');
+    const weekMarks=days.map((day,i)=>{const dt=parseGristDate(day);if(!dt)return'';if(dt.getUTCDay()!==1&&i!==0)return'';const x=p+i*step;return `<line class="analytics-week-separator" x1="${x}" y1="12" x2="${x}" y2="${H-p}"/><text class="analytics-line-label" x="${x+3}" y="${H-8}" text-anchor="start">${analyticsWeekLabelForDay(day)}</text>`}).join('');
+    e.innerHTML=`<div class="analytics-legend">${deps.map((d,i)=>`<span><i style="background:${colors[i]}"></i>${d}</span>`).join('')}</div><div class="analytics-line-wrap"><svg class="analytics-line-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"><line class="analytics-line-grid" x1="${p}" y1="${H-p}" x2="${W-p}" y2="${H-p}"/>${weekMarks}${paths}</svg></div>`;
   }
   function renderAnalyticsDashboard(){
     const rows=analyticsFiltered(),st=document.getElementById('analytics-status');if(st)st.textContent=`${rows.length} FE analysés sur ${analyticsRecords.length} FE chargés pour la période`;
