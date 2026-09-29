@@ -1277,7 +1277,8 @@
     EQUIPIER: "Equipier",
     ID_NOM: "Etablissement",
     VILLE: "Ville",
-    RESUME: "Resume_du_fait"
+    RESUME: "Resume_du_fait",
+    EXPOSE: "Expose_des_faits"
   });
 
   const COLUMNS = Object.freeze([
@@ -1308,6 +1309,9 @@
   let selectedLevel = "all";
   let selectedDegree = "all";
   let searchText = "";
+  let searchLoadTimer = null;
+  let searchLoadToken = 0;
+  let searchState = {tableId:null, query:"", offset:0, complete:true, rawMatches:[], loading:false};
 
   let selectedWhiteNoteDepartment = "";
   let selectedWhiteNoteDate = "";
@@ -1316,6 +1320,8 @@
   let etabRecords = [];
   let etabLoadState = "idle";
   let selectedWeeklyStatsWeek = "";
+  let weeklyStatsRecords = [];
+  let weeklyStatsLoadToken = 0;
 
   const diagnostic = document.getElementById("diagnostic");
 
@@ -1387,16 +1393,23 @@
     return (Array.isArray(payload.records) ? payload.records : []).map(function(r){ return Object.assign({id:r.id}, r.fields || {}); });
   }
 
-  async function fetchFactsForDateKey(tableId, dateKey, retry) {
+  function dateKeyToEpoch(dateKey) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(dateKey || ""));
+    return m ? Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])) / 1000 : null;
+  }
+
+  async function fetchFactsForDateKeys(tableId, dateKeys, retry) {
+    const epochs = Array.from(new Set((dateKeys || []).map(dateKeyToEpoch).filter(Number.isFinite)));
+    if (!epochs.length) return [];
     const t = await getTokenInfo(false);
-    const filter = JSON.stringify({[FIELD.DATE_SAISIE]: [dateKey]});
-    const qs = new URLSearchParams({cellFormat:"normal", filter:filter, sort:"-Numero_FE", auth:t.token});
+    const filter = JSON.stringify({[FIELD.DATE_SAISIE]: epochs});
+    const qs = new URLSearchParams({cellFormat:"normal", filter:filter, sort:"-Date_de_saisie,-Numero_FE", auth:t.token});
     const url = t.baseUrl + "/tables/" + encodeURIComponent(tableId) + "/records?" + qs.toString();
     const response = await fetch(url, {method:"GET", credentials:"omit"});
     if (response.status === 401 && retry !== false) {
       tokenInfo = null;
       await getTokenInfo(true);
-      return fetchFactsForDateKey(tableId, dateKey, false);
+      return fetchFactsForDateKeys(tableId, dateKeys, false);
     }
     if (!response.ok) throw new Error("HTTP " + response.status);
     const payload = await response.json();
@@ -1405,13 +1418,18 @@
     });
   }
 
+  async function fetchFactsForDateKey(tableId, dateKey, retry) {
+    return fetchFactsForDateKeys(tableId, [dateKey], retry);
+  }
+
   async function fetchDocumentDateKeys(dateKeys) {
     const keys = Array.from(new Set((dateKeys || []).filter(Boolean))).sort();
     const cacheKey = keys.join("|");
     if (documentPeriodCache.has(cacheKey)) return documentPeriodCache.get(cacheKey).slice();
-    const chunks = await Promise.all(keys.map(function(key){ return fetchFactsForDateKey(CURRENT_FE_TABLE, key); }));
+    /* Une période DOCUMENTS = une seule requête Grist, même pour un week-end/une semaine. */
+    const fetched = await fetchFactsForDateKeys(CURRENT_FE_TABLE, keys);
     const byId = new Map();
-    chunks.flat().forEach(function(row){ byId.set(String(row.id), row); });
+    fetched.forEach(function(row){ byId.set(String(row.id), row); });
     const rows = Array.from(byId.values());
     documentPeriodCache.set(cacheKey, rows.slice());
     return rows;
@@ -1471,8 +1489,7 @@
     try {
       const rows = await fetchDocumentDateKeys(keys);
       if (token !== documentsLoadToken) return;
-      documentRecords = rows.slice();
-      ingestRecords(rows);
+      documentRecords = normalizeFactRecords(rows);
       documentsInitialized = true;
       renderWhiteNote();
       renderBRQ();
@@ -1504,15 +1521,8 @@
   }
 
   async function fetchFactsForWeek(tableId, anchorDate) {
-    const keys = weekDateKeysFromDate(anchorDate);
-    const chunks = await Promise.all(keys.map(function(key) {
-      return fetchFactsForDateKey(tableId, key);
-    }));
-    const byId = new Map();
-    chunks.flat().forEach(function(row) { byId.set(String(row.id), row); });
-    return Array.from(byId.values()).sort(function(a, b) {
-      return Number(b[FIELD.NUMERO_FE] || 0) - Number(a[FIELD.NUMERO_FE] || 0);
-    });
+    /* Une semaine = une seule requête Grist avec les 7 dates, pas 7 requêtes. */
+    return fetchFactsForDateKeys(tableId, weekDateKeysFromDate(anchorDate));
   }
 
   async function fetchLatestFact(tableId, retry) {
@@ -1577,6 +1587,8 @@
       }
 
       if (token !== dataLoadToken) return;
+      if (anchor) selectedWeek = getISOWeekInfo(anchor).key;
+      selectedDate = "all";
       rawRecordsCache.set(tableId, rows.slice());
       ingestRecords(rows);
       currentPage = 1;
@@ -1599,16 +1611,110 @@
     }
   }
 
-  /* Conservé pour compatibilité avec un éventuel ancien bouton, mais le TABLEAU
-     ne charge plus de lots de 250 : il travaille semaine par semaine. */
-  async function loadMoreFacts() {
-    return;
+  function rawRecordMatchesSearch(record, query) {
+    const terms = normalizeSearch(query).split(/\s+/).filter(Boolean);
+    if (!terms.length) return true;
+    const haystack = normalizeSearch([
+      record[FIELD.NUMERO_FE], record[FIELD.ID_NOM], record[FIELD.VILLE],
+      record[FIELD.RESUME], record[FIELD.EXPOSE], record[FIELD.TYPES],
+      record[FIELD.TYPES_STRUCTURE], record[FIELD.VICTIMES],
+      record[FIELD.AUTEURS], record[FIELD.ESPACES], record.Departement,
+      record.Niveau, record.Degre
+    ].join(" "));
+    return terms.every(function(term) { return haystack.includes(term); });
+  }
+
+  async function fetchExactFactNumber(tableId, numero, retry) {
+    const t = await getTokenInfo(false);
+    const filter = JSON.stringify({[FIELD.NUMERO_FE]: [Number(numero)]});
+    const qs = new URLSearchParams({cellFormat:"normal", filter:filter, limit:"50", auth:t.token});
+    const url = t.baseUrl + "/tables/" + encodeURIComponent(tableId) + "/records?" + qs.toString();
+    const response = await fetch(url, {method:"GET", credentials:"omit"});
+    if (response.status === 401 && retry !== false) {
+      tokenInfo = null; await getTokenInfo(true); return fetchExactFactNumber(tableId, numero, false);
+    }
+    if (!response.ok) throw new Error("HTTP " + response.status);
+    const payload = await response.json();
+    return (Array.isArray(payload.records) ? payload.records : []).map(function(r){
+      return Object.assign({id:r.id}, r.fields || {});
+    });
+  }
+
+  /* Conservé pour compatibilité avec un éventuel ancien bouton. */
+  async function loadMoreFacts() { return; }
+
+  async function loadSearchScope(tableId) {
+    const token = ++searchLoadToken;
+    const query = searchText;
+    if (!query) return;
+    searchState = {tableId:tableId, query:query, offset:0, complete:false, rawMatches:[], loading:true};
+    showDiagnostic("Recherche ciblée dans l’année scolaire…", "");
+    try {
+      // Un numéro de FE exact est interrogé directement dans Grist.
+      if (/^\d{5,}$/.test(query)) {
+        searchState.rawMatches = await fetchExactFactNumber(tableId, query);
+        searchState.complete = true;
+      } else {
+        await extendSearchResults(PAGE_SIZE * 3, token);
+      }
+      if (token !== searchLoadToken || tableId !== selectedTableData || searchText !== query) return;
+      selectedWeek = "all"; selectedDate = "all"; currentPage = 1;
+      ingestRecords(searchState.rawMatches);
+      searchState.loading = false;
+      updateSearchDiagnostic();
+    } catch (error) {
+      searchState.loading = false;
+      console.error("Recherche ciblée impossible", error);
+      showDiagnostic("Impossible d’effectuer la recherche.", "error");
+    }
+  }
+
+  async function extendSearchResults(targetCount, existingToken) {
+    if (searchState.complete || searchState.loading && existingToken === undefined) return;
+    const token = existingToken === undefined ? searchLoadToken : existingToken;
+    const tableId = searchState.tableId, query = searchState.query;
+    const BATCH = 400;
+    searchState.loading = true;
+    while (!searchState.complete && searchState.rawMatches.length < targetCount) {
+      const batch = await fetchFactBatch(tableId, searchState.offset, BATCH);
+      if (token !== searchLoadToken || tableId !== selectedTableData || searchText !== query) return;
+      searchState.offset += batch.length;
+      searchState.rawMatches.push(...batch.filter(function(row){ return rawRecordMatchesSearch(row, query); }));
+      if (batch.length < BATCH) searchState.complete = true;
+    }
+    searchState.loading = false;
+  }
+
+  function updateSearchDiagnostic() {
+    if (!searchText || searchState.query !== searchText) return;
+    const n = searchState.rawMatches.length;
+    showDiagnostic(
+      n + " résultat" + (n > 1 ? "s" : "") + " chargé" + (n > 1 ? "s" : "") +
+      (searchState.complete ? " — recherche complète" : " — d’autres résultats seront chargés en avançant dans les pages") +
+      (searchState.offset ? " (" + searchState.offset + " FE examinés)" : ""),
+      "ok"
+    );
+  }
+
+  async function loadNextSearchPages() {
+    if (!searchText || searchState.complete || searchState.loading || searchState.query !== searchText || searchState.tableId !== selectedTableData) return false;
+    const before = searchState.rawMatches.length;
+    showDiagnostic("Chargement de résultats supplémentaires…", "");
+    await extendSearchResults(before + PAGE_SIZE * 3);
+    if (searchState.query !== searchText) return false;
+    ingestRecords(searchState.rawMatches);
+    updateSearchDiagnostic();
+    return searchState.rawMatches.length > before;
   }
 
   function setDataYear(tableId) {
     if (!DATA_TABLES.has(tableId)) return;
     selectedTableData = tableId;
-    if (activeBureauTab === "tableau") loadDataTable(tableId);
+    selectedWeek = "all"; selectedDate = "all"; currentPage = 1;
+    if (activeBureauTab === "tableau") {
+      if (searchText) loadSearchScope(tableId);
+      else loadDataTable(tableId);
+    }
   }
 
   function renderActiveBureauTab() {
@@ -1644,9 +1750,13 @@
       return;
     }
     if (tab === "statistiques") {
-      /* STATISTIQUES reste autonome : aucune dépendance aux lots TABLEAU/DOCUMENTS. */
+      /* STATISTIQUES reste autonome : ETABLISSEMENTS est chargé une fois,
+         puis seulement les FE de la semaine demandée. */
       if (etabLoadState === "idle") await loadEtabTableForWeeklyStats();
-      renderWeeklyStats();
+      const weeks = getWeeklyStatsWeeks();
+      if (!selectedWeeklyStatsWeek && weeks.length) selectedWeeklyStatsWeek = weeks[0].key;
+      if (selectedWeeklyStatsWeek) await setWeeklyStatsWeek(selectedWeeklyStatsWeek);
+      else renderWeeklyStats();
     }
   }
 
@@ -1660,35 +1770,39 @@
     ==================================================
   */
 
+  function normalizeFactRecords(records) {
+    if (!Array.isArray(records)) return [];
+    return records
+      .filter(function(record){ return getNumeroFE(record && record[FIELD.NUMERO_FE]) > 0; })
+      .map(function(record) {
+        const rawDate = record[FIELD.DATE_SAISIE];
+        const date = parseGristDate(rawDate);
+        const weekInfo = date ? getISOWeekInfo(date) : null;
+        const analysis = analyzeRecordFromColumns(record);
+        return Object.assign({}, record, {
+          _departement: getDepartement(record),
+          _rawDateDeSaisie: rawDate,
+          _date: date,
+          _weekKey: weekInfo ? weekInfo.key : "",
+          _weekNumber: weekInfo ? weekInfo.week : null,
+          _weekYear: weekInfo ? weekInfo.year : null,
+          _dateKey: date ? formatDateKey(date) : "",
+          _niveau: analysis.level,
+          _degre: analysis.degree,
+          _typeFait: analysis.types,
+          _dateDuFait: analysis.dateDuFait
+        });
+      })
+      .sort(function(a,b){ return getNumeroFE(b[FIELD.NUMERO_FE]) - getNumeroFE(a[FIELD.NUMERO_FE]); });
+  }
+
   function ingestRecords(records) {
     if (!Array.isArray(records)) {
       showDiagnostic("Erreur : les données reçues par le widget ne sont pas valides.", "error");
       return;
     }
 
-    const validFactRecords = records
-      .filter(record => getNumeroFE(record?.[FIELD.NUMERO_FE]) > 0)
-      .map(record => {
-        const rawDate = record[FIELD.DATE_SAISIE];
-        const date = parseGristDate(rawDate);
-        const weekInfo = date ? getISOWeekInfo(date) : null;
-        const analysis = analyzeRecordFromColumns(record);
-        return {
-          ...record,
-          _departement: getDepartement(record),
-          _rawDateDeSaisie: rawDate,
-          _date: date,
-          _weekKey: weekInfo?.key || "",
-          _weekNumber: weekInfo?.week ?? null,
-          _weekYear: weekInfo?.year ?? null,
-          _dateKey: date ? formatDateKey(date) : "",
-          _niveau: analysis.level,
-          _degre: analysis.degree,
-          _typeFait: analysis.types,
-          _dateDuFait: analysis.dateDuFait
-        };
-      })
-      .sort((a, b) => getNumeroFE(b[FIELD.NUMERO_FE]) - getNumeroFE(a[FIELD.NUMERO_FE]));
+    const validFactRecords = normalizeFactRecords(records);
 
     allRecords = validFactRecords;
     currentPage = 1;
@@ -2382,7 +2496,7 @@
 
     if (selectedBrqPeriod.startsWith("D:")) {
       const dateKey = selectedBrqPeriod.slice(2);
-      return allRecords.filter(function(record) {
+      return documentRecords.filter(function(record) {
         if (
           !record._date ||
           !record._dateKey ||
@@ -2399,7 +2513,7 @@
 
     if (selectedBrqPeriod.startsWith("W:")) {
       const weekKey = selectedBrqPeriod.slice(2);
-      return allRecords.filter(function(record){ return record._weekKey === weekKey; });
+      return documentRecords.filter(function(record){ return record._weekKey === weekKey; });
     }
 
     if (selectedBrqPeriod.startsWith("V:")) {
@@ -2410,7 +2524,7 @@
 
       if (!period) return [];
 
-      return allRecords.filter(function(record) {
+      return documentRecords.filter(function(record) {
         return record._dateKey &&
           record._dateKey >= period.start &&
           record._dateKey <= period.end;
@@ -3296,46 +3410,29 @@
     ==================================================
   */
 
+  const SCHOOL_YEAR_BY_TABLE = Object.freeze({
+    FE26_27_2: {start:"2026-09-01", end:"2027-08-31"},
+    FE25_26:   {start:"2025-09-01", end:"2026-08-31"},
+    FE24_25:   {start:"2024-09-01", end:"2025-08-31"}
+  });
+
   function getAvailableWeeks() {
-
-    const weeks = new Map();
-
-    allRecords.forEach(function(record) {
-
-      /*
-        Une semaine n'est créée QUE si Date_de_saisie
-        a pu être lue et convertie correctement.
-      */
-      if (
-        !record._weekKey ||
-        !record._date
-      ) {
-        return;
-      }
-
-      if (!weeks.has(record._weekKey)) {
-
-        weeks.set(
-          record._weekKey,
-          getISOWeekInfo(record._date)
-        );
-      }
-    });
-
-    /*
-      Semaine la plus récente en premier.
-    */
-    return Array
-      .from(weeks.values())
-      .sort(function(a, b) {
-
-        if (a.year !== b.year) {
-          return b.year - a.year;
-        }
-
-        return b.week - a.week;
-      });
+    /* Le sélecteur est construit depuis le calendrier scolaire de la table,
+       pas depuis les FE déjà chargés. Aucun chargement annuel nécessaire. */
+    const period = SCHOOL_YEAR_BY_TABLE[selectedTableData];
+    if (!period) return [];
+    let d = getMondayUtc(parseGristDate(period.start));
+    const end = parseGristDate(period.end);
+    const out = [];
+    const seen = new Set();
+    while (d && d <= end) {
+      const info = getISOWeekInfo(d);
+      if (!seen.has(info.key)) { seen.add(info.key); out.push(info); }
+      d = addDaysUTC(d, 7);
+    }
+    return out.sort(function(a,b){ return b.monday - a.monday; });
   }
+
 
 
   /*
@@ -3361,11 +3458,7 @@
       selectedWeek = "all";
     }
 
-    let html = `
-      <option value="all">
-        Toutes les semaines
-      </option>
-    `;
+    let html = ``;
 
     weeks.forEach(function(info) {
 
@@ -3402,12 +3495,30 @@
     ==================================================
   */
 
-  function setWeek(value) {
-
+  async function setWeek(value) {
+    if (!value || value === "all") return;
     selectedWeek = value;
+    selectedDate = "all";
     currentPage = 1;
-
-    renderTable();
+    const parts = String(value).split("-");
+    const year = Number(parts[0]);
+    const week = Number(parts[1]);
+    if (!year || !week) return;
+    const jan4 = new Date(Date.UTC(year, 0, 4));
+    const monday = addDaysUTC(jan4, -(jan4.getUTCDay() || 7) + 1 + (week - 1) * 7);
+    showDiagnostic("Chargement de la semaine sélectionnée…", "");
+    try {
+      const rows = await fetchFactsForWeek(selectedTableData, monday);
+      ingestRecords(rows);
+      selectedWeek = value;
+      selectedDate = "all";
+      renderWeekFilter();
+      renderDateFilter();
+      showDiagnostic(rows.length + " fait" + (rows.length > 1 ? "s" : "") + " chargé" + (rows.length > 1 ? "s" : "") + " pour cette semaine", "ok");
+    } catch (error) {
+      console.error("Chargement semaine impossible", error);
+      showDiagnostic("Impossible de charger la semaine sélectionnée.", "error");
+    }
   }
 
 
@@ -3437,26 +3548,18 @@
 
 
   function getAvailableDates() {
-
-    const dates = new Map();
-
-    allRecords.forEach(function(record) {
-
-      if (!record._date || !record._dateKey) {
-        return;
-      }
-
-      if (!dates.has(record._dateKey)) {
-        dates.set(record._dateKey, record._date);
-      }
+    if (!selectedWeek || selectedWeek === "all") return [];
+    const parts = String(selectedWeek).split("-");
+    const year = Number(parts[0]), week = Number(parts[1]);
+    if (!year || !week) return [];
+    const jan4 = new Date(Date.UTC(year, 0, 4));
+    const monday = addDaysUTC(jan4, -(jan4.getUTCDay() || 7) + 1 + (week - 1) * 7);
+    return Array.from({length:7}, function(_, i) {
+      const d = addDaysUTC(monday, i);
+      return [formatDateKey(d), d];
     });
-
-    return Array
-      .from(dates.entries())
-      .sort(function(a, b) {
-        return b[0].localeCompare(a[0]);
-      });
   }
+
 
 
   function renderDateFilter() {
@@ -3547,11 +3650,22 @@
 
 
   function setSearch(value) {
-
     searchText = normalizeSearch(value);
     currentPage = 1;
+    clearTimeout(searchLoadTimer);
 
-    renderTable();
+    if (!searchText) {
+      ++searchLoadToken;
+      searchState = {tableId:null, query:"", offset:0, complete:true, rawMatches:[], loading:false};
+      loadDataTable(selectedTableData);
+      return;
+    }
+
+    /* Recherche à la demande par petits lots : on ne charge jamais toute l’année
+       en mémoire simplement parce que l’utilisateur saisit un mot. */
+    searchLoadTimer = setTimeout(function() {
+      loadSearchScope(selectedTableData);
+    }, 250);
   }
 
 
@@ -3562,19 +3676,11 @@
   */
 
   function getDepartments() {
-
-    const departments = allRecords
-      .map(record => record._departement)
-      .filter(Boolean);
-
-    const unique = [...new Set(departments)];
-
-    unique.sort(function(a, b) {
-      return Number(a) - Number(b);
-    });
-
-    return unique;
+    /* Les cinq départements académiques restent toujours disponibles,
+       même lorsqu'aucun FE du département n'existe dans la semaine chargée. */
+    return ["11", "30", "34", "48", "66"];
   }
+
 
 
   /*
@@ -3781,16 +3887,22 @@
         record[FIELD.ID_NOM],
         record[FIELD.VILLE],
         record[FIELD.RESUME],
+        record[FIELD.EXPOSE],
+        record[FIELD.TYPES],
+        record[FIELD.TYPES_STRUCTURE],
+        record[FIELD.VICTIMES],
+        record[FIELD.AUTEURS],
+        record[FIELD.ESPACES],
         record._departement,
         record._niveau,
-        Array.isArray(record._typeFait)
-          ? record._typeFait.join(" ")
-          : ""
+        record._degre,
+        Array.isArray(record._typeFait) ? record._typeFait.join(" ") : record._typeFait
       ].join(" "));
 
-      const searchOk =
-        !searchText ||
-        searchableText.includes(searchText);
+      const searchTerms = searchText.split(/\s+/).filter(Boolean);
+      const searchOk = !searchTerms.length || searchTerms.every(function(term) {
+        return searchableText.includes(term);
+      });
 
       return (
         departmentOk &&
@@ -4334,7 +4446,7 @@
       getWhiteNoteSourceDates(noteDate).map(formatDateKey)
     );
 
-    return allRecords.filter(function(record) {
+    return documentRecords.filter(function(record) {
       return (
         isWhiteNoteDisplayableRecord(record, selectedWhiteNoteDepartment) &&
         sourceDateKeys.has(record._dateKey)
@@ -5342,12 +5454,12 @@
           class="page-btn"
           onclick="goToPage(${currentPage + 1})"
           ${
-            currentPage === totalPages
+            currentPage === totalPages && !(searchText && !searchState.complete)
               ? "disabled"
               : ""
           }
         >
-          Suivant →
+          ${currentPage === totalPages && searchText && !searchState.complete ? "Charger la suite →" : "Suivant →"}
         </button>
 
       </div>
@@ -5356,7 +5468,7 @@
         ${firstRow}–${lastRow}
         sur
         ${totalRecords}
-        faits
+        faits${searchText && !searchState.complete ? " chargés (suite disponible)" : ""}
       </div>
     `;
   }
@@ -5368,37 +5480,28 @@
     ==================================================
   */
 
-  function goToPage(page) {
+  async function goToPage(page) {
+    let filteredRecords = getFilteredRecords();
+    let totalPages = Math.max(1, Math.ceil(filteredRecords.length / PAGE_SIZE));
 
-    const filteredRecords =
-      getFilteredRecords();
-
-    const totalPages = Math.max(
-      1,
-      Math.ceil(
-        filteredRecords.length / PAGE_SIZE
-      )
-    );
-
-    if (
-      page < 1 ||
-      page > totalPages
-    ) {
-      return;
+    // En recherche textuelle, atteindre la fin des pages déjà chargées déclenche
+    // la lecture des lots Grist suivants au lieu de charger toute l’année d’un coup.
+    if (page > totalPages && searchText && !searchState.complete) {
+      await loadNextSearchPages();
+      // ingestRecords travaille par petits lots via setTimeout : attendre que le jeu
+      // filtré reflète les nouveaux résultats avant de changer de page.
+      await new Promise(function(resolve){ setTimeout(resolve, 30); });
+      filteredRecords = getFilteredRecords();
+      totalPages = Math.max(1, Math.ceil(filteredRecords.length / PAGE_SIZE));
     }
 
+    if (page < 1 || page > totalPages) return;
     currentPage = page;
-
     renderTable();
-
-    const table =
-      document.getElementById("table1");
-
-    if (table) {
-      table.scrollTop = 0;
-      table.scrollLeft = 0;
-    }
+    const table = document.getElementById("table1");
+    if (table) { table.scrollTop = 0; table.scrollLeft = 0; }
   }
+
 
 
   /*
@@ -5603,19 +5706,9 @@
   }
 
   function getWeeklyStatsWeeks() {
-    const map = new Map();
-    allRecords.forEach(function(record) {
-      if (!record._weekKey || !record._date) return;
-      if (!map.has(record._weekKey)) {
-        const info = getISOWeekInfo(record._date);
-        if (!info) return;
-        const day = record._date.getDay() || 7;
-        const monday = new Date(record._date); monday.setDate(record._date.getDate() - day + 1);
-        const sunday = new Date(monday); sunday.setDate(monday.getDate() + 6);
-        map.set(record._weekKey, { key:record._weekKey, week:info.week, year:info.year, monday:monday, sunday:sunday });
-      }
-    });
-    return Array.from(map.values()).sort(function(a,b) { return b.key.localeCompare(a.key); });
+    /* Même index léger que TABLEAU : semaines calculées depuis l’année scolaire,
+       jamais depuis des milliers de FE préchargés. */
+    return getAvailableWeeks();
   }
 
   function renderWeeklyStatsWeekOptions() {
@@ -5635,11 +5728,29 @@
     select.value = selectedWeeklyStatsWeek;
   }
 
-  function setWeeklyStatsWeek(value) { selectedWeeklyStatsWeek = value; renderWeeklyStats(); }
+  async function setWeeklyStatsWeek(value) {
+    if (!value) return;
+    selectedWeeklyStatsWeek = value;
+    const info = getWeeklyStatsWeeks().find(function(w){ return w.key === value; });
+    if (!info) { weeklyStatsRecords = []; renderWeeklyStats(); return; }
+    const token = ++weeklyStatsLoadToken;
+    const content = document.getElementById("weekly-stats-content");
+    if (content) content.innerHTML = '<div class="weekly-stats-empty">Chargement des FE de la semaine…</div>';
+    try {
+      const rows = await fetchFactsForWeek(selectedTableData, info.monday);
+      if (token !== weeklyStatsLoadToken || selectedWeeklyStatsWeek !== value) return;
+      weeklyStatsRecords = normalizeFactRecords(rows);
+      renderWeeklyStats();
+    } catch (error) {
+      console.error("Chargement statistiques impossible", error);
+      weeklyStatsRecords = [];
+      if (content) content.innerHTML = '<div class="weekly-stats-empty">Impossible de charger les FE de cette semaine.</div>';
+    }
+  }
 
   function buildWeeklyStats(department) {
     const isAcademy = department === "ACADEMIE";
-    const weekFacts = allRecords.filter(function(record) {
+    const weekFacts = weeklyStatsRecords.filter(function(record) {
       return record._weekKey === selectedWeeklyStatsWeek && (isAcademy || record._departement === department);
     });
     const scopedEtabs = etabRecords.filter(function(row) {
@@ -5724,7 +5835,7 @@
     if (!selectedWeeklyStatsWeek) { content.innerHTML='<div class="weekly-stats-empty">Aucune semaine disponible.</div>'; if(button)button.disabled=true; return; }
     const info=getWeeklyStatsWeeks().find(function(w){return w.key===selectedWeeklyStatsWeek;});
     if(period) period.textContent=info?`Semaine ${info.week} — ${formatDayMonth(info.monday)} au ${formatDayMonth(info.sunday)}`:"";
-    const order=["34","30","66","11","48"]; const available=new Set(etabRecords.map(getEtabDepartment).filter(Boolean).concat(allRecords.map(function(r){return r._departement;}).filter(Boolean)));
+    const order=["34","30","66","11","48"]; const available=new Set(etabRecords.map(getEtabDepartment).filter(Boolean).concat(weeklyStatsRecords.map(function(r){return r._departement;}).filter(Boolean)));
     const deps=order.filter(function(d){return available.has(d);});
     const academyHtml = renderWeeklyStatsDepartment(buildWeeklyStats("ACADEMIE"));
     content.innerHTML=academyHtml + deps.map(function(d){return renderWeeklyStatsDepartment(buildWeeklyStats(d));}).join("");
