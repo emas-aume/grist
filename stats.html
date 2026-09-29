@@ -965,7 +965,26 @@
     .data-year-select{padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--text)}
     @media(max-width:700px){.bureau-tabs{flex-wrap:wrap}.bureau-tab{flex:1 1 auto}.data-year-control{width:100%;margin-left:0}.data-year-select{flex:1}}
 
-  </style>
+  
+  /* Tableau de bord analytique */
+  .analytics-head{display:flex;justify-content:space-between;gap:24px;align-items:flex-start;flex-wrap:wrap}
+  .analytics-head h2{margin:0 0 6px}.analytics-head p{margin:0;color:#64748b;font-size:13px}
+  .analytics-filters{display:flex;gap:10px;flex-wrap:wrap;align-items:end}
+  .analytics-filters label{display:flex;flex-direction:column;gap:5px;font-size:11px;color:#64748b;font-weight:600}
+  .analytics-filters select{min-width:130px;padding:9px 11px;border:1px solid #dbe2ea;border-radius:8px;background:#fff;color:#172033}
+  .analytics-status{margin:18px 0 12px;padding:9px 12px;border-radius:8px;background:#f8fafc;color:#64748b;font-size:12px}
+  .analytics-status.error{background:#fff1f2;color:#b42318}
+  .analytics-kpis{display:grid;grid-template-columns:repeat(6,minmax(130px,1fr));gap:10px;margin-bottom:14px}
+  .analytics-kpi,.analytics-card{border:1px solid #e1e6ed;border-radius:10px;background:#fff}
+  .analytics-kpi{padding:14px}.analytics-kpi-label{font-size:11px;color:#64748b;font-weight:600}.analytics-kpi-value{font-size:25px;font-weight:700;margin:5px 0;color:#172033}.analytics-kpi-sub{font-size:10px;color:#7b8798}
+  .analytics-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}.analytics-card{padding:16px;min-width:0}.analytics-card h3{margin:0 0 14px;font-size:14px}.analytics-wide{grid-column:1/-1}
+  .analytics-empty{padding:22px;text-align:center;color:#718096;font-size:12px}
+  .analytics-bars{display:grid;gap:9px}.analytics-bar-row{display:grid;grid-template-columns:minmax(130px,1.1fr) 2fr 42px;gap:9px;align-items:center;font-size:11px}.analytics-bar-track{height:9px;background:#eef2f7;border-radius:999px;overflow:hidden}.analytics-bar-fill{height:100%;background:#2f6fed;border-radius:999px}.analytics-bar-value{text-align:right;font-weight:700}
+  .analytics-line-wrap{width:100%;overflow:hidden}.analytics-line-svg{width:100%;height:210px}.analytics-line-grid{stroke:#dbe2ea;stroke-width:1}.analytics-line-path{fill:none;stroke:#2f6fed;stroke-width:3;vector-effect:non-scaling-stroke}.analytics-line-dot{fill:#2f6fed}.analytics-line-label{font-size:10px;fill:#64748b}
+  .analytics-table{width:100%;border-collapse:collapse;font-size:11px}.analytics-table th,.analytics-table td{padding:9px 10px;border-bottom:1px solid #e7ebf0;text-align:left}.analytics-table th{background:#f8fafc;color:#475569}.analytics-table .num{text-align:right}
+  @media(max-width:900px){.analytics-kpis{grid-template-columns:repeat(2,1fr)}.analytics-grid{grid-template-columns:1fr}.analytics-wide{grid-column:auto}}
+
+</style>
 
 </head>
 
@@ -1244,9 +1263,24 @@
 
   <!-- ESPACE STATISTIQUES ANALYTIQUES -->
   <section class="section bureau-panel hidden-panel" id="analytics-stats-section">
-    <h2>Statistiques et analyses</h2>
-    <p>Tableau de bord analytique en préparation. Cet espace accueillera les indicateurs, évolutions, comparaisons et analyses des faits d’établissement.</p>
-    <div class="weekly-stats-empty">Les indicateurs de cet onglet seront construits indépendamment des documents hebdomadaires.</div>
+    <div class="analytics-head">
+      <div><h2>Statistiques et analyses</h2><p>Analyse interactive des faits d’établissement. Les données sont chargées uniquement pour la période demandée.</p></div>
+      <div class="analytics-filters">
+        <label>Année scolaire<select id="analytics-year" onchange="setAnalyticsYear(this.value)"><option value="FE26_27_2">2026-2027</option><option value="FE25_26">2025-2026</option><option value="FE24_25">2024-2025</option></select></label>
+        <label>Période<select id="analytics-period" onchange="setAnalyticsPeriod(this.value)"><option value="4weeks">4 dernières semaines</option><option value="week">Semaine</option><option value="month">Mois</option><option value="schoolyear">Depuis la rentrée</option></select></label>
+        <label>Référence<select id="analytics-anchor" onchange="setAnalyticsAnchor(this.value)"></select></label>
+        <label>Département<select id="analytics-department" onchange="setAnalyticsDepartment(this.value)"><option value="all">Académie</option><option value="11">11</option><option value="30">30</option><option value="34">34</option><option value="48">48</option><option value="66">66</option></select></label>
+        <label>Degré<select id="analytics-degree" onchange="setAnalyticsDegree(this.value)"><option value="all">Tous</option><option value="1er">1er degré</option><option value="2nd">2nd degré</option></select></label>
+      </div>
+    </div>
+    <div id="analytics-status" class="analytics-status">Ouvrez l’onglet pour charger les statistiques.</div>
+    <div id="analytics-kpis" class="analytics-kpis"></div>
+    <div class="analytics-grid">
+      <div class="analytics-card analytics-wide"><h3>Évolution hebdomadaire des FE</h3><div id="analytics-trend"></div></div>
+      <div class="analytics-card"><h3>Typologies principales</h3><div id="analytics-types"></div></div>
+      <div class="analytics-card"><h3>Répartition territoriale</h3><div id="analytics-territories"></div></div>
+      <div class="analytics-card analytics-wide"><h3>Établissements déclarants</h3><div id="analytics-establishments"></div></div>
+    </div>
   </section>
 
 
@@ -1332,6 +1366,16 @@
   let weeklyStatsRecords = [];
   let weeklyStatsLoadToken = 0;
 
+  /* État indépendant du tableau de bord analytique. */
+  let analyticsTable = "FE26_27_2";
+  let analyticsPeriod = "4weeks";
+  let analyticsAnchor = "";
+  let analyticsDepartment = "all";
+  let analyticsDegree = "all";
+  let analyticsRecords = [];
+  let analyticsLoadToken = 0;
+  const analyticsCache = new Map();
+
   const diagnostic = document.getElementById("diagnostic");
 
   /*
@@ -1380,6 +1424,11 @@
   let documentRecords = [];
   let documentsInitialized = false;
   let documentsLoadToken = 0;
+  let documentAvailabilityReady = false;
+  let documentAvailabilityLoading = null;
+  const documentAvailableDateKeys = new Set();
+  const whiteNoteAvailableKeysByDepartment = new Map();
+  let brqAvailableValues = [];
 
   function cacheProcessedRecords(tableId, rows) { processedRecordsCache.set(tableId, rows.slice()); }
 
@@ -1467,6 +1516,60 @@
     return r ? Object.assign({id:r.id}, r.fields || {}) : null;
   }
 
+  function getCurrentSchoolYearDateKeysToToday() {
+    const period = SCHOOL_YEAR_BY_TABLE[CURRENT_FE_TABLE];
+    if (!period) return [];
+    const start = parseGristDate(period.start);
+    const schoolEnd = parseGristDate(period.end);
+    if (!start || !schoolEnd) return [];
+    const today = parseGristDate(todayUtcKey());
+    let end = schoolEnd;
+    if (today && today < end) end = today;
+    const out = [];
+    let d = new Date(start.getTime());
+    while (d <= end) { out.push(formatDateKey(d)); d = addDaysUTC(d, 1); }
+    return out;
+  }
+
+  async function ensureDocumentAvailability() {
+    if (documentAvailabilityReady) return;
+    if (documentAvailabilityLoading) return documentAvailabilityLoading;
+    documentAvailabilityLoading = (async function() {
+      /* Découverte par blocs de 28 jours : une requête par bloc, mise en cache.
+         On ne recharge pas les mêmes périodes pour NB et BRQ. */
+      const keys = getCurrentSchoolYearDateKeysToToday();
+      const chunks = [];
+      for (let i = 0; i < keys.length; i += 28) chunks.push(keys.slice(i, i + 28));
+      const rows = [];
+      for (const chunk of chunks) {
+        const part = await fetchDocumentDateKeys(chunk);
+        rows.push.apply(rows, part);
+      }
+      documentAvailableDateKeys.clear();
+      whiteNoteAvailableKeysByDepartment.clear();
+      const brqSet = new Set();
+      rows.forEach(function(raw) {
+        const record = normalizeFactRecords([raw])[0];
+        if (!record || !record._date || !record._dateKey) return;
+        documentAvailableDateKeys.add(record._dateKey);
+        const dep = record._departement;
+        const noteDate = getWhiteNoteDateForRecordDate(record._date);
+        if (dep && noteDate && (record._degre === "1er" || record._degre === "2nd")) {
+          const noteKey = formatDateKey(noteDate);
+          if (!whiteNoteAvailableKeysByDepartment.has(dep)) whiteNoteAvailableKeysByDepartment.set(dep, new Set());
+          whiteNoteAvailableKeysByDepartment.get(dep).add(noteKey);
+        }
+        if (record._dateKey >= BRQ_START_DATE && !isBrqSchoolBreakDateKey(record._dateKey)) {
+          const brqDate = getBrqEffectiveDailyDate(record._date);
+          if (brqDate) brqSet.add("D:" + formatDateKey(brqDate));
+        }
+      });
+      brqAvailableValues = Array.from(brqSet).sort();
+      documentAvailabilityReady = true;
+    })().finally(function(){ documentAvailabilityLoading = null; });
+    return documentAvailabilityLoading;
+  }
+
   async function refreshLatestDocumentBounds(department) {
     const jobs = [];
     if (!latestDocumentFactDate) {
@@ -1483,12 +1586,16 @@
   }
 
   function latestWhiteNoteAvailableKey(department) {
+    const set = whiteNoteAvailableKeysByDepartment.get(department);
+    if (set && set.size) return Array.from(set).sort().pop();
     const factDate = latestDocumentFactByDepartment.get(department);
     const noteDate = factDate ? getWhiteNoteDateForRecordDate(factDate) : null;
     return noteDate ? formatDateKey(noteDate) : "";
   }
 
   function latestBrqAvailableKey() {
+    const daily = brqAvailableValues.filter(function(v){ return v.startsWith("D:"); });
+    if (daily.length) return daily[daily.length - 1].slice(2);
     const brqDate = latestDocumentFactDate ? getBrqEffectiveDailyDate(latestDocumentFactDate) : null;
     return brqDate ? formatDateKey(brqDate) : "";
   }
@@ -1560,6 +1667,7 @@
 
   async function initializeDocumentsTab() {
     if (!selectedWhiteNoteDepartment) selectedWhiteNoteDepartment = "34";
+    await ensureDocumentAvailability();
     await refreshLatestDocumentBounds(selectedWhiteNoteDepartment);
     const latestNoteKey = latestWhiteNoteAvailableKey(selectedWhiteNoteDepartment);
     const latestBrqKey = latestBrqAvailableKey();
@@ -1823,8 +1931,14 @@
       return;
     }
     if (tab === "statistiques") {
-      /* Tableau de bord analytique : aucun chargement FE tant que ses indicateurs
-         ne sont pas définis. */
+      /* Chargement indépendant et ciblé : par défaut seulement 4 semaines. */
+      if (etabLoadState === "idle") await loadEtabTableForWeeklyStats();
+      const year = document.getElementById("analytics-year");
+      const period = document.getElementById("analytics-period");
+      if (year) year.value = analyticsTable;
+      if (period) period.value = analyticsPeriod;
+      renderAnalyticsAnchorOptions();
+      await loadAnalytics();
       return;
     }
   }
@@ -2387,20 +2501,10 @@
   }
 
   function getBrqDailyDates() {
-    const out = [];
-    let d = parseGristDate(BRQ_START_DATE);
-    const latestKey = latestBrqAvailableKey();
-    let end = parseGristDate(latestKey || BRQ_START_DATE);
-    while (d && d <= end) {
-      const key = formatDateKey(d);
-      if (!isBrqSchoolBreakDateKey(key) && d.getUTCDay() !== 0 && d.getUTCDay() !== 6) {
-        const brqDate = addDaysUTC(d, 1);
-        if (brqDate.getUTCDay() !== 0 && brqDate.getUTCDay() !== 6) out.push([formatDateKey(brqDate), brqDate]);
-      }
-      d = addDaysUTC(d, 1);
-    }
-    const uniq = new Map(out.map(function(x){return [x[0],x[1]];}));
-    return Array.from(uniq.entries()).sort(function(a,b){ return b[0].localeCompare(a[0]); });
+    return brqAvailableValues
+      .filter(function(value){ return value.startsWith("D:"); })
+      .map(function(value){ const key=value.slice(2); return [key, parseGristDate(key)]; })
+      .sort(function(a,b){ return b[0].localeCompare(a[0]); });
   }
 
   function getBrqWeeks() {
@@ -2500,7 +2604,6 @@
 
     const dailyDates = getBrqDailyDates();
     const vacationPeriods = getBrqVacationPeriods();
-    const weeks = getBrqWeeks();
     const options = [];
 
     dailyDates.forEach(function(item) {
@@ -2520,15 +2623,6 @@
         value: value,
         sortKey: period.start,
         label: `BRQ n°${getBrqPeriodNumber(value)} - ${period.label}`
-      });
-    });
-
-    weeks.forEach(function(info) {
-      const value = "W:" + info.key;
-      options.push({
-        value: value,
-        sortKey: formatDateKey(info.monday),
-        label: `BRQ S${info.week} - ${formatDayMonth(info.monday)} au ${formatDayMonth(info.sunday)}`
       });
     });
 
@@ -4452,17 +4546,9 @@
 
   function getWhiteNoteCalendarDates(department) {
     if (!department) return [];
-    const out = [];
-    let d = parseGristDate(WHITE_NOTE_FIRST_DATE_KEY);
-    const latestKey = latestWhiteNoteAvailableKey(department);
-    let end = parseGristDate(latestKey || WHITE_NOTE_FIRST_DATE_KEY);
-    const schoolEnd = parseGristDate(WHITE_NOTE_SCHOOL_YEAR_END_KEY);
-    if (end > schoolEnd) end = schoolEnd;
-    while (d && d <= end) {
-      if (isWhiteNoteOperationalDay(d)) out.push([formatDateKey(d), new Date(d.getTime())]);
-      d = addDaysUTC(d, 1);
-    }
-    return out;
+    const set = whiteNoteAvailableKeysByDepartment.get(department);
+    if (!set || !set.size) return [];
+    return Array.from(set).sort().map(function(key){ return [key, parseGristDate(key)]; });
   }
 
   function getWhiteNoteDayFactDates(department) {
@@ -4506,6 +4592,7 @@
 
   async function setWhiteNoteDepartment(department) {
     selectedWhiteNoteDepartment = department;
+    await ensureDocumentAvailability();
     await refreshLatestDocumentBounds(department);
     const latestKey = latestWhiteNoteAvailableKey(department);
     if (!selectedWhiteNoteDate || !latestKey || selectedWhiteNoteDate > latestKey) selectedWhiteNoteDate = latestKey;
