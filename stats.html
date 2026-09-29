@@ -1278,10 +1278,10 @@
     <div id="analytics-status" class="analytics-status">Ouvrez l’onglet pour charger les statistiques.</div>
     <div id="analytics-kpis" class="analytics-kpis"></div>
     <div class="analytics-grid">
-      <div class="analytics-card analytics-wide"><h3>Évolution quotidienne des FE</h3><div id="analytics-trend"></div></div>
+      <div class="analytics-card analytics-wide"><h3>Évolution des FE par date du fait</h3><div id="analytics-trend"></div></div>
       <div class="analytics-card" id="analytics-types-card"><h3>Typologies principales</h3><div id="analytics-types"></div></div>
       <div class="analytics-card" id="analytics-territories-card"><h3>Répartition territoriale</h3><div id="analytics-territories"></div></div>
-      <div class="analytics-card analytics-wide" id="analytics-dept-trend-card"><h3>Évolution quotidienne par département</h3><div id="analytics-dept-trend"></div></div>
+      <div class="analytics-card analytics-wide" id="analytics-dept-trend-card"><h3>Évolution par département — date du fait</h3><div id="analytics-dept-trend"></div></div>
       <div class="analytics-card analytics-wide" id="analytics-violence-trend-card">
         <div class="analytics-chart-head">
           <h3 id="analytics-attack-title">Atteintes — comparaison entre départements</h3>
@@ -1409,6 +1409,7 @@
   let analyticsAttackType = "violence";
   const analyticsAttackDepartments = new Set(["11","30","34","48","66"]);
   let analyticsRecords = [];
+  let analyticsCurveRecords = [];
   let analyticsLoadToken = 0;
   const analyticsCache = new Map();
 
@@ -1514,6 +1515,24 @@
 
   async function fetchFactsForDateKey(tableId, dateKey, retry) {
     return fetchFactsForDateKeys(tableId, [dateKey], retry);
+  }
+
+  async function fetchFactsForFieldDateKeys(tableId, fieldName, dateKeys, retry) {
+    const epochs = Array.from(new Set((dateKeys || []).map(dateKeyToEpoch).filter(Number.isFinite)));
+    if (!epochs.length) return [];
+    const t = await getTokenInfo(false);
+    const filter = JSON.stringify({[fieldName]: epochs});
+    const qs = new URLSearchParams({cellFormat:"normal", filter:filter, sort:"-Numero_FE", auth:t.token});
+    const url = t.baseUrl + "/tables/" + encodeURIComponent(tableId) + "/records?" + qs.toString();
+    const response = await fetch(url, {method:"GET", credentials:"omit"});
+    if (response.status === 401 && retry !== false) {
+      tokenInfo = null;
+      await getTokenInfo(true);
+      return fetchFactsForFieldDateKeys(tableId, fieldName, dateKeys, false);
+    }
+    if (!response.ok) throw new Error("HTTP " + response.status);
+    const payload = await response.json();
+    return (Array.isArray(payload.records) ? payload.records : []).map(function(r){ return Object.assign({id:r.id}, r.fields || {}); });
   }
 
   async function fetchDocumentDateKeys(dateKeys) {
@@ -5858,6 +5877,7 @@
   function renderAnalyticsAnchorOptions(){const s=document.getElementById("analytics-anchor");if(!s)return;const w=analyticsWeeksForTable(analyticsTable);if(!w.length){s.innerHTML='<option>Aucune période</option>';analyticsAnchor='';return;}if(analyticsPeriod==='month'){const a=[],seen=new Set();w.forEach(x=>{const k=x.monday.getUTCFullYear()+'-'+String(x.monday.getUTCMonth()+1).padStart(2,'0');if(!seen.has(k)){seen.add(k);a.push({key:k,label:x.monday.toLocaleDateString('fr-FR',{month:'long',year:'numeric',timeZone:'UTC'})})}});if(!a.some(x=>x.key===analyticsAnchor))analyticsAnchor=a[0].key;s.innerHTML=a.map(x=>`<option value="${x.key}" ${x.key===analyticsAnchor?'selected':''}>${escapeHtml(x.label)}</option>`).join('');s.disabled=false;}else{if(!w.some(x=>x.key===analyticsAnchor))analyticsAnchor=w[0].key;s.innerHTML=w.map(x=>`<option value="${x.key}" ${x.key===analyticsAnchor?'selected':''}>S${String(x.week).padStart(2,'0')} — ${formatFullDate(x.monday)} au ${formatFullDate(x.sunday)}</option>`).join('');s.disabled=analyticsPeriod==='schoolyear';}}
   function analyticsDateKeys(){const p=SCHOOL_YEAR_BY_TABLE[analyticsTable];if(!p)return[];const ss=parseGristDate(p.start),se=parseGristDate(p.end),n=new Date(),today=new Date(Date.UTC(n.getFullYear(),n.getMonth(),n.getDate())),cap=(today>=ss&&today<se)?today:se;let a,b;if(analyticsPeriod==='month'&&/^\\d{4}-\\d{2}$/.test(analyticsAnchor)){const q=analyticsAnchor.split('-').map(Number);a=new Date(Date.UTC(q[0],q[1]-1,1));b=new Date(Date.UTC(q[0],q[1],0));}else{const ws=analyticsWeeksForTable(analyticsTable),i=ws.find(x=>x.key===analyticsAnchor)||ws[0];if(!i)return[];a=analyticsPeriod==='week'?new Date(i.monday):analyticsPeriod==='4weeks'?addDaysUTC(i.monday,-21):new Date(ss);b=analyticsPeriod==='schoolyear'?cap:new Date(i.sunday);}if(a<ss)a=ss;if(b>se)b=se;if(b>cap)b=cap;const out=[];for(let d=new Date(a);d<=b;d=addDaysUTC(d,1))out.push(formatDateKey(d));return out;}
   async function fetchAnalyticsDateKeys(t,keys){const ck=t+'|'+keys.join(',');if(analyticsCache.has(ck))return analyticsCache.get(ck).slice();const all=[];for(let i=0;i<keys.length;i+=28){const part=await fetchFactsForDateKeys(t,keys.slice(i,i+28));all.push(...part);}const m=new Map();all.forEach(r=>m.set(String(r.id),r));const out=[...m.values()];analyticsCache.set(ck,out.slice());return out;}
+  async function fetchAnalyticsFactDateKeys(t,keys){const ck='factdate|'+t+'|'+keys.join(',');if(analyticsCache.has(ck))return analyticsCache.get(ck).slice();const all=[];for(let i=0;i<keys.length;i+=28){const part=await fetchFactsForFieldDateKeys(t,FIELD.DATE_FAIT,keys.slice(i,i+28));all.push(...part);}const m=new Map();all.forEach(r=>m.set(String(r.id),r));const out=[...m.values()];analyticsCache.set(ck,out.slice());return out;}
   function analyticsFiltered(){return analyticsRecords.filter(r=>(analyticsDepartment==='all'||r._departement===analyticsDepartment)&&(analyticsDegree==='all'||r._degre===analyticsDegree));}
   function analyticsEtabKey(r){const u=r[FIELD.UAI];return u!==null&&u!==undefined&&u!==''?String(u):String(r[FIELD.ID_NOM]||'').trim();}
   function analyticsEtabFromFact(r){
@@ -5883,13 +5903,20 @@
 
   function analyticsTotalEstablishments(){return etabRecords.filter(e=>{if(analyticsDepartment!=='all'&&getEtabDepartment(e)!==analyticsDepartment)return false;if(analyticsDegree!=='all'){const c=getEtabCategory(e),d=c==='first'?'1er':(c==='college'||c==='lycee'?'2nd':'');if(d!==analyticsDegree)return false;}return true;}).length;}
   function renderAnalyticsBars(id,entries){const e=document.getElementById(id);if(!e)return;if(!entries.length){e.innerHTML='<div class="analytics-empty">Aucune donnée sur la période.</div>';return;}const max=Math.max(...entries.map(x=>x[1]))||1;e.innerHTML='<div class="analytics-bars">'+entries.map(x=>`<div class="analytics-bar-row"><div>${escapeHtml(x[0])}</div><div class="analytics-bar-track"><div class="analytics-bar-fill" style="width:${Math.max(2,x[1]/max*100).toFixed(1)}%"></div></div><div class="analytics-bar-value">${x[1]}</div></div>`).join('')+'</div>';}
+  function analyticsCurveDayKey(r){
+    const d=parseGristDate(r&&r._dateDuFait);if(!d)return '';
+    const dow=d.getUTCDay();
+    if(dow===6)d.setUTCDate(d.getUTCDate()-1);
+    else if(dow===0)d.setUTCDate(d.getUTCDate()-2);
+    return formatDateKey(d);
+  }
   function analyticsChartDays(rows){
     const requested=analyticsDateKeys();
-    const source=Array.isArray(rows)&&rows.length?rows:analyticsRecords;
-    const available=source.map(r=>r&&r._dateKey).filter(Boolean).sort();
+    const source=Array.isArray(rows)&&rows.length?rows:analyticsCurveRecords;
+    const available=source.map(analyticsCurveDayKey).filter(Boolean).sort();
     if(!requested.length||!available.length)return [];
     const lastFact=available[available.length-1];
-    return requested.filter(day=>day<=lastFact);
+    return requested.filter(day=>{const d=parseGristDate(day);return d&&d.getUTCDay()>=1&&d.getUTCDay()<=5&&day<=lastFact;});
   }
   function analyticsWeekLabelForDay(dayKey){
     const d=parseGristDate(dayKey);if(!d)return '';
@@ -5919,7 +5946,7 @@
   function renderAnalyticsTrend(rows){
     const e=document.getElementById('analytics-trend');if(!e)return;
     const days=analyticsChartDays(rows);if(!days.length){e.innerHTML='<div class="analytics-empty">Aucune période disponible.</div>';return;}
-    const counts=new Map(days.map(d=>[d,0]));rows.forEach(r=>{if(r._dateKey&&counts.has(r._dateKey))counts.set(r._dateKey,(counts.get(r._dateKey)||0)+1)});
+    const counts=new Map(days.map(d=>[d,0]));rows.forEach(r=>{const day=analyticsCurveDayKey(r);if(day&&counts.has(day))counts.set(day,(counts.get(day)||0)+1)});
     const W=900,H=230,p=38,max=Math.max(1,...days.map(d=>counts.get(d)||0)),step=days.length>1?(W-p*2)/(days.length-1):0;
     const pts=days.map((d,i)=>[p+i*step,H-p-((counts.get(d)||0)/max)*(H-p*2),d,counts.get(d)||0]);
     const path=analyticsSmoothPath(pts);
@@ -5934,7 +5961,7 @@
     if(!days.length){e.innerHTML='<div class="analytics-empty">Aucun FE sur la période chargée.</div>';return;}
     if(!deps.length){e.innerHTML='<div class="analytics-empty">Cochez au moins un département.</div>';return;}
     const data={};deps.forEach(d=>data[d]=new Map(days.map(day=>[day,0])));
-    rows.forEach(r=>{if(attackMode&&!analyticsMatchesAttackType(r))return;const d=analyticsResolveDepartment(r),day=r._dateKey;if(!deps.includes(d)||!day||!data[d].has(day))return;data[d].set(day,(data[d].get(day)||0)+1);});
+    rows.forEach(r=>{if(attackMode&&!analyticsMatchesAttackType(r))return;const d=analyticsResolveDepartment(r),day=analyticsCurveDayKey(r);if(!deps.includes(d)||!day||!data[d].has(day))return;data[d].set(day,(data[d].get(day)||0)+1);});
     const max=Math.max(1,...deps.flatMap(d=>days.map(day=>data[d].get(day)||0))),W=900,H=250,p=40,step=days.length>1?(W-p*2)/(days.length-1):0,colorsByDep={'11':'#2563eb','30':'#dc2626','34':'#16a34a','48':'#9333ea','66':'#ea580c'};
     const paths=deps.map(d=>{const color=colorsByDep[d],pts=days.map((day,i)=>[p+i*step,H-p-((data[d].get(day)||0)/max)*(H-p*2),data[d].get(day)||0,day]);const path=analyticsSmoothPath(pts);return `<path d="${path}" fill="none" stroke="${color}" stroke-width="2.2" vector-effect="non-scaling-stroke"/>${pts.map(x=>`<circle cx="${x[0]}" cy="${x[1]}" r="1.55" fill="${color}" vector-effect="non-scaling-stroke"><title>${d} — ${formatFullDate(parseGristDate(x[3]))} : ${x[2]} FE${attackMode?' — '+analyticsAttackLabel():''}</title></circle>`).join('')}`}).join('');
     const weekMarks=days.map((day,i)=>{const dt=parseGristDate(day);if(!dt)return'';if(dt.getUTCDay()!==1&&i!==0)return'';const x=p+i*step;return `<line class="analytics-week-separator" x1="${x}" y1="12" x2="${x}" y2="${H-p}"/><text class="analytics-line-label" x="${x+3}" y="${H-8}" text-anchor="start">${analyticsWeekLabelForDay(day)}</text>`}).join('');
@@ -5943,16 +5970,17 @@
   function renderAnalyticsDashboard(){
     const rows=analyticsFiltered(),st=document.getElementById('analytics-status');if(st)st.textContent=`${rows.length} FE analysés sur ${analyticsRecords.length} FE chargés pour la période`;
     const es=new Set(rows.map(analyticsEtabKey).filter(Boolean)),tot=analyticsTotalEstablishments(),cov=tot?es.size/tot*100:0,n2=rows.filter(r=>r._niveau==='2').length,n3=rows.filter(r=>r._niveau==='3').length,int=es.size?rows.length/es.size:0,k=document.getElementById('analytics-kpis');if(k)k.innerHTML=[["Faits d’établissement",rows.length,'sur la période'],['Établissements déclarants',es.size,tot+' établissements dans le périmètre'],['Taux de déclarants',cov.toFixed(1).replace('.',',')+' %','établissements avec ≥ 1 FE'],['FE / étab. déclarant',int.toFixed(2).replace('.',','),'moyenne sur la période'],['Niveau 2',n2,rows.length?(n2/rows.length*100).toFixed(1).replace('.',',')+' % des FE':'0 %'],['Niveau 3',n3,rows.length?(n3/rows.length*100).toFixed(1).replace('.',',')+' % des FE':'0 %']].map(x=>`<div class="analytics-kpi"><div class="analytics-kpi-label">${x[0]}</div><div class="analytics-kpi-value">${x[1]}</div><div class="analytics-kpi-sub">${x[2]}</div></div>`).join('');
-    renderAnalyticsTrend(rows);
+    const curveRows=analyticsCurveRecords.filter(r=>(analyticsDepartment==='all'||analyticsResolveDepartment(r)===analyticsDepartment)&&(analyticsDegree==='all'||r._degre===analyticsDegree));
+    renderAnalyticsTrend(curveRows);
     const tc=new Map();rows.forEach(r=>analyticsTypeLabels(r).forEach(t=>tc.set(t,(tc.get(t)||0)+1)));renderAnalyticsBars('analytics-types',[...tc.entries()].sort((a,b)=>b[1]-a[1]).slice(0,10));
     const terr=document.getElementById('analytics-territories-card'),types=document.getElementById('analytics-types-card'),deptTrend=document.getElementById('analytics-dept-trend-card'),violTrend=document.getElementById('analytics-violence-trend-card');
     const attackTitle=document.getElementById('analytics-attack-title');if(attackTitle)attackTitle.textContent=analyticsAttackLabel()+' — comparaison entre départements';
     const academy=analyticsDepartment==='all';if(terr)terr.classList.toggle('is-hidden',!academy);if(types)types.classList.toggle('analytics-full',!academy);if(deptTrend)deptTrend.classList.toggle('is-hidden',!academy);if(violTrend)violTrend.classList.toggle('is-hidden',!academy);
-    if(academy){const dc=new Map();rows.forEach(r=>{const d=analyticsResolveDepartment(r);if(d)dc.set(d,(dc.get(d)||0)+1)});renderAnalyticsBars('analytics-territories',['11','30','34','48','66'].filter(d=>dc.has(d)).map(d=>[d,dc.get(d)]));renderAnalyticsMultiDeptTrend('analytics-dept-trend',analyticsRecords.filter(r=>analyticsDegree==='all'||r._degre===analyticsDegree),false);renderAnalyticsMultiDeptTrend('analytics-violence-trend',analyticsRecords.filter(r=>analyticsDegree==='all'||r._degre===analyticsDegree),true);}
+    if(academy){const dc=new Map();rows.forEach(r=>{const d=analyticsResolveDepartment(r);if(d)dc.set(d,(dc.get(d)||0)+1)});renderAnalyticsBars('analytics-territories',['11','30','34','48','66'].filter(d=>dc.has(d)).map(d=>[d,dc.get(d)]));renderAnalyticsMultiDeptTrend('analytics-dept-trend',analyticsCurveRecords.filter(r=>analyticsDegree==='all'||r._degre===analyticsDegree),false);renderAnalyticsMultiDeptTrend('analytics-violence-trend',analyticsCurveRecords.filter(r=>analyticsDegree==='all'||r._degre===analyticsDegree),true);}
     const em=new Map();rows.forEach(r=>{const key=analyticsEtabKey(r);if(!key)return;let o=em.get(key);if(!o)o={name:String(r[FIELD.ID_NOM]||'Établissement'),city:String(r[FIELD.VILLE]||''),dep:analyticsResolveDepartment(r),count:0,weeks:new Set()};o.count++;if(r._weekKey)o.weeks.add(r._weekKey);em.set(key,o)});
     const threshold=Number(analyticsEtabThreshold)||0,top=[...em.values()].filter(o=>o.count>=threshold).sort((a,b)=>b.count-a.count||a.name.localeCompare(b.name)).slice(0,100),ee=document.getElementById('analytics-establishments');if(ee)ee.innerHTML=top.length?`<table class="analytics-table"><thead><tr><th>Établissement</th><th>Commune</th><th>Dépt.</th><th class="num">FE</th><th class="num" title="Nombre de semaines ISO distinctes de la période où l’établissement a au moins un FE">Semaines avec FE</th></tr></thead><tbody>${top.map(o=>`<tr><td>${escapeHtml(o.name)}</td><td>${escapeHtml(o.city)}</td><td>${escapeHtml(o.dep)}</td><td class="num">${o.count}</td><td class="num">${o.weeks.size}</td></tr>`).join('')}</tbody></table>`:'<div class="analytics-empty">Aucun établissement ne correspond à ce seuil.</div>';
   }
-  async function loadAnalytics(){const keys=analyticsDateKeys(),token=++analyticsLoadToken,st=document.getElementById('analytics-status');if(st){st.className='analytics-status';st.textContent='Chargement ciblé de la période…';}if(!keys.length){analyticsRecords=[];renderAnalyticsDashboard();return;}try{const raw=await fetchAnalyticsDateKeys(analyticsTable,keys);if(token!==analyticsLoadToken)return;analyticsRecords=normalizeFactRecords(raw);renderAnalyticsDashboard();}catch(e){console.error('Statistiques analytiques',e);if(st){st.className='analytics-status error';st.textContent='Impossible de charger les statistiques de cette période.';}}}
+  async function loadAnalytics(){const keys=analyticsDateKeys(),token=++analyticsLoadToken,st=document.getElementById('analytics-status');if(st){st.className='analytics-status';st.textContent='Chargement ciblé de la période…';}if(!keys.length){analyticsRecords=[];analyticsCurveRecords=[];renderAnalyticsDashboard();return;}try{const [raw,curveRaw]=await Promise.all([fetchAnalyticsDateKeys(analyticsTable,keys),fetchAnalyticsFactDateKeys(analyticsTable,keys)]);if(token!==analyticsLoadToken)return;analyticsRecords=normalizeFactRecords(raw);analyticsCurveRecords=normalizeFactRecords(curveRaw);renderAnalyticsDashboard();}catch(e){console.error('Statistiques analytiques',e);if(st){st.className='analytics-status error';st.textContent='Impossible de charger les statistiques de cette période.';}}}
   async function setAnalyticsYear(v){analyticsTable=v;analyticsAnchor='';renderAnalyticsAnchorOptions();await loadAnalytics();}
   async function setAnalyticsPeriod(v){analyticsPeriod=v;renderAnalyticsAnchorOptions();await loadAnalytics();}
   async function setAnalyticsAnchor(v){analyticsAnchor=v;await loadAnalytics();}
