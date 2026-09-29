@@ -980,7 +980,7 @@
   .analytics-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}.analytics-card{padding:16px;min-width:0}.analytics-card h3{margin:0 0 14px;font-size:14px}.analytics-wide{grid-column:1/-1}
   .analytics-empty{padding:22px;text-align:center;color:#718096;font-size:12px}
   .analytics-bars{display:grid;gap:9px}.analytics-bar-row{display:grid;grid-template-columns:minmax(130px,1.1fr) 2fr 42px;gap:9px;align-items:center;font-size:11px}.analytics-bar-track{height:9px;background:#eef2f7;border-radius:999px;overflow:hidden}.analytics-bar-fill{height:100%;background:#2f6fed;border-radius:999px}.analytics-bar-value{text-align:right;font-weight:700}
-  .analytics-line-wrap{width:100%;overflow:hidden}.analytics-line-svg{width:100%;height:210px}.analytics-line-grid{stroke:#dbe2ea;stroke-width:1}.analytics-line-path{fill:none;stroke:#2f6fed;stroke-width:3;vector-effect:non-scaling-stroke}.analytics-line-dot{fill:#2f6fed}.analytics-line-label{font-size:10px;fill:#64748b}.analytics-line-value{font-size:10px;fill:#172033;font-weight:700}.analytics-card.is-hidden{display:none}.analytics-card.analytics-full{grid-column:1/-1}.analytics-threshold{display:flex;align-items:center;gap:8px;margin:-4px 0 12px;justify-content:flex-end}.analytics-threshold label{font-size:11px;color:#64748b;font-weight:600}.analytics-threshold select{padding:6px 8px;border:1px solid #dbe2ea;border-radius:7px;background:#fff;color:#172033;font-size:11px}.analytics-legend{display:flex;gap:12px;flex-wrap:wrap;margin:2px 0 8px;font-size:10px;color:#64748b}.analytics-legend span{display:inline-flex;align-items:center;gap:4px}.analytics-legend i{width:14px;height:3px;border-radius:2px;display:inline-block}
+  .analytics-line-wrap{width:100%;overflow:hidden}.analytics-line-svg{width:100%;height:210px}.analytics-line-grid{stroke:#dbe2ea;stroke-width:1}.analytics-line-path{fill:none;stroke:#2f6fed;stroke-width:3;vector-effect:non-scaling-stroke}.analytics-line-dot{fill:#2f6fed}.analytics-line-label{font-size:10px;fill:#64748b}.analytics-line-value{font-size:10px;fill:#172033;font-weight:700}.analytics-card.is-hidden{display:none}.analytics-card.analytics-full{grid-column:1/-1}.analytics-threshold{display:flex;align-items:center;gap:8px;margin:-4px 0 12px;justify-content:flex-end}.analytics-threshold label{font-size:11px;color:#64748b;font-weight:600}.analytics-threshold select{padding:6px 8px;border:1px solid #dbe2ea;border-radius:7px;background:#fff;color:#172033;font-size:11px}.analytics-legend{display:flex;gap:12px;flex-wrap:wrap;margin:2px 0 8px;font-size:10px;color:#64748b}.analytics-legend span{display:inline-flex;align-items:center;gap:4px}.analytics-legend i{width:14px;height:3px;border-radius:2px;display:inline-block}.analytics-chart-head{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;flex-wrap:wrap}.analytics-chart-head h3{margin-right:auto}.analytics-chart-controls{display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap}.analytics-chart-controls>label{font-size:11px;color:#64748b;font-weight:600;display:flex;flex-direction:column;gap:4px}.analytics-chart-controls select{padding:6px 8px;border:1px solid #dbe2ea;border-radius:7px;background:#fff;color:#172033;font-size:11px}.analytics-dept-checks{display:flex;align-items:center;gap:7px;font-size:11px;color:#475569;flex-wrap:wrap}.analytics-dept-checks>span{font-weight:600;color:#64748b}.analytics-dept-checks label{display:inline-flex;align-items:center;gap:3px;cursor:pointer}.analytics-dept-checks input{margin:0}
   .analytics-table{width:100%;border-collapse:collapse;font-size:11px}.analytics-table th,.analytics-table td{padding:9px 10px;border-bottom:1px solid #e7ebf0;text-align:left}.analytics-table th{background:#f8fafc;color:#475569}.analytics-table .num{text-align:right}
   @media(max-width:900px){.analytics-kpis{grid-template-columns:repeat(2,1fr)}.analytics-grid{grid-template-columns:1fr}.analytics-wide{grid-column:auto}}
 
@@ -1281,8 +1281,37 @@
       <div class="analytics-card analytics-wide"><h3>Évolution quotidienne des FE</h3><div id="analytics-trend"></div></div>
       <div class="analytics-card" id="analytics-types-card"><h3>Typologies principales</h3><div id="analytics-types"></div></div>
       <div class="analytics-card" id="analytics-territories-card"><h3>Répartition territoriale</h3><div id="analytics-territories"></div></div>
-      <div class="analytics-card analytics-wide" id="analytics-dept-trend-card"><h3>Évolution hebdomadaire par département</h3><div id="analytics-dept-trend"></div></div>
-      <div class="analytics-card analytics-wide" id="analytics-violence-trend-card"><h3>Violences — comparaison hebdomadaire entre départements</h3><div id="analytics-violence-trend"></div></div>
+      <div class="analytics-card analytics-wide" id="analytics-dept-trend-card"><h3>Évolution quotidienne par département</h3><div id="analytics-dept-trend"></div></div>
+      <div class="analytics-card analytics-wide" id="analytics-violence-trend-card">
+        <div class="analytics-chart-head">
+          <h3 id="analytics-attack-title">Atteintes — comparaison entre départements</h3>
+          <div class="analytics-chart-controls">
+            <label>Type d’atteinte
+              <select id="analytics-attack-type" onchange="setAnalyticsAttackType(this.value)">
+                <option value="violence">Violences (ensemble)</option>
+                <option value="violences physiques">Violences physiques</option>
+                <option value="violences verbales">Violences verbales</option>
+                <option value="violences sexuelles">Violences sexuelles</option>
+                <option value="harcelement">Harcèlement / cyber-harcèlement</option>
+                <option value="port d'arme">Port d’arme</option>
+                <option value="usage d'arme">Usage d’arme</option>
+                <option value="stupefi">Stupéfiants</option>
+                <option value="atteintes aux biens">Atteintes aux biens</option>
+                <option value="valeurs de la republique">Atteintes aux valeurs de la République</option>
+              </select>
+            </label>
+            <div class="analytics-dept-checks" aria-label="Départements affichés">
+              <span>Départements</span>
+              <label><input type="checkbox" value="11" checked onchange="setAnalyticsAttackDepartment('11',this.checked)">11</label>
+              <label><input type="checkbox" value="30" checked onchange="setAnalyticsAttackDepartment('30',this.checked)">30</label>
+              <label><input type="checkbox" value="34" checked onchange="setAnalyticsAttackDepartment('34',this.checked)">34</label>
+              <label><input type="checkbox" value="48" checked onchange="setAnalyticsAttackDepartment('48',this.checked)">48</label>
+              <label><input type="checkbox" value="66" checked onchange="setAnalyticsAttackDepartment('66',this.checked)">66</label>
+            </div>
+          </div>
+        </div>
+        <div id="analytics-violence-trend"></div>
+      </div>
       <div class="analytics-card analytics-wide"><h3>Établissements déclarants</h3><div class="analytics-threshold"><label for="analytics-etab-threshold">Afficher</label><select id="analytics-etab-threshold" onchange="setAnalyticsEtabThreshold(this.value)"><option value="0">Tous les établissements</option><option value="2">2 FE ou plus</option><option value="4">4 FE ou plus</option><option value="5">Plus de 4 FE</option><option value="10">10 FE ou plus</option></select></div><div id="analytics-establishments"></div></div>
     </div>
   </section>
@@ -1377,6 +1406,8 @@
   let analyticsDepartment = "all";
   let analyticsDegree = "all";
   let analyticsEtabThreshold = 0;
+  let analyticsAttackType = "violence";
+  const analyticsAttackDepartments = new Set(["11","30","34","48","66"]);
   let analyticsRecords = [];
   let analyticsLoadToken = 0;
   const analyticsCache = new Map();
@@ -5842,10 +5873,23 @@
   }
   function analyticsTypeLabels(r){const src=String(r[FIELD.TYPES_STRUCTURE]||r[FIELD.TYPES]||'');if(!src)return['Non renseigné'];const low=normalizeText(src),out=[];[['Violences physiques','violences physiques'],['Violences verbales','violences verbales'],['Violences sexuelles','violences sexuelles'],['Harcèlement','harcelement'],["Port d'arme","port d'arme"],["Usage d'arme","usage d'arme"],['Stupéfiants','stupefi'],['Atteintes aux biens','atteintes aux biens'],['Valeurs de la République','valeurs de la republique']].forEach(x=>{if(low.includes(x[1]))out.push(x[0])});return out.length?out:['Autres faits'];}
   function analyticsIsViolence(r){const t=normalizeText(String(r[FIELD.TYPES_STRUCTURE]||r[FIELD.TYPES]||''));return t.includes('violence')||t.includes('harcelement')||t.includes('homicide')||t.includes('racket')||t.includes('extorsion');}
+  function analyticsMatchesAttackType(r){
+    if(analyticsAttackType==='violence')return analyticsIsViolence(r);
+    const t=normalizeText(String(r[FIELD.TYPES_STRUCTURE]||r[FIELD.TYPES]||''));
+    if(analyticsAttackType==='harcelement')return t.includes('harcelement');
+    return t.includes(analyticsAttackType);
+  }
+  function analyticsAttackLabel(){const s=document.getElementById('analytics-attack-type');return s&&s.selectedOptions&&s.selectedOptions[0]?s.selectedOptions[0].textContent:'Atteintes';}
+
   function analyticsTotalEstablishments(){return etabRecords.filter(e=>{if(analyticsDepartment!=='all'&&getEtabDepartment(e)!==analyticsDepartment)return false;if(analyticsDegree!=='all'){const c=getEtabCategory(e),d=c==='first'?'1er':(c==='college'||c==='lycee'?'2nd':'');if(d!==analyticsDegree)return false;}return true;}).length;}
   function renderAnalyticsBars(id,entries){const e=document.getElementById(id);if(!e)return;if(!entries.length){e.innerHTML='<div class="analytics-empty">Aucune donnée sur la période.</div>';return;}const max=Math.max(...entries.map(x=>x[1]))||1;e.innerHTML='<div class="analytics-bars">'+entries.map(x=>`<div class="analytics-bar-row"><div>${escapeHtml(x[0])}</div><div class="analytics-bar-track"><div class="analytics-bar-fill" style="width:${Math.max(2,x[1]/max*100).toFixed(1)}%"></div></div><div class="analytics-bar-value">${x[1]}</div></div>`).join('')+'</div>';}
-  function analyticsChartDays(){
-    return analyticsDateKeys();
+  function analyticsChartDays(rows){
+    const requested=analyticsDateKeys();
+    const source=Array.isArray(rows)&&rows.length?rows:analyticsRecords;
+    const available=source.map(r=>r&&r._dateKey).filter(Boolean).sort();
+    if(!requested.length||!available.length)return [];
+    const lastFact=available[available.length-1];
+    return requested.filter(day=>day<=lastFact);
   }
   function analyticsWeekLabelForDay(dayKey){
     const d=parseGristDate(dayKey);if(!d)return '';
@@ -5856,10 +5900,8 @@
     if(points.length===1)return `M${points[0][0].toFixed(1)} ${points[0][1].toFixed(1)}`;
     let d=`M${points[0][0].toFixed(1)} ${points[0][1].toFixed(1)}`;
     for(let i=0;i<points.length-1;i++){
-      const p0=points[Math.max(0,i-1)],p1=points[i],p2=points[i+1],p3=points[Math.min(points.length-1,i+2)];
-      const c1x=p1[0]+(p2[0]-p0[0])/6,c1y=p1[1]+(p2[1]-p0[1])/6;
-      const c2x=p2[0]-(p3[0]-p1[0])/6,c2y=p2[1]-(p3[1]-p1[1])/6;
-      d+=` C${c1x.toFixed(1)} ${c1y.toFixed(1)},${c2x.toFixed(1)} ${c2y.toFixed(1)},${p2[0].toFixed(1)} ${p2[1].toFixed(1)}`;
+      const p1=points[i],p2=points[i+1],mid=(p1[0]+p2[0])/2;
+      d+=` C${mid.toFixed(1)} ${p1[1].toFixed(1)},${mid.toFixed(1)} ${p2[1].toFixed(1)},${p2[0].toFixed(1)} ${p2[1].toFixed(1)}`;
     }
     return d;
   }
@@ -5876,23 +5918,27 @@
   }
   function renderAnalyticsTrend(rows){
     const e=document.getElementById('analytics-trend');if(!e)return;
-    const days=analyticsChartDays();if(!days.length){e.innerHTML='<div class="analytics-empty">Aucune période disponible.</div>';return;}
+    const days=analyticsChartDays(rows);if(!days.length){e.innerHTML='<div class="analytics-empty">Aucune période disponible.</div>';return;}
     const counts=new Map(days.map(d=>[d,0]));rows.forEach(r=>{if(r._dateKey&&counts.has(r._dateKey))counts.set(r._dateKey,(counts.get(r._dateKey)||0)+1)});
     const W=900,H=230,p=38,max=Math.max(1,...days.map(d=>counts.get(d)||0)),step=days.length>1?(W-p*2)/(days.length-1):0;
     const pts=days.map((d,i)=>[p+i*step,H-p-((counts.get(d)||0)/max)*(H-p*2),d,counts.get(d)||0]);
     const path=analyticsSmoothPath(pts);
     const weekMarks=days.map((day,i)=>{const dt=parseGristDate(day);if(!dt)return'';if(dt.getUTCDay()!==1&&i!==0)return'';const x=p+i*step;return `<line class="analytics-week-separator" x1="${x}" y1="12" x2="${x}" y2="${H-p}"/><text class="analytics-line-label" x="${x+3}" y="${H-8}" text-anchor="start">${analyticsWeekLabelForDay(day)}</text>`}).join('');
-    e.innerHTML=`<div class="analytics-line-wrap"><svg class="analytics-line-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"><line class="analytics-line-grid" x1="${p}" y1="${H-p}" x2="${W-p}" y2="${H-p}"/>${weekMarks}<path class="analytics-line-path" d="${path}"/>${pts.map(x=>`<circle class="analytics-line-dot" cx="${x[0]}" cy="${x[1]}" r="2.7"><title>${formatFullDate(parseGristDate(x[2]))} : ${x[3]} FE</title></circle>${x[3]>0?`<text class="analytics-line-value" x="${x[0]}" y="${Math.max(11,x[1]-7)}" text-anchor="middle">${x[3]}</text>`:''}`).join('')}</svg></div>`;
+    e.innerHTML=`<div class="analytics-line-wrap"><svg class="analytics-line-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"><line class="analytics-line-grid" x1="${p}" y1="${H-p}" x2="${W-p}" y2="${H-p}"/>${weekMarks}<path class="analytics-line-path" d="${path}"/>${pts.map(x=>`<circle class="analytics-line-dot" cx="${x[0]}" cy="${x[1]}" r="1.9" vector-effect="non-scaling-stroke"><title>${formatFullDate(parseGristDate(x[2]))} : ${x[3]} FE</title></circle>${x[3]>0?`<text class="analytics-line-value" x="${x[0]}" y="${Math.max(11,x[1]-7)}" text-anchor="middle">${x[3]}</text>`:''}`).join('')}</svg></div>`;
   }
-  function renderAnalyticsMultiDeptTrend(id,rows,violenceOnly){
+  function renderAnalyticsMultiDeptTrend(id,rows,attackMode){
     const e=document.getElementById(id);if(!e)return;
-    const deps=['11','30','34','48','66'],days=analyticsChartDays();if(!days.length){e.innerHTML='<div class="analytics-empty">Aucune donnée sur la période.</div>';return;}
+    const allDeps=['11','30','34','48','66'];
+    const deps=attackMode?allDeps.filter(d=>analyticsAttackDepartments.has(d)):allDeps;
+    const days=analyticsChartDays(rows);
+    if(!days.length){e.innerHTML='<div class="analytics-empty">Aucun FE sur la période chargée.</div>';return;}
+    if(!deps.length){e.innerHTML='<div class="analytics-empty">Cochez au moins un département.</div>';return;}
     const data={};deps.forEach(d=>data[d]=new Map(days.map(day=>[day,0])));
-    rows.forEach(r=>{if(violenceOnly&&!analyticsIsViolence(r))return;const d=analyticsResolveDepartment(r),day=r._dateKey;if(!deps.includes(d)||!day||!data[d].has(day))return;data[d].set(day,(data[d].get(day)||0)+1);});
-    const max=Math.max(1,...deps.flatMap(d=>days.map(day=>data[d].get(day)||0))),W=900,H=250,p=40,step=days.length>1?(W-p*2)/(days.length-1):0,colors=['#2563eb','#dc2626','#16a34a','#9333ea','#ea580c'];
-    const paths=deps.map((d,di)=>{const pts=days.map((day,i)=>[p+i*step,H-p-((data[d].get(day)||0)/max)*(H-p*2),data[d].get(day)||0,day]);const path=analyticsSmoothPath(pts);return `<path d="${path}" fill="none" stroke="${colors[di]}" stroke-width="2.2" vector-effect="non-scaling-stroke"/>${pts.map(x=>`<circle cx="${x[0]}" cy="${x[1]}" r="2" fill="${colors[di]}"><title>${d} — ${formatFullDate(parseGristDate(x[4]))} : ${x[2]} FE${violenceOnly?' de violence':''}</title></circle>`).join('')}`}).join('');
+    rows.forEach(r=>{if(attackMode&&!analyticsMatchesAttackType(r))return;const d=analyticsResolveDepartment(r),day=r._dateKey;if(!deps.includes(d)||!day||!data[d].has(day))return;data[d].set(day,(data[d].get(day)||0)+1);});
+    const max=Math.max(1,...deps.flatMap(d=>days.map(day=>data[d].get(day)||0))),W=900,H=250,p=40,step=days.length>1?(W-p*2)/(days.length-1):0,colorsByDep={'11':'#2563eb','30':'#dc2626','34':'#16a34a','48':'#9333ea','66':'#ea580c'};
+    const paths=deps.map(d=>{const color=colorsByDep[d],pts=days.map((day,i)=>[p+i*step,H-p-((data[d].get(day)||0)/max)*(H-p*2),data[d].get(day)||0,day]);const path=analyticsSmoothPath(pts);return `<path d="${path}" fill="none" stroke="${color}" stroke-width="2.2" vector-effect="non-scaling-stroke"/>${pts.map(x=>`<circle cx="${x[0]}" cy="${x[1]}" r="1.55" fill="${color}" vector-effect="non-scaling-stroke"><title>${d} — ${formatFullDate(parseGristDate(x[3]))} : ${x[2]} FE${attackMode?' — '+analyticsAttackLabel():''}</title></circle>`).join('')}`}).join('');
     const weekMarks=days.map((day,i)=>{const dt=parseGristDate(day);if(!dt)return'';if(dt.getUTCDay()!==1&&i!==0)return'';const x=p+i*step;return `<line class="analytics-week-separator" x1="${x}" y1="12" x2="${x}" y2="${H-p}"/><text class="analytics-line-label" x="${x+3}" y="${H-8}" text-anchor="start">${analyticsWeekLabelForDay(day)}</text>`}).join('');
-    e.innerHTML=`<div class="analytics-legend">${deps.map((d,i)=>`<span><i style="background:${colors[i]}"></i>${d}</span>`).join('')}</div><div class="analytics-line-wrap"><svg class="analytics-line-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"><line class="analytics-line-grid" x1="${p}" y1="${H-p}" x2="${W-p}" y2="${H-p}"/>${weekMarks}${paths}</svg></div>`;
+    e.innerHTML=`<div class="analytics-legend">${deps.map(d=>`<span><i style="background:${colorsByDep[d]}"></i>${d}</span>`).join('')}</div><div class="analytics-line-wrap"><svg class="analytics-line-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"><line class="analytics-line-grid" x1="${p}" y1="${H-p}" x2="${W-p}" y2="${H-p}"/>${weekMarks}${paths}</svg></div>`;
   }
   function renderAnalyticsDashboard(){
     const rows=analyticsFiltered(),st=document.getElementById('analytics-status');if(st)st.textContent=`${rows.length} FE analysés sur ${analyticsRecords.length} FE chargés pour la période`;
@@ -5900,6 +5946,7 @@
     renderAnalyticsTrend(rows);
     const tc=new Map();rows.forEach(r=>analyticsTypeLabels(r).forEach(t=>tc.set(t,(tc.get(t)||0)+1)));renderAnalyticsBars('analytics-types',[...tc.entries()].sort((a,b)=>b[1]-a[1]).slice(0,10));
     const terr=document.getElementById('analytics-territories-card'),types=document.getElementById('analytics-types-card'),deptTrend=document.getElementById('analytics-dept-trend-card'),violTrend=document.getElementById('analytics-violence-trend-card');
+    const attackTitle=document.getElementById('analytics-attack-title');if(attackTitle)attackTitle.textContent=analyticsAttackLabel()+' — comparaison entre départements';
     const academy=analyticsDepartment==='all';if(terr)terr.classList.toggle('is-hidden',!academy);if(types)types.classList.toggle('analytics-full',!academy);if(deptTrend)deptTrend.classList.toggle('is-hidden',!academy);if(violTrend)violTrend.classList.toggle('is-hidden',!academy);
     if(academy){const dc=new Map();rows.forEach(r=>{const d=analyticsResolveDepartment(r);if(d)dc.set(d,(dc.get(d)||0)+1)});renderAnalyticsBars('analytics-territories',['11','30','34','48','66'].filter(d=>dc.has(d)).map(d=>[d,dc.get(d)]));renderAnalyticsMultiDeptTrend('analytics-dept-trend',analyticsRecords.filter(r=>analyticsDegree==='all'||r._degre===analyticsDegree),false);renderAnalyticsMultiDeptTrend('analytics-violence-trend',analyticsRecords.filter(r=>analyticsDegree==='all'||r._degre===analyticsDegree),true);}
     const em=new Map();rows.forEach(r=>{const key=analyticsEtabKey(r);if(!key)return;let o=em.get(key);if(!o)o={name:String(r[FIELD.ID_NOM]||'Établissement'),city:String(r[FIELD.VILLE]||''),dep:analyticsResolveDepartment(r),count:0,weeks:new Set()};o.count++;if(r._weekKey)o.weeks.add(r._weekKey);em.set(key,o)});
@@ -5912,6 +5959,8 @@
   function setAnalyticsDepartment(v){analyticsDepartment=v;renderAnalyticsDashboard();}
   function setAnalyticsDegree(v){analyticsDegree=v;renderAnalyticsDashboard();}
   function setAnalyticsEtabThreshold(v){analyticsEtabThreshold=Number(v)||0;renderAnalyticsDashboard();}
+  function setAnalyticsAttackType(v){analyticsAttackType=v||'violence';renderAnalyticsDashboard();}
+  function setAnalyticsAttackDepartment(dep,checked){if(checked)analyticsAttackDepartments.add(dep);else analyticsAttackDepartments.delete(dep);renderAnalyticsDashboard();}
 
   function normalizedObjectText(record) {
     return Object.values(record || {}).map(function(value) {
