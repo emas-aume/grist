@@ -1515,16 +1515,30 @@
     });
   }
 
-  async function getInitialWeekAnchor(tableId) {
-    if (tableId === CURRENT_FE_TABLE) {
-      const now = new Date();
-      return new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
+  async function fetchLatestFact(tableId, retry) {
+    const t = await getTokenInfo(false);
+    const qs = new URLSearchParams({
+      cellFormat: "normal",
+      limit: "1",
+      sort: "-" + FIELD.DATE_SAISIE + ",-" + FIELD.NUMERO_FE,
+      auth: t.token
+    });
+    const url = t.baseUrl + "/tables/" + encodeURIComponent(tableId) + "/records?" + qs.toString();
+    const response = await fetch(url, {method:"GET", credentials:"omit"});
+    if (response.status === 401 && retry !== false) {
+      tokenInfo = null;
+      await getTokenInfo(true);
+      return fetchLatestFact(tableId, false);
     }
-    /* Pour une archive, on ne charge pas l'année : une seule ligne suffit pour
-       repérer sa semaine la plus récente, puis on ne demande que cette semaine. */
-    const latest = await fetchFactBatch(tableId, 0, 1);
-    if (!latest.length) return null;
-    return parseGristDate(latest[0][FIELD.DATE_SAISIE]);
+    if (!response.ok) throw new Error("HTTP " + response.status);
+    const payload = await response.json();
+    const r = Array.isArray(payload.records) ? payload.records[0] : null;
+    return r ? Object.assign({id:r.id}, r.fields || {}) : null;
+  }
+
+  async function getLatestWeekAnchor(tableId) {
+    const latest = await fetchLatestFact(tableId);
+    return latest ? parseGristDate(latest[FIELD.DATE_SAISIE]) : null;
   }
 
   function updateTableLoadedUi() {
@@ -1538,14 +1552,47 @@
     const token = ++dataLoadToken;
     showDiagnostic("Chargement des faits de la semaine…", "");
     try {
-      const anchor = await getInitialWeekAnchor(tableId);
-      if (token !== dataLoadToken) return;
-      const rows = anchor ? await fetchFactsForWeek(tableId, anchor) : [];
+      let anchor;
+      let rows = [];
+      let usedFallback = false;
+
+      if (tableId === CURRENT_FE_TABLE) {
+        const now = new Date();
+        anchor = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
+        rows = await fetchFactsForWeek(tableId, anchor);
+
+        // S'il n'existe encore aucun FE dans la semaine courante, afficher
+        // automatiquement la dernière semaine réellement renseignée.
+        if (!rows.length) {
+          const latestAnchor = await getLatestWeekAnchor(tableId);
+          if (latestAnchor) {
+            anchor = latestAnchor;
+            rows = await fetchFactsForWeek(tableId, anchor);
+            usedFallback = true;
+          }
+        }
+      } else {
+        anchor = await getLatestWeekAnchor(tableId);
+        rows = anchor ? await fetchFactsForWeek(tableId, anchor) : [];
+      }
+
       if (token !== dataLoadToken) return;
       rawRecordsCache.set(tableId, rows.slice());
       ingestRecords(rows);
       currentPage = 1;
-      setTimeout(updateTableLoadedUi, 0);
+      const monday = anchor ? getMondayUtc(anchor) : null;
+      const sunday = monday ? addDaysUTC(monday, 6) : null;
+      if (usedFallback && monday && sunday) {
+        showDiagnostic(
+          rows.length + " fait" + (rows.length > 1 ? "s" : "") +
+          " chargé" + (rows.length > 1 ? "s" : "") +
+          " — aucune donnée cette semaine, affichage de la dernière semaine disponible (" +
+          formatFullDate(monday) + " au " + formatFullDate(sunday) + ")",
+          "ok"
+        );
+      } else {
+        setTimeout(updateTableLoadedUi, 0);
+      }
     } catch (error) {
       console.error("Chargement hebdomadaire impossible", error);
       showDiagnostic("Impossible de charger les faits de la semaine.", "error");
