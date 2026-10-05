@@ -1202,11 +1202,18 @@
               id="white-note-download"
               class="white-note-download-btn"
               type="button"
-              onclick="downloadSelectedWhiteNotePdf()"
+              onclick="downloadSelectedWhiteNotePdf(false)"
               title="Télécharger la Note Blanche en PDF"
             >
               PDF
             </button>
+            <button
+              id="white-note-crise-download"
+              class="white-note-download-btn"
+              type="button"
+              onclick="downloadSelectedWhiteNotePdf(true)"
+              title="Note Blanche exceptionnelle : signaler les collèges et lycées dont le FE est lié à la crise des 1er et 2 octobre"
+            >⚠ PDF crise</button>
           </div>
         </div>
       </div>
@@ -5114,9 +5121,10 @@
   }
 
 
-  async function downloadSelectedWhiteNotePdf() {
+  async function downloadSelectedWhiteNotePdf(crisisMode) {
+    crisisMode = Boolean(crisisMode);
 
-    const button = document.getElementById("white-note-download");
+    const button = document.getElementById(crisisMode ? "white-note-crise-download" : "white-note-download");
 
     if (!selectedWhiteNoteDepartment || !selectedWhiteNoteDate) {
       return;
@@ -5154,7 +5162,9 @@
       selectedWhiteNoteDepartment +
       "." +
       noteNumber +
-      " année 2026-2027.pdf";
+      " année 2026-2027" +
+      (crisisMode ? " - CRISE 1er-2 octobre" : "") +
+      ".pdf";
 
     if (button) {
       button.disabled = true;
@@ -5203,7 +5213,7 @@
       function drawHeader() {
         setBold(16);
         doc.text(
-          "Note Blanche n°" + noteNumber + " - DSDEN." + selectedWhiteNoteDepartment,
+          "Note Blanche n°" + noteNumber + " - DSDEN." + selectedWhiteNoteDepartment + (crisisMode ? " — repérage crise 1er/2 octobre" : ""),
           marginX,
           y + 5
         );
@@ -5595,12 +5605,26 @@
           const typeX = summaryX + colWidths[summaryColIndex];
           doc.text(typeLines, typeX + 2, rowY + 5);
 
-          /* Etablissement : poids et couleur normaux. */
+          /* Etablissement : dans le PDF crise, ajoute un petit badge warning
+             uniquement devant les collèges/lycées rattachés à la mobilisation. */
           doc.setFont("helvetica", "normal");
           doc.setFontSize(7.8);
           doc.setTextColor.apply(doc, textColor);
           const establishmentX = typeX + colWidths[typeColIndex];
-          doc.text(establishmentLines, establishmentX + 2, rowY + 5);
+          const crisisFlag = crisisMode && isOctoberMobilisationCrisisRecord(record);
+          if (crisisFlag) {
+            const badgeOffset = drawCrisisWarningBadge(doc, establishmentX + 2, rowY + 5);
+            const crisisEstablishmentLines = doc.splitTextToSize(
+              establishmentText || "-",
+              colWidths[establishmentColIndex] - 4 - badgeOffset
+            );
+            doc.setFont("helvetica", "normal");
+            doc.setFontSize(7.8);
+            doc.setTextColor.apply(doc, textColor);
+            doc.text(crisisEstablishmentLines, establishmentX + 2 + badgeOffset, rowY + 5);
+          } else {
+            doc.text(establishmentLines, establishmentX + 2, rowY + 5);
+          }
 
           y += rowHeight;
         });
@@ -5635,7 +5659,7 @@
     } finally {
       if (button) {
         button.disabled = false;
-        button.textContent = "PDF";
+        button.textContent = crisisMode ? "⚠ PDF crise" : "PDF";
       }
     }
   }
