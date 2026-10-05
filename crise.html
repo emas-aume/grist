@@ -1257,8 +1257,7 @@
     DATE_SAISIE: "Date_de_saisie",
     ID_NOM: "ID_et_Nom",
     VILLE: "Ville",
-    RESUME: "Resume_du_fait",
-    EXPOSE: "Expose_des_faits"
+    RESUME: "Resume_du_fait"
   });
 
   const COLUMNS = Object.freeze([
@@ -1363,8 +1362,8 @@
       renderDepartmentFilters();
       renderLevelFilters();
       renderTable();
-      renderWhiteNote();
       renderBRQ();
+      renderWhiteNote();
       renderWeeklyStats();
       return;
     }
@@ -1638,8 +1637,8 @@
       renderDepartmentFilters();
       renderLevelFilters();
       renderTable();
-      renderWhiteNote();
       renderBRQ();
+      renderWhiteNote();
       renderWeeklyStats();
     }
 
@@ -5275,17 +5274,7 @@
       "2026-011-5599127","2026-011-5599211","2026-011-5599261",
       "2026-011-5599230"
     ]);
-    if (confirmed.has(fe)) return true;
-
-    const factDate = String(record._dateDuFait || "").trim();
-    if (factDate !== "01/10/2026" && factDate !== "02/10/2026") return false;
-
-    const expose = normalizeText(record[FIELD.EXPOSE] || "");
-    if (!expose) return false;
-    const explicitMovement = /(blocus|blocage|bloquer|manifestation|manifestants|mouvement lyceen|violences urbaines)/.test(expose);
-    const movementEffects = /(mortier|fumigene|petard|incend|poubelle|barriere|projectile|crs)/.test(expose) &&
-      /(lycee|college|etablissement|abords|portail|manifest)/.test(expose);
-    return explicitMovement || movementEffects;
+    return confirmed.has(fe);
   }
 
   function drawCrisisBadgePdf(doc, x, baselineY) {
