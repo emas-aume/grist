@@ -962,14 +962,21 @@
     function getNumeroFE(value) {
       if (value === null || value === undefined || value === "") return "";
 
-      // Même logique que dans index.html : le numéro FE est le DERNIER groupe
-      // de chiffres présent dans la cellule source. Cela évite de prendre
-      // l'année scolaire (ex. 2026) lorsqu'elle apparaît avant « Fait n°... ».
-      // Ex. « Année 2026 — Fait n°5571234 » -> « 5571234 ».
-      // Aucune longueur n'est imposée au numéro FE.
+      // Numero_FE est désormais stocké sous la forme « 2026-011-5588091 ».
+      // Dans toute l'interface, on continue volontairement à n'afficher que
+      // le dernier bloc numérique (« 5588091 »). Cette normalisation sert aussi
+      // aux rapprochements avec SUIVI_FE et reste compatible avec les anciennes
+      // lignes qui contiennent encore uniquement « 5588091 ».
       const numbers = String(value).match(/\d+/g);
       if (!numbers || !numbers.length) return "";
       return numbers[numbers.length - 1];
+    }
+
+    function getRawNumeroFE(value) {
+      // Valeur complète telle qu'elle existe dans la BDD (ex. 2026-011-5588091).
+      // Elle n'est jamais utilisée pour l'affichage, uniquement lorsque la
+      // référence complète doit être conservée lors d'une écriture/recherche.
+      return value === null || value === undefined ? "" : String(value).trim();
     }
 
     function parseGristDate(value) {
@@ -1451,6 +1458,7 @@
           _anneeScolaire: "2026-2027",
           _key: "current:" + numero,
           _numeroFE: numero,
+          _numeroFERaw: getRawNumeroFE(record[FIELD.NUMERO_FE]) || numero,
           _departement: getDepartement(record),
           _date: date,
           _dateKey: formatDateKey(date),
@@ -1511,6 +1519,7 @@
           _anneeScolaire: String(record.Annee_scolaire || "2025-2026"),
           _key: "historical:" + numero,
           _numeroFE: numero,
+          _numeroFERaw: getRawNumeroFE(record.Numero_FE) || numero,
           _departement: dep,
           _date: date,
           _dateKey: formatDateKey(date),
@@ -1685,6 +1694,7 @@
         if (q) {
           const haystack = normalizeText([
             fact._numeroFE,
+            fact._numeroFERaw || "",
             fact._nom,
             fact._ville,
             fact._degre,
@@ -1966,7 +1976,11 @@
     async function addFollowUp(type, options) {
       if (isWriting || !selectedFE || selectedFE._source === "historical") return;
       const fields = {
-        [SUIVI_FIELD.NUMERO_FE]: selectedFE._numeroFE,
+        // Conserver dans SUIVI_FE la référence complète de la BDD actuelle
+        // (ex. 2026-011-5588091). Les lectures restent normalisées via
+        // getNumeroFE(), donc les anciens suivis « 5588091 » continuent aussi
+        // à être rattachés au bon fait.
+        [SUIVI_FIELD.NUMERO_FE]: selectedFE._numeroFERaw || selectedFE._numeroFE,
         [SUIVI_FIELD.TYPE_ENTREE]: type,
         [SUIVI_FIELD.DATE_HEURE]: Math.floor(Date.now() / 1000),
         [SUIVI_FIELD.ATTRIBUE_A]: options?.assigneeId || null,
