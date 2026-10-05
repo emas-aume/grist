@@ -956,6 +956,15 @@
 
   
 
+    /* Analyse de la séquence de mobilisation scolaire — export PDF uniquement */
+    .mobilisation-report-section { margin-top:32px; padding-top:26px; border-top:2px solid var(--line); }
+    .mobilisation-report-header { display:flex; align-items:center; justify-content:space-between; gap:18px; flex-wrap:wrap; }
+    .mobilisation-report-title { margin:0; font-size:18px; font-weight:700; color:var(--text); }
+    .mobilisation-report-subtitle { margin:5px 0 0; color:var(--muted); font-size:13px; }
+    .mobilisation-report-download-btn { height:38px; padding:0 16px; border:1px solid var(--primary); border-radius:8px; background:var(--primary); color:#fff; font:inherit; font-weight:600; cursor:pointer; }
+    .mobilisation-report-download-btn:hover:not(:disabled) { background:var(--primary-hover); border-color:var(--primary-hover); }
+    .mobilisation-report-download-btn:disabled { opacity:.45; cursor:not-allowed; }
+
     /* Bureau statistiques : navigation par onglets et chargement à la demande */
     .bureau-tabs{position:sticky;top:0;z-index:20;display:flex;gap:8px;padding:12px 0 16px;background:var(--bg);border-bottom:1px solid var(--line);margin-bottom:18px}
     .bureau-tab{border:1px solid var(--line);background:#fff;color:var(--text);padding:10px 18px;border-radius:9px;font-weight:700;cursor:pointer;letter-spacing:.02em}
@@ -1272,7 +1281,16 @@
   </section>
 
 
-
+  <!-- ANALYSE DE LA SÉQUENCE DE MOBILISATION SCOLAIRE — PDF UNIQUEMENT -->
+  <section class="section bureau-panel hidden-panel mobilisation-report-section" id="mobilisation-report-section">
+    <div class="mobilisation-report-header">
+      <div>
+        <h2 class="mobilisation-report-title">Analyse de la séquence de mobilisation scolaire</h2>
+        <p class="mobilisation-report-subtitle">Académie de Montpellier — EMAS 34 — situation au 5 octobre 2026</p>
+      </div>
+      <button id="mobilisation-report-download" class="mobilisation-report-download-btn" type="button" onclick="downloadMobilisationAnalysisPdf()" title="Exporter l’analyse en PDF">PDF</button>
+    </div>
+  </section>
 
   <!-- ESPACE STATISTIQUES ANALYTIQUES -->
   <section class="section bureau-panel hidden-panel" id="analytics-stats-section">
@@ -1971,11 +1989,13 @@
     const white = document.getElementById("white-note-section");
     const brq = document.getElementById("brq-section");
     const weeklyStats = document.getElementById("weekly-stats-section");
+    const mobilisationReport = document.getElementById("mobilisation-report-section");
     const analyticsStats = document.getElementById("analytics-stats-section");
     if (tableSection) tableSection.classList.toggle("hidden-panel", tab !== "tableau");
     if (white) white.classList.toggle("hidden-panel", tab !== "documents");
     if (brq) brq.classList.toggle("hidden-panel", tab !== "documents");
     if (weeklyStats) weeklyStats.classList.toggle("hidden-panel", tab !== "documents");
+    if (mobilisationReport) mobilisationReport.classList.toggle("hidden-panel", tab !== "documents");
     if (analyticsStats) analyticsStats.classList.toggle("hidden-panel", tab !== "statistiques");
     const yearControl = document.getElementById("data-year-control");
     if (yearControl) yearControl.style.display = tab === "tableau" ? "flex" : "none";
@@ -6322,7 +6342,81 @@
   }
 
 
+  async function downloadMobilisationAnalysisPdf() {
+    const button=document.getElementById("mobilisation-report-download");
+    const C=window.jspdf&&window.jspdf.jsPDF?window.jspdf.jsPDF:(window.jsPDF||null);
+    if(!C){alert("Bibliothèque PDF indisponible.");return;}
+    if(button){button.disabled=true;button.textContent="…";}
+    try {
+      const doc=new C({orientation:"portrait",unit:"mm",format:"a4"});
+      const pw=doc.internal.pageSize.getWidth(), ph=doc.internal.pageSize.getHeight();
+      const mx=16, mt=15, mb=14, cw=pw-mx*2; let y=mt;
+      const ink=[31,41,55], muted=[102,112,133], line=[208,213,221], pale=[247,248,250], primary=[32,73,117];
+      function clean(t){return String(t||"").replace(/\u202f/g," ").replace(/\u00a0/g," ").replace(/[’]/g,"'").replace(/[–—]/g,"-");}
+      function page(){doc.addPage("a4","portrait");y=mt;}
+      function ensure(h){if(y+h>ph-mb)page();}
+      function title(t){ensure(12);doc.setFont("helvetica","bold");doc.setFontSize(12);doc.setTextColor.apply(doc,primary);const lines=doc.splitTextToSize(clean(t),cw);doc.text(lines,mx,y+4);y+=lines.length*5.2+4;}
+      function para(t,boldLead){doc.setFont("helvetica","normal");doc.setFontSize(9);doc.setTextColor.apply(doc,ink);const lines=doc.splitTextToSize(clean(t),cw);const h=lines.length*4.15+3;ensure(h);doc.text(lines,mx,y+3);y+=h+2;}
+      function source(t){doc.setFont("helvetica","italic");doc.setFontSize(7.8);doc.setTextColor.apply(doc,muted);const lines=doc.splitTextToSize(clean(t),cw);ensure(lines.length*3.7+3);doc.text(lines,mx,y+2.5);y+=lines.length*3.7+3;}
+      function table(headers, rows, widths){
+        const rh=8; ensure(rh*(rows.length+1)+5); let x=mx;
+        headers.forEach((h,i)=>{doc.setFillColor.apply(doc,pale);doc.setDrawColor.apply(doc,line);doc.rect(x,y,widths[i],rh,"FD");doc.setFont("helvetica","bold");doc.setFontSize(7.4);doc.setTextColor.apply(doc,ink);const l=doc.splitTextToSize(clean(h),widths[i]-3);doc.text(l,x+1.5,y+3.2);x+=widths[i];}); y+=rh;
+        rows.forEach((row,ri)=>{let heights=row.map((v,i)=>doc.splitTextToSize(clean(v),widths[i]-3).length);let h=Math.max(rh,Math.max(...heights)*3.3+3);ensure(h);x=mx;row.forEach((v,i)=>{doc.setDrawColor.apply(doc,line);if(ri%2){doc.setFillColor(252,252,252);doc.rect(x,y,widths[i],h,"FD");}else doc.rect(x,y,widths[i],h);doc.setFont("helvetica",i===0?"bold":"normal");doc.setFontSize(7.3);doc.setTextColor.apply(doc,ink);doc.text(doc.splitTextToSize(clean(v),widths[i]-3),x+1.5,y+3.3);x+=widths[i];});y+=h;});y+=5;
+      }
+      // En-tête inspiré des exports NB / BRQ
+      doc.setTextColor.apply(doc,ink);doc.setFont("helvetica","bold");doc.setFontSize(16);doc.text("Analyse de la séquence de mobilisation scolaire",mx,y+5);y+=9;
+      doc.setFont("helvetica","normal");doc.setFontSize(9);doc.setTextColor.apply(doc,muted);doc.text("Académie de Montpellier - EMAS 34 - situation au 5 octobre 2026",mx,y+3);y+=10;
+      doc.setDrawColor.apply(doc,line);doc.line(mx,y,pw-mx,y);y+=8;
 
+      title("1. Une crise concentrée sur les 1er et 2 octobre");
+      para("Sur les 214 faits établissement (FE) recensés entre le 28 septembre et le 2 octobre, 41 sont rattachables à la séquence de mobilisation, soit 19,2 % de l'activité FE hebdomadaire.");
+      para("La crise se concentre très nettement sur les 1er et 2 octobre, avec 37 FE. Les 4 autres situations correspondent à des signaux précurseurs apparus les 29 et 30 septembre ou rapportés dans un FE du 1er octobre : premiers rassemblements, incidents et appels au blocage diffusés avant le déclenchement principal du mouvement.");
+      table(["Période","FE liés à la crise","Caractérisation"],[["29-30 septembre / précurseurs","4","Premiers incidents et préparation"],["1er-2 octobre","37","Cœur de la mobilisation"],["Total","41","19,2 % des 214 FE"]],[58,38,cw-96]);
+      para("Cette montée en puissance s'inscrit dans une dynamique nationale : plus de 1 020 lycées sont touchés le 1er octobre, dont 222 bloqués, contre environ 180 établissements concernés le 28 septembre.");source("Selon Le Monde, sur données du ministère de l'Éducation nationale");
+      title("Une donnée FE nécessairement provisoire");
+      para("Au 5 octobre, les 41 FE ne permettent pas de mesurer exhaustivement l'étendue de la crise. Certains établissements touchés les 1er et 2 octobre peuvent ne pas avoir transmis de FE, tandis que d'autres ont pu connaître un blocage sans qu'un signalement soit réalisé.");
+      para("Le croisement avec les bilans préfectoraux le confirme : 13 établissements sont touchés dans l'Hérault dès le 1er octobre ; dans le Gard, 8 établissements connaissent encore des rassemblements et 12 fonctionnent à distance le 2 octobre.");source("Selon les préfectures de l'Hérault et du Gard");
+      para("Les FE constituent donc un plancher documenté de l'impact de la crise, et non un recensement exhaustif.");
+
+      title("2. Au moins une trentaine de lycées et collèges affectés dans l'académie");
+      para("Le croisement des FE avec les sources institutionnelles et locales permet d'identifier au moins une trentaine d'établissements du second degré directement affectés par un blocage, une tentative de blocage, un rassemblement ou des troubles liés au mouvement.");
+      table(["Département","Éléments recensés"],[["Hérault","13 établissements touchés dès le 1er octobre, notamment à Montpellier, Sète, Lunel, Agde, Gignac et Sérignan ; 13 points de rassemblement ou de blocage le lendemain."],["Gard","8 établissements encore mobilisés le 2 octobre, notamment à Nîmes, Alès, Milhaud, Beaucaire, Bagnols-sur-Cèze et Villeneuve-lès-Avignon."],["Aude","Blocages ou tentatives à Carcassonne, Narbonne, Castelnaudary, Lézignan-Corbières et Limoux."],["Pyrénées-Orientales","Plusieurs lycées de Perpignan touchés - Arago, Pablo-Picasso, Jean-Lurçat et Aristide-Maillol - ainsi qu'une mobilisation à Céret."]],[42,cw-42]);
+      source("Sources : préfectures de l'Hérault, du Gard et de l'Aude ; Made in Perpignan pour les Pyrénées-Orientales");
+      para("Le bilan de « plus de 30 établissements » doit rester présenté comme un minimum, les différentes sources ne fournissant pas encore, au 5 octobre, une liste académique consolidée et exhaustive.");
+
+      title("3. Des atteintes principalement orientées vers la sécurité et le fonctionnement des établissements");
+      para("Les FE montrent une nette prédominance des atteintes à la sécurité et au climat scolaire, devant les atteintes aux biens et les atteintes directes aux personnes.");
+      table(["Nature observée","FE concernés*","Principales manifestations"],[["Sécurité / climat scolaire","25","Blocages, rassemblements, intrusions, engins pyrotechniques"],["Biens","14","Incendies, dégradations, mobilier et accès détériorés"],["Personnes","5","Mortiers, projectiles, menaces ou violences envers personnels/FDO"],["Valeurs de la République","1","Situation ponctuelle"]],[48,32,cw-80]);
+      source("* Catégories pouvant se cumuler dans un même FE.");
+      para("Une gradation apparaît nettement dans les faits : appel au blocage -> rassemblement ou entrave -> fumigènes/pétards -> incendies et dégradations -> mortiers, projectiles et violences.");
+      para("Les 41 FE ne correspondent donc pas à 41 situations violentes. La mobilisation est largement diffusée, mais les formes de forte intensité restent concentrées sur certains établissements.");
+      para("Cette distinction se retrouve au niveau national : le 2 octobre, 735 établissements sont encore concernés par le mouvement, tandis que des violences urbaines sont recensées devant 158 établissements.");source("Selon le ministère de l'Intérieur, cité par Le Monde");
+
+      title("4. Des établissements fortement impactés, jusqu'à l'arrêt du présentiel");
+      para("Certains sites concentrent une part importante de la gravité de la séquence. Dans l'Hérault, Jules-Guesde, Léonard-de-Vinci, Jean-Mermoz et Pierre-Mendès-France à Montpellier ainsi que Joliot-Curie à Sète connaissent notamment d'importantes dégradations, incendies ou usages d'engins pyrotechniques.");
+      para("La situation conduit la rectrice Carole Drucker-Godard à décider le passage à l'enseignement à distance de six lycées le vendredi 2 octobre, en raison des dégradations et des conditions de sécurité.");
+      table(["Ville","Lycées passés à distance"],[["Montpellier","Jules-Guesde ; Jean-Mermoz ; Jules-Ferry ; Léonard-de-Vinci ; Pierre-Mendès-France"],["Béziers","Jean-Moulin"]],[42,cw-42]);
+      source("Selon la préfecture de l'Hérault et le rectorat");
+      para("Les dégâts constatés dans cinq lycées de l'Hérault dépassent alors un million d'euros. Le retour à la normale n'est pas immédiat : Jean-Mermoz et Pierre-Mendès-France restent en enseignement à distance le lundi 5 octobre.");source("Selon le communiqué commun préfecture-rectorat");
+      para("Dans le Gard, l'impact sur le fonctionnement scolaire est également important puisque 12 établissements assurent leurs enseignements à distance le 2 octobre.");source("Selon la préfecture du Gard");
+
+      title("5. Une diffusion vers les collèges largement favorisée par les réseaux sociaux");
+      para("Si le mouvement demeure principalement lycéen, les FE mettent en évidence une diffusion rapide vers plusieurs collèges par l'intermédiaire de Snapchat, TikTok, WhatsApp et de flyers numériques.");
+      para("Des groupes consacrés au « blocus » rassemblent parfois plusieurs dizaines d'élèves avant même qu'une action ne soit organisée. Cette extension est également constatée nationalement : une petite centaine de collèges sont concernés le 2 octobre, notamment dans les cités scolaires ou à proximité de lycées mobilisés.");source("Selon le ministère de l'Éducation nationale, cité par Le Monde");
+      para("Dans l'académie, cette mobilisation collégienne apparaît davantage comme un phénomène de diffusion et d'imitation du mouvement lycéen que comme une mobilisation autonome : appels au blocus, déplacement de poubelles ou barrières, regroupements et, plus ponctuellement, fumigènes, pétards ou participation aux troubles.");
+      para("Les conséquences dépassent enfin les établissements mobilisés. Deux écoles du premier degré apparaissent dans les FE après avoir subi les effets de manifestations voisines, notamment par l'exposition à des fumigènes, mortiers ou gaz lacrymogènes. Le premier degré apparaît ainsi comme impacté indirectement, sans mobilisation propre identifiée.");
+
+      title("En conclusion");
+      para("La séquence représente 41 des 214 FE de la semaine (19,2 %), dont 37 concentrés sur les seules journées des 1er et 2 octobre. Le nombre réel d'établissements concernés est cependant supérieur : le croisement des FE et des bilans disponibles permet d'identifier au moins une trentaine de lycées et collèges affectés dans les quatre départements, bilan encore provisoire au 5 octobre.");
+      para("La crise est principalement caractérisée par des atteintes au fonctionnement et à la sécurité des établissements. Si la majorité des situations relève de blocages ou rassemblements, certains points de tension connaissent un durcissement important, associant incendies, dégradations, mortiers et projectiles, jusqu'à entraîner le basculement temporaire de plusieurs établissements vers l'enseignement à distance.");
+      para("La séquence se distingue enfin par sa rapidité de propagation et son extension au-delà des lycées. Les réseaux sociaux favorisent la diffusion vers les collèges, tandis que la présence ponctuelle d'individus extérieurs et l'utilisation d'engins pyrotechniques ou incendiaires contribuent à faire basculer certains rassemblements d'une problématique scolaire vers une problématique d'ordre public et de sécurisation des établissements.");
+
+      const pages=doc.getNumberOfPages();
+      for(let i=1;i<=pages;i++){doc.setPage(i);doc.setDrawColor.apply(doc,line);doc.line(mx,ph-10,pw-mx,ph-10);doc.setFont("helvetica","normal");doc.setFontSize(6.8);doc.setTextColor(128,128,128);doc.text("EMAS 34 - Académie de Montpellier",mx,ph-5);doc.text(`Page ${i} / ${pages}`,pw-mx,ph-5,{align:"right"});}
+      doc.save("Analyse sequence mobilisation scolaire - situation au 5 octobre 2026.pdf");
+    } catch(error){console.error("Erreur PDF analyse mobilisation :",error);alert("Impossible de générer le PDF de l'analyse pour le moment.");}
+    finally{if(button){button.disabled=false;button.textContent="PDF";}}
+  }
 
 </script>
 
