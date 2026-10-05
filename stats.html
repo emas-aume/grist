@@ -1322,6 +1322,7 @@
 
 
 <script>
+  /* Correctif NB/BRQ 2026-2027 : prise en charge des départements composites (ex. HERAULT 34). */
   /*
     ==================================================
     CONFIGURATION DES COLONNES GRIST
@@ -2104,20 +2105,48 @@
   function getDepartement(record) {
     if (!record) return "";
 
-    /* FE26_27_2 possède déjà la colonne Departement : elle est prioritaire. */
+    /*
+      FE26_27_2 possède déjà la colonne Departement : elle est prioritaire.
+
+      IMPORTANT :
+      dans la base 2026-2027, les valeurs sont notamment de la forme
+      "HERAULT 34", "GARD 30", "AUDE 11", etc. Il ne faut donc pas
+      exiger que la cellule soit exactement égale à "34" ou "herault".
+    */
     const raw = record[FIELD.DEPARTEMENT];
     if (raw !== null && raw !== undefined && raw !== "") {
-      const normalized = String(raw).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
-      const byName = { "aude":"11", "gard":"30", "herault":"34", "lozere":"48", "pyrenees orientales":"66" };
-      if (byName[normalized]) return byName[normalized];
-      const direct = normalized.match(/^(11|30|34|48|66)$/);
-      if (direct) return direct[1];
+      const normalized = String(raw)
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase()
+        .replace(/[_-]+/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+
+      /* Priorité au numéro lorsqu'il est présent dans une valeur composite. */
+      const numberMatch = normalized.match(/(?:^|\D)(11|30|34|48|66)(?:\D|$)/);
+      if (numberMatch) return numberMatch[1];
+
+      /* Secours par nom, y compris dans une valeur plus longue. */
+      const byName = [
+        ["pyrenees orientales", "66"],
+        ["herault", "34"],
+        ["lozere", "48"],
+        ["gard", "30"],
+        ["aude", "11"]
+      ];
+      for (const item of byName) {
+        if (normalized.includes(item[0])) return item[1];
+      }
     }
 
-    /* Secours seulement pour d'anciennes tables ne possédant pas Departement. */
-    const uai = String(record[FIELD.UAI] || "").toUpperCase();
+    /*
+      Secours UAI pour les anciennes tables ou une ligne dont le département
+      serait exceptionnellement absent/non exploitable.
+    */
+    const uai = String(record[FIELD.UAI] || "").toUpperCase().trim();
     const match = uai.match(/^0(11|30|34|48|66)\d{4}[A-Z]$/);
-    return match ? String(Number(match[1])) : "";
+    return match ? match[1] : "";
   }
 
 
