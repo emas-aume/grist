@@ -1611,10 +1611,12 @@
 
   async function ensureDocumentAvailability() {
     /*
-      Index DOCUMENTS ultra-léger : aucune lecture massive de FE26_27_2.
-      Les NB et BRQ sont des documents calendaires. On construit donc leurs
-      dates localement, puis on ne lit dans Grist que les dates nécessaires
-      lorsque l'utilisateur ouvre un document.
+      Les Notes Blanches ne sont plus créées à partir du seul calendrier.
+      On indexe d'abord les FE réels de FE26_27_2 puis on ne conserve,
+      département par département, que les dates de note qui contiennent
+      effectivement au moins un FE affichable. La numérotation suit donc
+      uniquement ces notes réellement existantes, sans numéro consommé
+      par une journée vide.
     */
     if (documentAvailabilityReady) return;
     if (documentAvailabilityLoading) return documentAvailabilityLoading;
@@ -1624,25 +1626,31 @@
       whiteNoteAvailableKeysByDepartment.clear();
       brqAvailableValues = [];
 
+      const departments = ["11","30","34","48","66"];
+      departments.forEach(function(dep){ whiteNoteAvailableKeysByDepartment.set(dep, new Set()); });
+
+      /* ~1 000 FE : lecture unique et fiable pour déterminer les NB existantes. */
+      const allRows = await fetchAllDocumentFacts();
+      const allFacts = normalizeFactRecords(allRows);
+
+      allFacts.forEach(function(record) {
+        if (record && record._dateKey) documentAvailableDateKeys.add(record._dateKey);
+        const dep = record && record._departement;
+        if (!dep || !whiteNoteAvailableKeysByDepartment.has(dep)) return;
+        if (!isWhiteNoteDisplayableRecord(record, dep)) return;
+
+        const noteDate = getWhiteNoteDateForRecordDate(record._date);
+        if (!noteDate) return;
+        const noteKey = formatDateKey(noteDate);
+        if (noteKey < WHITE_NOTE_FIRST_DATE_KEY || noteKey > WHITE_NOTE_SCHOOL_YEAR_END_KEY) return;
+        whiteNoteAvailableKeysByDepartment.get(dep).add(noteKey);
+      });
+
+      /* BRQ : on conserve le calendrier actuel ; son contenu est chargé à la demande. */
       const today = parseGristDate(todayUtcKey());
       const schoolEnd = parseGristDate(WHITE_NOTE_SCHOOL_YEAR_END_KEY);
       const effectiveEnd = today && schoolEnd && today < schoolEnd ? today : schoolEnd;
-      const departments = ["11","30","34","48","66"];
-
-      departments.forEach(function(dep){ whiteNoteAvailableKeysByDepartment.set(dep, new Set()); });
-
-      let d = parseGristDate(WHITE_NOTE_FIRST_DATE_KEY);
-      while (d && effectiveEnd && d <= effectiveEnd) {
-        if (isWhiteNoteOperationalDay(d)) {
-          const key = formatDateKey(d);
-          departments.forEach(function(dep){ whiteNoteAvailableKeysByDepartment.get(dep).add(key); });
-        }
-        d = addDaysUTC(d, 1);
-      }
-
-      /* BRQ journalier : mêmes jours ouvrés hors vacances scolaires.
-         La numérotation démarre au premier BRQ du 03/09/2026. */
-      d = parseGristDate("2026-09-03");
+      let d = parseGristDate("2026-09-03");
       while (d && effectiveEnd && d <= effectiveEnd) {
         const key = formatDateKey(d);
         const day = d.getUTCDay();
