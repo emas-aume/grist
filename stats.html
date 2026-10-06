@@ -2928,17 +2928,17 @@
       const pageWidth = doc.internal.pageSize.getWidth();
       const pageHeight = doc.internal.pageSize.getHeight();
 
-      /* Filigrane central : 80 pt à 9 % d’opacité, dimensionné pour rester lisible sur A4 sans écraser le contenu. */
+      /* Filigrane central : 90 pt à 8 % d’opacité. */
       doc.saveGraphicsState();
       try {
         if (typeof doc.GState === "function" && typeof doc.setGState === "function") {
-          doc.setGState(new doc.GState({ opacity: 0.09 }));
+          doc.setGState(new doc.GState({ opacity: 0.08 }));
         }
       } catch (e) {}
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(80);
+      doc.setFontSize(90);
       doc.setTextColor(90, 100, 115);
-      doc.text("EMAS 34", pageWidth / 2, pageHeight / 2, {
+      doc.text("E M A S 34", pageWidth / 2, pageHeight / 2, {
         align: "center",
         angle: 0
       });
