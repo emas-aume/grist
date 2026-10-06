@@ -166,6 +166,19 @@ function equipierRef(v){
   return found?.id??null;
 }
 function etabUai(ref){return etabMap.get(Number(ref))?.UAI||""}
+function feNumericKey(v){
+  const raw=String(v??"").trim();
+  const m=raw.match(/(\d{6,})$/);
+  if(!m)return null;
+  const n=Number(m[1]);
+  return Number.isSafeInteger(n)&&n>0?n:null;
+}
+function feDisplayNumber(v){return String(v??"").trim()||"numéro inconnu"}
+function requireFeNumericKey(v){
+  const n=feNumericKey(v);
+  if(!n)throw new Error(`Numéro FE invalide (${feDisplayNumber(v)}) : opération bloquée pour éviter toute modification erronée.`);
+  return n;
+}
 function sourceStatus(f){
   const raw=String(f?.Statut||"").trim();
   if(!raw)return "Non attribué";
@@ -177,7 +190,7 @@ function sourceStatus(f){
 }
 function isArchivedFact(f){return !!f&&[T.OLD,T.OLD2].includes(f._source)}
 function statusOf(f){
-  let s=suiviMap.get(Number(f.Numero_FE));
+  let s=suiviMap.get(feNumericKey(f.Numero_FE));
   return isArchivedFact(f)?"Terminé":(s?.Statut||sourceStatus(f));
 }
 function sourceSuivi(f){
@@ -386,13 +399,13 @@ function periodSpec(){
   if(week){let m=/^(\d{4})-W(\d{2})$/.exec(week);if(!m)return null;let year=+m[1],wk=+m[2],start=isoWeekStart(year,wk),dates=[];for(let i=0;i<7;i++){let d=new Date(start);d.setUTCDate(start.getUTCDate()+i);dates.push(d.getTime()/1000)}let en=new Date(start.getTime()+6*86400000);return{label:`S${String(wk).padStart(2,"0")} — ${frShortUTC(start)} à ${frShortUTC(en)}`,dates}}
   return null;
 }
-async function loadCurrent(){let spec=periodSpec();if(!spec){notice("Choisissez une période valide.","error");return}notice(`Chargement des faits ${spec.label} — départements 34 et 48…`);let loaded=await apiAllPaged(T.CUR,{filter:{Date_de_saisie:spec.dates},sort:"-Date_de_saisie,-Numero_FE",pageSize:1000,maxRows:10000});currentRows=loaded.filter(f=>{if(!isCurrentSchoolYear(f))return false;let d=depCode(f.Departement);if(!d){let e=etabMap.get(Number(f.UAI));d=depCode(e?.Departement)}return ["34","48"].includes(d)}).sort((a,b)=>(date(b.Date_de_saisie)?.getTime()||0)-(date(a.Date_de_saisie)?.getTime()||0)||Number(b.Numero_FE||0)-Number(a.Numero_FE||0));await loadSuiviFor(currentRows);rows=[...currentRows];notice(`${currentRows.length} fait(s) des départements 34 et 48 chargé(s) pour ${spec.label}.`,"ok");page=1;render()}
-async function loadSuiviFor(facts){let ids=facts.filter(f=>!isArchivedFact(f)).map(f=>Number(f.Numero_FE)).filter(Boolean);if(!ids.length)return;let ss=await api(T.SUIVI,{filter:{Numero_FE:ids},limit:Math.max(ids.length*2,200)});ss.forEach(s=>suiviMap.set(Number(s.Numero_FE),s))}
+async function loadCurrent(){let spec=periodSpec();if(!spec){notice("Choisissez une période valide.","error");return}notice(`Chargement des faits ${spec.label} — départements 34 et 48…`);let loaded=await apiAllPaged(T.CUR,{filter:{Date_de_saisie:spec.dates},sort:"-Date_de_saisie,-Numero_FE",pageSize:1000,maxRows:10000});currentRows=loaded.filter(f=>{if(!isCurrentSchoolYear(f))return false;let d=depCode(f.Departement);if(!d){let e=etabMap.get(Number(f.UAI));d=depCode(e?.Departement)}return ["34","48"].includes(d)}).sort((a,b)=>(date(b.Date_de_saisie)?.getTime()||0)-(date(a.Date_de_saisie)?.getTime()||0)||(feNumericKey(b.Numero_FE)||0)-(feNumericKey(a.Numero_FE)||0));await loadSuiviFor(currentRows);rows=[...currentRows];notice(`${currentRows.length} fait(s) des départements 34 et 48 chargé(s) pour ${spec.label}.`,"ok");page=1;render()}
+async function loadSuiviFor(facts){let ids=facts.filter(f=>!isArchivedFact(f)).map(f=>feNumericKey(f.Numero_FE)).filter(Boolean);if(!ids.length)return;let ss=await api(T.SUIVI,{filter:{Numero_FE:ids},limit:Math.max(ids.length*2,200)});ss.forEach(s=>suiviMap.set(Number(s.Numero_FE),s))}
 const LIVE_REFRESH_MS=5000; let liveRefreshBusy=false,liveRefreshTimer=null;
 async function refreshLiveSuivi(){
   if(liveRefreshBusy||document.hidden)return;
   const facts=rows.filter(f=>!isArchivedFact(f));
-  const ids=[...new Set(facts.map(f=>Number(f.Numero_FE)).filter(Boolean))];
+  const ids=[...new Set(facts.map(f=>feNumericKey(f.Numero_FE)).filter(Boolean))];
   if(!ids.length)return;
   liveRefreshBusy=true;
   try{
@@ -401,10 +414,10 @@ async function refreshLiveSuivi(){
     for(const id of ids){if(fresh.has(id))suiviMap.set(id,fresh.get(id));else suiviMap.delete(id)}
     render();
     if(selected&&!isArchivedFact(selected)){
-      const live=fresh.get(Number(selected.Numero_FE))||null;
+      const live=fresh.get(feNumericKey(selected.Numero_FE))||null;
       const opened=Number(selectedSuivi?.Derniere_modification||0),current=Number(live?.Derniere_modification||0);
       if(live&&current!==opened){
-        if(!opsDirty()){selectedSuivi=live;suiviMap.set(Number(selected.Numero_FE),live);renderOps();}
+        if(!opsDirty()){selectedSuivi=live;suiviMap.set(feNumericKey(selected.Numero_FE),live);renderOps();}
         else{$("saveMeta").textContent=`⚠ Mise à jour externe détectée${live.Modifie_par?" — "+live.Modifie_par:""}${live.Derniere_modification?" — "+dateTimeFR(live.Derniere_modification):""}`;}
       }else if(!live&&selectedSuivi&&!opsDirty()){selectedSuivi=null;renderOps();}
     }
@@ -479,7 +492,17 @@ function renderOperationalId(){
   if(oid!=null){box.textContent="ID opérationnel : "+oid;box.classList.remove("hidden");btn.classList.add("hidden")}
   else{box.textContent="";box.classList.add("hidden");btn.classList.toggle("hidden",!selected||isArchivedFact(selected))}
 }
-async function searchExactFE(num){notice("Recherche directe du FE n°"+num+"…");let n=Number(num);let found=await api(T.CUR,{filter:{Numero_FE:[n]},limit:10});if(!found.length)found=await api(T.OLD,{filter:{Numero_FE:[n]},limit:10});if(!found.length)found=await api(T.OLD2,{filter:{Numero_FE:[n]},limit:10});found=found.filter(f=>["34","48"].includes(depCode(f.Departement)));await loadSuiviFor(found);rows=found;page=1;render();notice(found.length?`${found.length} résultat(s) trouvé(s)${found[0]._source===T.OLD2?" dans les archives 2024–2025":found[0]._source===T.OLD?" dans les archives 2025–2026":" en 2026–2027"}.`:`Aucun FE n°${num} trouvé dans les départements 34 ou 48. Pour les autres départements, recherchez l’établissement par son nom.`,found.length?"ok":"error")}
+async function searchExactFE(num){
+  const query=String(num??"").trim();notice("Recherche directe du FE n°"+query+"…");
+  const suffix=(query.match(/(\d{6,})$/)||[])[1]||query;
+  let found=[];
+  for(const table of [T.CUR,T.OLD,T.OLD2]){
+    const candidates=await apiAllPaged(table,{pageSize:2000,maxRows:50000});
+    found=candidates.filter(f=>{const n=String(f.Numero_FE??"").trim();return n===query||n===suffix||n.endsWith("-"+suffix)}).slice(0,10);
+    if(found.length)break;
+  }
+  found=found.filter(f=>["34","48"].includes(depCode(f.Departement)));await loadSuiviFor(found);rows=found;page=1;render();notice(found.length?`${found.length} résultat(s) trouvé(s)${found[0]._source===T.OLD2?" dans les archives 2024–2025":found[0]._source===T.OLD?" dans les archives 2025–2026":" en 2026–2027"}.`:`Aucun FE n°${query} trouvé dans les départements 34 ou 48. Pour les autres départements, recherchez l’établissement par son nom.`,found.length?"ok":"error")
+}
 async function renderEtabMatches(q){
   let box=$("etabMatches");
   if(!q||/^\d{6,}$/.test(q)){box.classList.add("hidden");box.innerHTML="";return}
@@ -540,7 +563,7 @@ function filtered(){
     }
     if(level!=="all"&&String(f.Niveau??"").trim()!==level)return false;
 
-    const su=suiviMap.get(Number(f.Numero_FE));
+    const su=suiviMap.get(feNumericKey(f.Numero_FE));
     const st=statusOf(f);
     if(status!=="all"&&st!==status)return false;
 
@@ -567,12 +590,12 @@ function filtered(){
     return true;
   });
 }
-function render(){let a=filtered(),pages=Math.max(1,Math.ceil(a.length/PAGE));page=Math.min(page,pages);let slice=a.slice((page-1)*PAGE,page*PAGE);$("body").innerHTML=slice.length?slice.map(f=>{let su=suiviMap.get(Number(f.Numero_FE));let eq=isArchivedFact(f)?(f.Equipier||"N/A"):eqName(su ? su.Equipier : f.Equipier);return `<tr><td>${dateFR(f.Date_de_saisie)}</td><td><span class="badge ${String(f.Niveau)==="3"?"b3":""}">${esc(f.Niveau||"—")}</span></td><td>${factTypeBadges(f.Types_de_fait,f.Niveau)}</td><td><button class="etab-link" data-etab-from-fe="${f._source}:${f.id}">${esc(f.Etablissement||"—")}</button></td><td>${esc(f.Ville||"—")}</td><td>${badgeStatus(statusOf(f))}</td><td>${equipierBadge(eq)}</td><td>${esc(f.Numero_FE)}</td><td><button class="btn open-btn" data-open="${f._source}:${f.id}" title="Ouvrir le fait" aria-label="Ouvrir le fait">↗</button></td></tr>`}).join(""):'<tr><td colspan="9" class="loading">Aucun résultat.</td></tr>';document.querySelectorAll("[data-open]").forEach(b=>b.onclick=()=>openFact(b.dataset.open));document.querySelectorAll("[data-etab-from-fe]").forEach(b=>b.onclick=()=>openEstablishmentFromFact(b.dataset.etabFromFe));$("count").textContent=a.length+" résultat(s) dans les données actuellement chargées";$("pageInfo").textContent=`Page ${page} / ${pages}`;$("prev").disabled=page<=1;$("next").disabled=page>=pages}
+function render(){let a=filtered(),pages=Math.max(1,Math.ceil(a.length/PAGE));page=Math.min(page,pages);let slice=a.slice((page-1)*PAGE,page*PAGE);$("body").innerHTML=slice.length?slice.map(f=>{let su=suiviMap.get(feNumericKey(f.Numero_FE));let eq=isArchivedFact(f)?(f.Equipier||"N/A"):eqName(su ? su.Equipier : f.Equipier);return `<tr><td>${dateFR(f.Date_de_saisie)}</td><td><span class="badge ${String(f.Niveau)==="3"?"b3":""}">${esc(f.Niveau||"—")}</span></td><td>${factTypeBadges(f.Types_de_fait,f.Niveau)}</td><td><button class="etab-link" data-etab-from-fe="${f._source}:${f.id}">${esc(f.Etablissement||"—")}</button></td><td>${esc(f.Ville||"—")}</td><td>${badgeStatus(statusOf(f))}</td><td>${equipierBadge(eq)}</td><td>${esc(f.Numero_FE)}</td><td><button class="btn open-btn" data-open="${f._source}:${f.id}" title="Ouvrir le fait" aria-label="Ouvrir le fait">↗</button></td></tr>`}).join(""):'<tr><td colspan="9" class="loading">Aucun résultat.</td></tr>';document.querySelectorAll("[data-open]").forEach(b=>b.onclick=()=>openFact(b.dataset.open));document.querySelectorAll("[data-etab-from-fe]").forEach(b=>b.onclick=()=>openEstablishmentFromFact(b.dataset.etabFromFe));$("count").textContent=a.length+" résultat(s) dans les données actuellement chargées";$("pageInfo").textContent=`Page ${page} / ${pages}`;$("prev").disabled=page<=1;$("next").disabled=page>=pages}
 function openEstablishmentFromFact(key){etabReturnTarget="detail";let [source,id]=key.split(":");let f=rows.find(x=>x._source===source&&x.id===Number(id));if(!f)return;selected=f;let ref=Number(f.UAI);let e=etabMap.get(ref);if(!e){notice("Établissement introuvable dans ETABLISSEMENTS.","error");return}selectedEtab=e;$("listView").classList.add("hidden");$("detailView").classList.add("hidden");openEstablishment(e,ref)}
 function cleanDisplayText(v){return String(v??"").replace(/\r\n?/g,"\n").replace(/([^\n])\n(?!\n)/g,"$1 ").replace(/\n{3,}/g,"\n\n").replace(/[ \t]{2,}/g," ").trim()}
 function info(label,val,cls=""){return `<div class="info ${cls}"><span class="label">${esc(label)}</span><div class="value">${esc(cleanDisplayText(val)||"—")}</div></div>`}
-async function openFact(key){let [source,id]=key.split(":");selected=rows.find(x=>x._source===source&&x.id===Number(id));if(!selected){let got=await api(source,{filter:{Numero_FE:[Number(key)]},limit:1});selected=got[0]}if(!selected)return;$("listView").classList.add("hidden");$("etabView").classList.add("hidden");$("detailView").classList.remove("hidden");const origin=factOriginLabel(selected);const detailLevel=displayLevel(selected.Niveau);$("title").innerHTML=`FE n°${esc(selected.Numero_FE)} — <span class="${detailLevel==="3"?"event-level3":""}">Niveau ${esc(detailLevel)}</span>${origin?` <span class="fact-origin-badge ${origin.cls}">${esc(origin.label)}</span>`:""}`;$("subtitle").textContent=origin?.cls==="update"?`Date de saisie : ${dateFR(selected.Date_de_saisie)} — Date du fait : ${dateFR(selected.Date_du_fait)} — ${selected.Etablissement||"Établissement non renseigné"} — ${selected.Ville||""} — ${selected.Departement||""}`:`Date du fait : ${dateFR(selected.Date_du_fait)} — ${selected.Etablissement||"Établissement non renseigné"} — ${selected.Ville||""} — ${selected.Departement||""}`;let authorParts=[];if(selected.Redacteur)authorParts.push(String(selected.Redacteur).trim());if(selected.Courriel_redacteur)authorParts.push(String(selected.Courriel_redacteur).trim());$("detailAuthor").textContent=authorParts.length?`Rédigé par ${authorParts.join(", ")}`:"Rédacteur non renseigné";renderOperationalId();$("detailStatus").innerHTML=badgeStatus(isArchivedFact(selected)?"Terminé":((selectedSuivi||sourceSuivi(selected)).Statut||"Non attribué"));const archived=[T.OLD,T.OLD2].includes(source);const sourceParts=[];const detailedTypes=selected.Types_de_fait_structure||selected.Types_de_fait;if(String(detailedTypes||"").trim())sourceParts.push(`<div class="info span4"><span class="label">Types de fait détaillés</span><div class="detail-type-wrap">${structuredTypeBadges(detailedTypes,detailLevel)}</div></div>`);if(String(selected.Resume_du_fait||"").trim())sourceParts.push(info("Résumé du fait",selected.Resume_du_fait,"span4"));if(String(selected.Expose_des_faits||"").trim())sourceParts.push(info("Exposé des faits",selected.Expose_des_faits,"span4"));$("sourceGrid").innerHTML=sourceParts.join("");if(archived){opsCleanSnapshot=null;$("opsCard").classList.remove("hidden");const archivedParts=[];const archivedEquipier=String(selected.Equipier||"").trim();if(archivedEquipier&&!norm(archivedEquipier).includes("non attrib")&&archivedEquipier!=="—")archivedParts.push(info("Équipier",selected.Equipier));if(selected.Date_traitement_EMS)archivedParts.push(info("Date traitement EMAS",dateFR(selected.Date_traitement_EMS)));if(String(selected.Suivi_etablissement||"").trim()&&!norm(selected.Suivi_etablissement).includes("non renseigne"))archivedParts.push(info("Suivi établissement",selected.Suivi_etablissement,"span2"));if(String(selected.Accompagnement_EMAS||"").trim()&&!norm(selected.Accompagnement_EMAS).includes("non renseigne"))archivedParts.push(info("Accompagnement EMAS",selected.Accompagnement_EMAS,"span2"));$("opsCard").innerHTML=`<div class="sectiontitle"><h2>Suivi archivé</h2>${badgeStatus("Terminé")}</div>${archivedParts.length?`<div class="grid">${archivedParts.join("")}</div>`:'<div class="muted">Aucune information de suivi archivée.</div>'}`;return}await loadSingleSuivi(selected);renderOps()}
-async function loadSingleSuivi(f){let ss=await api(T.SUIVI,{filter:{Numero_FE:[Number(f.Numero_FE)]},limit:5});selectedSuivi=ss[0]||null;if(selectedSuivi)suiviMap.set(Number(f.Numero_FE),selectedSuivi)}
+async function openFact(key){let [source,id]=key.split(":");selected=rows.find(x=>x._source===source&&x.id===Number(id));if(!selected&&source&&id){let got=await api(source,{filter:{id:[Number(id)]},limit:1});selected=got[0]}if(!selected)return;selectedSuivi=null;$("listView").classList.add("hidden");$("etabView").classList.add("hidden");$("detailView").classList.remove("hidden");const origin=factOriginLabel(selected);const detailLevel=displayLevel(selected.Niveau);$("title").innerHTML=`FE n°${esc(selected.Numero_FE)} — <span class="${detailLevel==="3"?"event-level3":""}">Niveau ${esc(detailLevel)}</span>${origin?` <span class="fact-origin-badge ${origin.cls}">${esc(origin.label)}</span>`:""}`;$("subtitle").textContent=origin?.cls==="update"?`Date de saisie : ${dateFR(selected.Date_de_saisie)} — Date du fait : ${dateFR(selected.Date_du_fait)} — ${selected.Etablissement||"Établissement non renseigné"} — ${selected.Ville||""} — ${selected.Departement||""}`:`Date du fait : ${dateFR(selected.Date_du_fait)} — ${selected.Etablissement||"Établissement non renseigné"} — ${selected.Ville||""} — ${selected.Departement||""}`;let authorParts=[];if(selected.Redacteur)authorParts.push(String(selected.Redacteur).trim());if(selected.Courriel_redacteur)authorParts.push(String(selected.Courriel_redacteur).trim());$("detailAuthor").textContent=authorParts.length?`Rédigé par ${authorParts.join(", ")}`:"Rédacteur non renseigné";renderOperationalId();$("detailStatus").innerHTML=badgeStatus(isArchivedFact(selected)?"Terminé":((selectedSuivi||sourceSuivi(selected)).Statut||"Non attribué"));const archived=[T.OLD,T.OLD2].includes(source);const sourceParts=[];const detailedTypes=selected.Types_de_fait_structure||selected.Types_de_fait;if(String(detailedTypes||"").trim())sourceParts.push(`<div class="info span4"><span class="label">Types de fait détaillés</span><div class="detail-type-wrap">${structuredTypeBadges(detailedTypes,detailLevel)}</div></div>`);if(String(selected.Resume_du_fait||"").trim())sourceParts.push(info("Résumé du fait",selected.Resume_du_fait,"span4"));if(String(selected.Expose_des_faits||"").trim())sourceParts.push(info("Exposé des faits",selected.Expose_des_faits,"span4"));$("sourceGrid").innerHTML=sourceParts.join("");if(archived){opsCleanSnapshot=null;$("opsCard").classList.remove("hidden");const archivedParts=[];const archivedEquipier=String(selected.Equipier||"").trim();if(archivedEquipier&&!norm(archivedEquipier).includes("non attrib")&&archivedEquipier!=="—")archivedParts.push(info("Équipier",selected.Equipier));if(selected.Date_traitement_EMS)archivedParts.push(info("Date traitement EMAS",dateFR(selected.Date_traitement_EMS)));if(String(selected.Suivi_etablissement||"").trim()&&!norm(selected.Suivi_etablissement).includes("non renseigne"))archivedParts.push(info("Suivi établissement",selected.Suivi_etablissement,"span2"));if(String(selected.Accompagnement_EMAS||"").trim()&&!norm(selected.Accompagnement_EMAS).includes("non renseigne"))archivedParts.push(info("Accompagnement EMAS",selected.Accompagnement_EMAS,"span2"));$("opsCard").innerHTML=`<div class="sectiontitle"><h2>Suivi archivé</h2>${badgeStatus("Terminé")}</div>${archivedParts.length?`<div class="grid">${archivedParts.join("")}</div>`:'<div class="muted">Aucune information de suivi archivée.</div>'}`;return}await loadSingleSuivi(selected);renderOps()}
+async function loadSingleSuivi(f){let ss=await api(T.SUIVI,{filter:{Numero_FE:[feNumericKey(f.Numero_FE)]},limit:5});selectedSuivi=ss[0]||null;if(selectedSuivi)suiviMap.set(feNumericKey(f.Numero_FE),selectedSuivi)}
 const ACTIVITY_CHOICES={
  Securisation:["Situation de crise","Élèves perturbateurs","Conseil de discipline","Abords (EPLE, écoles, DSDEN...)"],
  Prevention:["Suivi DS","Intervention classe","CESC","Autres (enquêtes de victimisation...)"],
@@ -817,7 +840,7 @@ async function syncActivity(f,s){
   if(!f||!s)return;
   const table=degreeActivityTable(f);if(!table)throw new Error("Degré du FE non identifiable : synchronisation Activité impossible.");
   const e=etabMap.get(Number(f.UAI))||{};
-  const numero=Number(f.Numero_FE);
+  const numero=requireFeNumericKey(f.Numero_FE);
   const cols=await activityColumns(table);
   const keyCol=activityCol(cols,"Nmr_FE_ou_Initiative","Nmr FE ou Initiative","N° FE ou Initiative","Numero_FE","Numéro FE");
   if(!keyCol)throw new Error("Colonne Nmr_FE_ou_Initiative introuvable dans "+table+".");
@@ -872,19 +895,20 @@ async function removeActivityForFact(f){
   const table=degreeActivityTable(f);if(!table)return 0;
   const cols=await activityColumns(table);const keyCol=activityCol(cols,"Nmr_FE_ou_Initiative","Nmr FE ou Initiative","N° FE ou Initiative","Numero_FE","Numéro FE");
   if(!keyCol)throw new Error("Colonne numéro FE introuvable dans "+table+".");
-  const numero=Number(f.Numero_FE);const matches=await api(table,{filter:{[keyCol]:[numero,String(numero)]},limit:50});
+  const numero=requireFeNumericKey(f.Numero_FE);const matches=await api(table,{filter:{[keyCol]:[numero,String(numero)]},limit:50});
   if(matches.length)await grist.docApi.applyUserActions(matches.map(r=>["RemoveRecord",table,r.id]));
   return matches.length;
 }
 async function resetFollowup(){
   if(!selected||isArchivedFact(selected))return;
-  const numero=Number(selected.Numero_FE);
-  const ok=await showModal({title:"Remettre le suivi à zéro ?",message:`Le suivi du FE ${numero} sera remis à zéro.`,type:"error",confirmText:"Remettre à zéro",cancelText:"Annuler"});
+  let numero;try{numero=requireFeNumericKey(selected.Numero_FE)}catch(e){await showModal({title:"Réinitialisation impossible",message:e.message,type:"error"});return}
+  const numeroAffiche=feDisplayNumber(selected.Numero_FE);
+  const ok=await showModal({title:"Remettre le suivi à zéro ?",message:`Le suivi du FE ${numeroAffiche} sera remis à zéro.`,type:"error",confirmText:"Remettre à zéro",cancelText:"Annuler"});
   if(!ok)return;
   const btn=$("resetFollowup");btn.disabled=true;$("save").disabled=true;$("toggleDone").disabled=true;
   try{
     const suivis=await api(T.SUIVI,{filter:{Numero_FE:[numero]},limit:50});
-    if(suivis.length>1)throw new Error(`Doublon SUIVI détecté pour le FE ${numero}. Réinitialisation bloquée.`);
+    if(suivis.length>1)throw new Error(`Doublon SUIVI détecté pour le FE ${numeroAffiche}. Réinitialisation bloquée.`);
     const resetFields={Equipier:null,Statut:"Non attribué",Suivi_etablissement:"",Accompagnement_EMAS:"",Notes_informations:"",Eleve_suivi:"",Securisation:gristChoiceList([]),Prevention:gristChoiceList([]),Accompagnement:gristChoiceList([]),Formation:gristChoiceList([]),Representation_Partenariat:gristChoiceList([]),Date_traitement_EMS:null,Derniere_modification:null};
     if(suivis.length)await grist.docApi.applyUserActions([["UpdateRecord",T.SUIVI,suivis[0].id,resetFields]]);
     else await grist.docApi.applyUserActions([["AddRecord",T.SUIVI,null,{Numero_FE:numero,...resetFields}]]);
@@ -893,13 +917,13 @@ async function resetFollowup(){
     catch(e){await showModal({title:"Réinitialisation partielle",message:`Le suivi a été remis à zéro, mais la ligne Activité n'a pas pu être retirée : ${e.message}`,type:"error"})}
     await loadSingleSuivi(selected);
     renderOps();render();
-    await showModal({title:"Suivi remis à zéro",message:`Le FE ${numero} est de nouveau non attribué.`,type:"success"});
+    await showModal({title:"Suivi remis à zéro",message:`Le FE ${numeroAffiche} est de nouveau non attribué.`,type:"success"});
   }catch(e){await showModal({title:"Réinitialisation impossible",message:e.message,type:"error"})}
   finally{btn.disabled=false;$("save").disabled=false;$("toggleDone").disabled=false}
 }
 async function persistOps(forcedStatus=null){
   if(!selected||isArchivedFact(selected))return;
-  const numero=Number(selected.Numero_FE);
+  let numero;try{numero=requireFeNumericKey(selected.Numero_FE)}catch(e){await showModal({title:"Enregistrement impossible",message:e.message,type:"error"});return;}
   let currentState=selectedSuivi||sourceSuivi(selected);let eq=equipierSelectionTouched?($("equipier").value?Number($("equipier").value):null):equipierRef(currentState.Equipier);
   let st=forcedStatus||$("editStatus").value;if(!forcedStatus&&st!=="Terminé")st="En cours";
   let now=Math.floor(Date.now()/1000);
@@ -1004,7 +1028,7 @@ async function saveAmbiance(){
   finally{btn.disabled=false}
 }
 
-async function openEstablishment(e,ref){selectedEtab=e||etabMap.get(Number(ref))||null;$("etabBack").textContent=etabReturnTarget==="detail"?"← Retour à la fiche":"← Retour";$("detailView").classList.add("hidden");$("etabView").classList.remove("hidden");$("etabTitle").textContent=e?.Etablissement||selected.Etablissement||"Établissement";$("etabSub").textContent=[e?.UAI,e?.Ville,e?.Departement].filter(Boolean).join(" — ");$("etabGrid").innerHTML=[info("UAI",e?.UAI),info("Degré",e?.Degre),info("Ville",e?.Ville),info("Département",e?.Departement),info("Bassin",e?.Bassin),info("Type",e?.Type_etablissement),info("Secteur",e?.Secteur),info("Code postal",e?.Code_postal)].join("");$("history").innerHTML='<div class="loading">Chargement de l’historique par UAI…</div>';$("etabCounts").textContent="Chargement du nombre de faits…";$("ambianceDisplay").classList.remove("hidden");$("ambianceEditor").classList.add("hidden");$("ambianceDisplay").innerHTML='<div class="loading">Chargement…</div>';loadAmbiance(e);try{let [cur,old,old2]=await Promise.all([apiAllPaged(T.CUR,{filter:{UAI:[ref]},sort:"-Date_de_saisie"}),apiAllPaged(T.OLD,{filter:{UAI:[ref]},sort:"-Date_de_saisie"}),apiAllPaged(T.OLD2,{filter:{UAI:[ref]},sort:"-Date_de_saisie"})]);$("etabCounts").innerHTML=`<strong>Nombre de faits établissement :</strong> 2026-2027 : <strong>${cur.length}</strong> &nbsp;•&nbsp; 2025-2026 : <strong>${old.length}</strong> &nbsp;•&nbsp; 2024-2025 : <strong>${old2.length}</strong>`;let all=[...cur,...old,...old2].sort((a,b)=>(date(b.Date_de_saisie)?.getTime()||0)-(date(a.Date_de_saisie)?.getTime()||0));await loadSuiviFor(cur);let lastSchoolYear=null;$("history").innerHTML=all.length?all.map(f=>{const level=displayLevel(f.Niveau);const warning=level==="3"?'<span class="level-warning" title="Fait de niveau 3" aria-label="Fait de niveau 3">⚠</span>':"";const schoolYear=String(f.Annee_scolaire|| (f._source===T.CUR?"2026-2027":f._source===T.OLD?"2025-2026":"2024-2025"));const separator=schoolYear!==lastSchoolYear?`<div class="school-year-separator"><span>Année scolaire ${esc(schoolYear)}</span></div>`:"";lastSchoolYear=schoolYear;const oldYear=isArchivedFact(f);return `${separator}<div class="event ${oldYear?"old-school-year":""}"><div class="event-title">FE n°${esc(f.Numero_FE)} — <span class="${level==="3"?"event-level3":""}">Niveau ${esc(level)}</span> ${warning}</div><div class="event-meta">${dateFR(f.Date_de_saisie)} — ${esc(schoolYear)} — Équipier : ${esc(isArchivedFact(f)?(String(f.Equipier||"N/A").trim()||"N/A"):eqName(suiviMap.get(Number(f.Numero_FE)) ? suiviMap.get(Number(f.Numero_FE)).Equipier : f.Equipier))}</div>${historyTypeBadges(f,level)}<div>${esc(cleanDisplayText((isArchivedFact(f) && (!String(f.Resume_du_fait||"").trim() || norm(f.Resume_du_fait).includes("resume non renseigne"))) ? (f.Expose_des_faits||"Résumé non renseigné") : (f.Resume_du_fait||"Résumé non renseigné")))}</div><button class="btn" style="margin-top:7px" data-hist="${f._source}:${f.id}">Ouvrir la fiche</button></div>`}).join(""):'<div class="muted">Aucun fait trouvé pour cet UAI.</div>';all.forEach(f=>{if(!rows.some(r=>r._source===f._source&&r.id===f.id))rows.push(f)});document.querySelectorAll("[data-hist]").forEach(b=>b.onclick=()=>openFact(b.dataset.hist))}catch(e){$("history").innerHTML='<div class="notice error">Impossible de charger l’historique : '+esc(e.message)+'</div>'}}
+async function openEstablishment(e,ref){selectedEtab=e||etabMap.get(Number(ref))||null;$("etabBack").textContent=etabReturnTarget==="detail"?"← Retour à la fiche":"← Retour";$("detailView").classList.add("hidden");$("etabView").classList.remove("hidden");$("etabTitle").textContent=e?.Etablissement||selected.Etablissement||"Établissement";$("etabSub").textContent=[e?.UAI,e?.Ville,e?.Departement].filter(Boolean).join(" — ");$("etabGrid").innerHTML=[info("UAI",e?.UAI),info("Degré",e?.Degre),info("Ville",e?.Ville),info("Département",e?.Departement),info("Bassin",e?.Bassin),info("Type",e?.Type_etablissement),info("Secteur",e?.Secteur),info("Code postal",e?.Code_postal)].join("");$("history").innerHTML='<div class="loading">Chargement de l’historique par UAI…</div>';$("etabCounts").textContent="Chargement du nombre de faits…";$("ambianceDisplay").classList.remove("hidden");$("ambianceEditor").classList.add("hidden");$("ambianceDisplay").innerHTML='<div class="loading">Chargement…</div>';loadAmbiance(e);try{let [cur,old,old2]=await Promise.all([apiAllPaged(T.CUR,{filter:{UAI:[ref]},sort:"-Date_de_saisie"}),apiAllPaged(T.OLD,{filter:{UAI:[ref]},sort:"-Date_de_saisie"}),apiAllPaged(T.OLD2,{filter:{UAI:[ref]},sort:"-Date_de_saisie"})]);$("etabCounts").innerHTML=`<strong>Nombre de faits établissement :</strong> 2026-2027 : <strong>${cur.length}</strong> &nbsp;•&nbsp; 2025-2026 : <strong>${old.length}</strong> &nbsp;•&nbsp; 2024-2025 : <strong>${old2.length}</strong>`;let all=[...cur,...old,...old2].sort((a,b)=>(date(b.Date_de_saisie)?.getTime()||0)-(date(a.Date_de_saisie)?.getTime()||0));await loadSuiviFor(cur);let lastSchoolYear=null;$("history").innerHTML=all.length?all.map(f=>{const level=displayLevel(f.Niveau);const warning=level==="3"?'<span class="level-warning" title="Fait de niveau 3" aria-label="Fait de niveau 3">⚠</span>':"";const schoolYear=String(f.Annee_scolaire|| (f._source===T.CUR?"2026-2027":f._source===T.OLD?"2025-2026":"2024-2025"));const separator=schoolYear!==lastSchoolYear?`<div class="school-year-separator"><span>Année scolaire ${esc(schoolYear)}</span></div>`:"";lastSchoolYear=schoolYear;const oldYear=isArchivedFact(f);return `${separator}<div class="event ${oldYear?"old-school-year":""}"><div class="event-title">FE n°${esc(f.Numero_FE)} — <span class="${level==="3"?"event-level3":""}">Niveau ${esc(level)}</span> ${warning}</div><div class="event-meta">${dateFR(f.Date_de_saisie)} — ${esc(schoolYear)} — Équipier : ${esc(isArchivedFact(f)?(String(f.Equipier||"N/A").trim()||"N/A"):eqName(suiviMap.get(feNumericKey(f.Numero_FE)) ? suiviMap.get(feNumericKey(f.Numero_FE)).Equipier : f.Equipier))}</div>${historyTypeBadges(f,level)}<div>${esc(cleanDisplayText((isArchivedFact(f) && (!String(f.Resume_du_fait||"").trim() || norm(f.Resume_du_fait).includes("resume non renseigne"))) ? (f.Expose_des_faits||"Résumé non renseigné") : (f.Resume_du_fait||"Résumé non renseigné")))}</div><button class="btn" style="margin-top:7px" data-hist="${f._source}:${f.id}">Ouvrir la fiche</button></div>`}).join(""):'<div class="muted">Aucun fait trouvé pour cet UAI.</div>';all.forEach(f=>{if(!rows.some(r=>r._source===f._source&&r.id===f.id))rows.push(f)});document.querySelectorAll("[data-hist]").forEach(b=>b.onclick=()=>openFact(b.dataset.hist))}catch(e){$("history").innerHTML='<div class="notice error">Impossible de charger l’historique : '+esc(e.message)+'</div>'}}
 document.querySelectorAll("[data-inline-edit]").forEach(b=>b.onclick=()=>editInlineField(b.dataset.inlineEdit));
 document.querySelectorAll("[data-inline-cancel]").forEach(b=>b.onclick=()=>cancelInlineField(b.dataset.inlineCancel));
 document.querySelectorAll("[data-inline-save]").forEach(b=>b.onclick=()=>saveInlineField(b.dataset.inlineSave));
