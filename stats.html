@@ -1322,6 +1322,7 @@
 
 
 <script>
+  /* Correctif Documents/ETABLISSEMENTS v3 — chargement ciblé par période. */
   /* Correctif DOCUMENTS v2 : NB/BRQ calculés depuis l'ensemble de FE26_27_2. */
   /*
     ==================================================
@@ -1589,11 +1590,10 @@
 
   async function fetchAllDocumentFacts() {
     /*
-      DOCUMENTS 2026-2027 : contrairement à l'ancien index qui pouvait
-      agréger plusieurs années (~7 000 FE), on ne charge ici QUE la table
-      courante FE26_27_2. Cela conserve la logique fiable de l'ancien index
-      (un dataset normalisé commun aux NB/BRQ), sans recharger l'historique.
-      En pratique : ~1 000 FE actuellement, lus par lots de 500.
+      NB / BRQ : on charge la table FE26_27_2 entière une seule fois.
+      Avec ~1 000 lignes, c'est léger et surtout beaucoup plus fiable que
+      des filtres API date par date (qui peuvent varier selon le type Grist
+      Date / DateTime / import Excel).
     */
     const rows = [];
     const BATCH = 500;
@@ -1610,99 +1610,60 @@
   }
 
   async function ensureDocumentAvailability() {
+    /*
+      Index DOCUMENTS ultra-léger : aucune lecture massive de FE26_27_2.
+      Les NB et BRQ sont des documents calendaires. On construit donc leurs
+      dates localement, puis on ne lit dans Grist que les dates nécessaires
+      lorsque l'utilisateur ouvre un document.
+    */
     if (documentAvailabilityReady) return;
     if (documentAvailabilityLoading) return documentAvailabilityLoading;
 
     documentAvailabilityLoading = (async function() {
-      const rows = await fetchAllDocumentFacts();
-
-      /* Dataset DOCUMENTS commun NB/BRQ, mais strictement limité à 2026-2027. */
-      const currentPeriod = SCHOOL_YEAR_BY_TABLE[CURRENT_FE_TABLE];
-      documentRecords = normalizeFactRecords(rows).filter(function(record) {
-        if (!record || !record._dateKey || !currentPeriod) return false;
-        return record._dateKey >= currentPeriod.start && record._dateKey <= currentPeriod.end;
-      });
-      documentsInitialized = true;
-
       documentAvailableDateKeys.clear();
       whiteNoteAvailableKeysByDepartment.clear();
+      brqAvailableValues = [];
 
-      const brqSet = new Set();
+      const today = parseGristDate(todayUtcKey());
+      const schoolEnd = parseGristDate(WHITE_NOTE_SCHOOL_YEAR_END_KEY);
+      const effectiveEnd = today && schoolEnd && today < schoolEnd ? today : schoolEnd;
+      const departments = ["11","30","34","48","66"];
 
-      documentRecords.forEach(function(record) {
-        if (!record || !record._date || !record._dateKey) return;
+      departments.forEach(function(dep){ whiteNoteAvailableKeysByDepartment.set(dep, new Set()); });
 
-        documentAvailableDateKeys.add(record._dateKey);
-
-        /* Notes Blanches : une date existe dès qu'au moins un FE affichable
-           du département est rattaché à cette note. */
-        const dep = record._departement;
-        const noteDate = getWhiteNoteDateForRecordDate(record._date);
-
-        if (
-          dep &&
-          noteDate &&
-          (record._degre === "1er" || record._degre === "2nd")
-        ) {
-          const noteKey = formatDateKey(noteDate);
-
-          if (noteKey >= WHITE_NOTE_FIRST_DATE_KEY &&
-              noteKey <= WHITE_NOTE_SCHOOL_YEAR_END_KEY) {
-            if (!whiteNoteAvailableKeysByDepartment.has(dep)) {
-              whiteNoteAvailableKeysByDepartment.set(dep, new Set());
-            }
-            whiteNoteAvailableKeysByDepartment.get(dep).add(noteKey);
-          }
+      let d = parseGristDate(WHITE_NOTE_FIRST_DATE_KEY);
+      while (d && effectiveEnd && d <= effectiveEnd) {
+        if (isWhiteNoteOperationalDay(d)) {
+          const key = formatDateKey(d);
+          departments.forEach(function(dep){ whiteNoteAvailableKeysByDepartment.get(dep).add(key); });
         }
+        d = addDaysUTC(d, 1);
+      }
 
-        /* BRQ : même dataset complet, période calculée localement. */
-        if (
-          record._dateKey >= BRQ_START_DATE &&
-          !isBrqSchoolBreakDateKey(record._dateKey)
-        ) {
-          const brqDate = getBrqEffectiveDailyDate(record._date);
-          if (brqDate) brqSet.add("D:" + formatDateKey(brqDate));
+      /* BRQ journalier : mêmes jours ouvrés hors vacances scolaires.
+         La numérotation démarre au premier BRQ du 03/09/2026. */
+      d = parseGristDate("2026-09-03");
+      while (d && effectiveEnd && d <= effectiveEnd) {
+        const key = formatDateKey(d);
+        const day = d.getUTCDay();
+        if (day !== 0 && day !== 6 && !isBrqSchoolBreakDateKey(key)) {
+          brqAvailableValues.push("D:" + key);
         }
-      });
+        d = addDaysUTC(d, 1);
+      }
 
-      brqAvailableValues = Array.from(brqSet).sort();
       documentAvailabilityReady = true;
-    })().finally(function() {
-      documentAvailabilityLoading = null;
-    });
+    })().finally(function(){ documentAvailabilityLoading = null; });
 
     return documentAvailabilityLoading;
   }
 
   async function refreshLatestDocumentBounds(department) {
-    /*
-      Les bornes sont calculées directement depuis le dataset DOCUMENTS
-      déjà chargé. On évite le filtre Grist exact sur Departement ("34")
-      alors que FE26_27 peut contenir "HERAULT 34".
-    */
     await ensureDocumentAvailability();
-
-    let latestGlobal = null;
-    let latestDepartment = null;
-
-    documentRecords.forEach(function(record) {
-      if (!record._date) return;
-
-      if (!latestGlobal || record._date > latestGlobal) {
-        latestGlobal = record._date;
-      }
-
-      if (
-        department &&
-        record._departement === department &&
-        (!latestDepartment || record._date > latestDepartment)
-      ) {
-        latestDepartment = record._date;
-      }
-    });
-
-    latestDocumentFactDate = latestGlobal;
-    if (department) latestDocumentFactByDepartment.set(department, latestDepartment);
+    const noteKey = latestWhiteNoteAvailableKey(department || "34");
+    const brqKey = latestBrqAvailableKey();
+    latestDocumentFactDate = parseGristDate(brqKey || noteKey || todayUtcKey());
+    if (department) latestDocumentFactByDepartment.set(department, parseGristDate(noteKey || ""));
   }
 
   function latestWhiteNoteAvailableKey(department) {
@@ -1711,9 +1672,7 @@
   }
 
   function latestBrqAvailableKey() {
-    const daily = brqAvailableValues
-      .filter(function(v){ return v.startsWith("D:"); })
-      .sort();
+    const daily = brqAvailableValues.filter(function(v){ return v.startsWith("D:"); }).sort();
     return daily.length ? daily[daily.length - 1].slice(2) : "";
   }
 
@@ -1723,65 +1682,67 @@
   }
 
   function latestWhiteNoteDateKey() {
-    let d = parseGristDate(todayUtcKey());
-    const end = parseGristDate(WHITE_NOTE_SCHOOL_YEAR_END_KEY);
-    if (d > end) d = end;
-    while (d && formatDateKey(d) >= WHITE_NOTE_FIRST_DATE_KEY) {
-      if (isWhiteNoteOperationalDay(d)) return formatDateKey(d);
-      d = addDaysUTC(d, -1);
-    }
-    return WHITE_NOTE_FIRST_DATE_KEY;
+    return latestWhiteNoteAvailableKey(selectedWhiteNoteDepartment || "34") || WHITE_NOTE_FIRST_DATE_KEY;
   }
 
   async function loadDocumentsForWhiteNote(noteKey) {
     selectedWhiteNoteDate = noteKey;
-    await ensureDocumentAvailability();
+    const noteDate = parseGristDate(noteKey);
+    const keys = noteDate ? getWhiteNoteSourceDates(noteDate).map(formatDateKey) : [];
+    const rows = keys.length ? await fetchDocumentDateKeys(keys) : [];
+    documentRecords = normalizeFactRecords(rows);
+    documentsInitialized = true;
     renderWhiteNote();
   }
 
   async function loadDocumentsForBrq(value) {
     selectedBrqPeriod = value;
-    await ensureDocumentAvailability();
+    let keys = [];
+
+    if (value && value.startsWith("D:")) {
+      const range = getBrqDailySourceRange(value.slice(2));
+      if (range) {
+        let d = new Date(range.startDate.getTime());
+        while (d <= range.endDate) { keys.push(formatDateKey(d)); d = addDaysUTC(d, 1); }
+      }
+    } else if (value && value.startsWith("V:")) {
+      const period = BRQ_SCHOOL_BREAK_PERIODS.find(function(p){ return p.key === value.slice(2); });
+      if (period) {
+        let d = parseGristDate(period.start), e = parseGristDate(period.end);
+        while (d && e && d <= e) { keys.push(formatDateKey(d)); d = addDaysUTC(d, 1); }
+      }
+    }
+
+    const rows = keys.length ? await fetchDocumentDateKeys(keys) : [];
+    documentRecords = normalizeFactRecords(rows);
+    documentsInitialized = true;
     renderBRQ();
   }
 
   async function loadDocumentsPeriod(keys) {
-    /*
-      Conservée pour compatibilité avec d'éventuels appels existants.
-      Le dataset complet est déjà chargé : aucun rechargement partiel ne
-      doit écraser documentRecords.
-    */
-    await ensureDocumentAvailability();
-    renderWhiteNote();
-    renderBRQ();
+    const rows = keys && keys.length ? await fetchDocumentDateKeys(keys) : [];
+    documentRecords = normalizeFactRecords(rows);
+    documentsInitialized = true;
   }
 
   async function initializeDocumentsTab() {
     if (!selectedWhiteNoteDepartment) selectedWhiteNoteDepartment = "34";
-
     await ensureDocumentAvailability();
-    await refreshLatestDocumentBounds(selectedWhiteNoteDepartment);
 
     const latestNoteKey = latestWhiteNoteAvailableKey(selectedWhiteNoteDepartment);
     const latestBrqKey = latestBrqAvailableKey();
 
-    if (
-      !selectedWhiteNoteDate ||
-      !getWhiteNoteCalendarDates(selectedWhiteNoteDepartment)
-        .some(function(item){ return item[0] === selectedWhiteNoteDate; })
-    ) {
+    if (!selectedWhiteNoteDate || !getWhiteNoteCalendarDates(selectedWhiteNoteDepartment).some(function(item){ return item[0] === selectedWhiteNoteDate; })) {
       selectedWhiteNoteDate = latestNoteKey;
     }
-
-    if (
-      !selectedBrqPeriod ||
-      !brqAvailableValues.includes(selectedBrqPeriod)
-    ) {
+    if (!selectedBrqPeriod || !brqAvailableValues.includes(selectedBrqPeriod)) {
       selectedBrqPeriod = latestBrqKey ? "D:" + latestBrqKey : "";
     }
 
-    renderWhiteNote();
-    renderBRQ();
+    /* Deux datasets successifs : on charge/rend d'abord la NB, puis le BRQ.
+       Chaque changement de sélecteur recharge ensuite uniquement son document. */
+    if (selectedWhiteNoteDate) await loadDocumentsForWhiteNote(selectedWhiteNoteDate); else renderWhiteNote();
+    if (selectedBrqPeriod) await loadDocumentsForBrq(selectedBrqPeriod); else renderBRQ();
   }
 
   function getMondayUtc(date) {
@@ -5897,14 +5858,25 @@
      STATISTIQUES HEBDOMADAIRES / BASE ETAB
      ================================================== */
   function tableDataToRows(tableData) {
-    if (!tableData || typeof tableData !== "object") return [];
-    const keys = Object.keys(tableData).filter(function(key) { return Array.isArray(tableData[key]); });
+    if (!tableData) return [];
+    /* Compatibilité avec les deux formes rencontrées dans Grist :
+       tableau de lignes OU objet colonne -> tableau de valeurs. */
+    if (Array.isArray(tableData)) {
+      return tableData.map(function(row){
+        if (row && row.fields && typeof row.fields === "object") return Object.assign({id:row.id}, row.fields);
+        return row && typeof row === "object" ? Object.assign({}, row) : {};
+      });
+    }
+    if (typeof tableData !== "object") return [];
+    const keys = Object.keys(tableData).filter(function(key) {
+      return Array.isArray(tableData[key]) || ArrayBuffer.isView(tableData[key]);
+    });
     if (!keys.length) return [];
-    const length = Math.max.apply(null, keys.map(function(key) { return tableData[key].length; }));
+    const length = Math.max.apply(null, keys.map(function(key){ return tableData[key].length || 0; }));
     const rows = [];
-    for (let i = 0; i < length; i++) {
+    for (let i=0; i<length; i++) {
       const row = {};
-      keys.forEach(function(key) { row[key] = tableData[key][i]; });
+      keys.forEach(function(key){ row[key] = tableData[key][i]; });
       rows.push(row);
     }
     return rows;
@@ -6069,13 +6041,30 @@
 
   function getEtabDepartment(row) {
     const uai = getEtabUai(row);
-    if (uai) return String(Number(uai.slice(0, 3)));
-    const preferred = ["Departement", "Département", "departement", "DPT", "Dept", "Code_departement"];
+    if (uai) {
+      const dep = uai.slice(1,3); /* 0342397W -> 34 ; 011... -> 11 */
+      if (["11","30","34","48","66"].includes(dep)) return dep;
+    }
+    const preferred = ["Departement","Département","departement","DPT","Dept","Code_departement","CODE_DEPARTEMENT"];
     for (const key of preferred) {
       if (!(key in (row || {}))) continue;
-      const m = String(row[key] || "").match(/\b(11|30|34|48|66)\b/);
+      const txt = normalizeText(row[key]);
+      const m = txt.match(/(?:^|\D)(11|30|34|48|66)(?:\D|$)/);
       if (m) return m[1];
+      if (txt.includes("herault")) return "34";
+      if (txt.includes("gard")) return "30";
+      if (txt.includes("aude")) return "11";
+      if (txt.includes("lozere")) return "48";
+      if (txt.includes("pyrenees orientales")) return "66";
     }
+    const text = normalizeText(normalizedObjectText(row));
+    const m = text.match(/(?:^|\D)(11|30|34|48|66)(?:\D|$)/);
+    if (m) return m[1];
+    if (text.includes("herault")) return "34";
+    if (text.includes("gard")) return "30";
+    if (text.includes("aude")) return "11";
+    if (text.includes("lozere")) return "48";
+    if (text.includes("pyrenees orientales")) return "66";
     return "";
   }
 
@@ -6177,7 +6166,7 @@
     weekFacts.forEach(function(record) {
       const key = getFactEstablishmentKey(record);
       const etab = etabByKey.get(key);
-      let cat = etab ? getEtabCategory(etab) : (record._degre === "1" || record._degre === "1er degré" ? "first" : "other");
+      let cat = etab ? getEtabCategory(etab) : (record._degre === "1" || record._degre === "1er" || record._degre === "1er degré" ? "first" : "other");
       if (cat === "other") {
         const txt = normalizeText(String(record[FIELD.ID_NOM] || ""));
         if (/\bcollege\b/.test(txt)) cat="college"; else if (/\blycee\b/.test(txt)) cat="lycee"; else if (/\becole\b/.test(txt)) cat="first";
