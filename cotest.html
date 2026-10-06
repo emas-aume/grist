@@ -414,7 +414,7 @@ async function loadOperationalIds(){
   try{data=await apiAllPaged(T.ID_FE,{pageSize:1000,maxRows:10000})}catch(e){throw new Error("Table ID_FE : "+e.message)}
   idFeRows=data;idByNumero=new Map();numeroById=new Map();
   for(const r of data){
-    const numero=String(r.Numero_FE??"").trim().replace(/^.*?(\d{6,})$/,"$1");
+    const numero=String(r.Numero_FE??"").trim();
     const oid=Number(r.ID_Centre_Op);
     if(!numero||!Number.isFinite(oid))continue;
     if(idByNumero.has(numero)&&idByNumero.get(numero)!==oid)console.warn("Plusieurs ID opérationnels pour le FE",numero);
@@ -431,6 +431,17 @@ async function searchOperationalId(id){
   let found=await api(T.CUR,{filter:{Numero_FE:[numero]},limit:10});
   if(!found.length)found=await api(T.OLD,{filter:{Numero_FE:[numero]},limit:10});
   if(!found.length)found=await api(T.OLD2,{filter:{Numero_FE:[numero]},limit:10});
+  // Compatibilité avec d’anciennes lignes où seul le suffixe numérique était conservé.
+  if(!found.length){
+    const suffix=(String(numero).match(/(\d{6,})$/)||[])[1];
+    if(suffix){
+      for(const table of [T.CUR,T.OLD,T.OLD2]){
+        const candidates=await apiAllPaged(table,{pageSize:2000,maxRows:50000});
+        found=candidates.filter(f=>String(f.Numero_FE??"").trim()===suffix||String(f.Numero_FE??"").trim().endsWith("-"+suffix)).slice(0,10);
+        if(found.length)break;
+      }
+    }
+  }
   found=found.filter(f=>["34","48"].includes(depCode(f.Departement)));
   if(!found.length){notice("Le FE associé à l’ID opérationnel "+oid+" est introuvable dans les bases 34/48.","error");return}
   await loadSuiviFor(found);rows=found;page=1;render();await openFact(found[0]._source+":"+found[0].id);
