@@ -428,9 +428,9 @@ async function searchOperationalId(id){
   await loadOperationalIds();
   const numero=numeroById.get(oid);
   if(!numero){notice("Aucun FE n’est associé à l’ID opérationnel "+oid+".","error");return}
-  let found=await api(T.CUR,{filter:{Numero_FE:[Number(numero)]},limit:10});
-  if(!found.length)found=await api(T.OLD,{filter:{Numero_FE:[Number(numero)]},limit:10});
-  if(!found.length)found=await api(T.OLD2,{filter:{Numero_FE:[Number(numero)]},limit:10});
+  let found=await api(T.CUR,{filter:{Numero_FE:[numero]},limit:10});
+  if(!found.length)found=await api(T.OLD,{filter:{Numero_FE:[numero]},limit:10});
+  if(!found.length)found=await api(T.OLD2,{filter:{Numero_FE:[numero]},limit:10});
   found=found.filter(f=>["34","48"].includes(depCode(f.Departement)));
   if(!found.length){notice("Le FE associé à l’ID opérationnel "+oid+" est introuvable dans les bases 34/48.","error");return}
   await loadSuiviFor(found);rows=found;page=1;render();await openFact(found[0]._source+":"+found[0].id);
@@ -450,7 +450,7 @@ async function assignOperationalId(){
     if(idByNumero.has(numero)){renderOperationalId();return}
     let candidate=Math.max(0,...[...numeroById.keys()].filter(Number.isFinite))+1;
     while(numeroById.has(candidate))candidate++;
-    await grist.docApi.applyUserActions([["AddRecord",T.ID_FE,null,{Numero_FE:Number(numero),ID_Centre_Op:candidate}]]);
+    await grist.docApi.applyUserActions([["AddRecord",T.ID_FE,null,{Numero_FE:numero,ID_Centre_Op:candidate}]]);
     await loadOperationalIds();renderOperationalId();
     await showModal({title:"ID opérationnel attribué",message:`ID opérationnel : ${candidate}`,type:"success"});
   }catch(e){await showModal({title:"Attribution impossible",message:e.message,type:"error"})}
