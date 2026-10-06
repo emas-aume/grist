@@ -2928,7 +2928,9 @@
       const pageWidth = doc.internal.pageSize.getWidth();
       const pageHeight = doc.internal.pageSize.getHeight();
 
-      /* Filigrane central : 90 pt à 8 % d’opacité. */
+      /* Filigrane commun NB / BRQ / STATS : position fixe centrée sur la zone de tableau.
+         Placé légèrement sous le centre géométrique de la page et incliné de façon à
+         avoir le « E » plus bas et le « 34 » plus haut. */
       doc.saveGraphicsState();
       try {
         if (typeof doc.GState === "function" && typeof doc.setGState === "function") {
@@ -2938,9 +2940,11 @@
       doc.setFont("helvetica", "bold");
       doc.setFontSize(90);
       doc.setTextColor(90, 100, 115);
-      doc.text("E M A S 34", pageWidth / 2, pageHeight / 2, {
+      const watermarkX = pageWidth / 2;
+      const watermarkY = pageHeight * 0.54;
+      doc.text("E M A S 34", watermarkX, watermarkY, {
         align: "center",
-        angle: 0
+        angle: 8
       });
       doc.restoreGraphicsState();
 
