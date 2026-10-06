@@ -1589,10 +1589,11 @@
 
   async function fetchAllDocumentFacts() {
     /*
-      NB / BRQ : on charge la table FE26_27_2 entière une seule fois.
-      Avec ~1 000 lignes, c'est léger et surtout beaucoup plus fiable que
-      des filtres API date par date (qui peuvent varier selon le type Grist
-      Date / DateTime / import Excel).
+      DOCUMENTS 2026-2027 : contrairement à l'ancien index qui pouvait
+      agréger plusieurs années (~7 000 FE), on ne charge ici QUE la table
+      courante FE26_27_2. Cela conserve la logique fiable de l'ancien index
+      (un dataset normalisé commun aux NB/BRQ), sans recharger l'historique.
+      En pratique : ~1 000 FE actuellement, lus par lots de 500.
     */
     const rows = [];
     const BATCH = 500;
@@ -1615,8 +1616,12 @@
     documentAvailabilityLoading = (async function() {
       const rows = await fetchAllDocumentFacts();
 
-      /* Dataset DOCUMENTS complet et indépendant du tableau principal. */
-      documentRecords = normalizeFactRecords(rows);
+      /* Dataset DOCUMENTS commun NB/BRQ, mais strictement limité à 2026-2027. */
+      const currentPeriod = SCHOOL_YEAR_BY_TABLE[CURRENT_FE_TABLE];
+      documentRecords = normalizeFactRecords(rows).filter(function(record) {
+        if (!record || !record._dateKey || !currentPeriod) return false;
+        return record._dateKey >= currentPeriod.start && record._dateKey <= currentPeriod.end;
+      });
       documentsInitialized = true;
 
       documentAvailableDateKeys.clear();
