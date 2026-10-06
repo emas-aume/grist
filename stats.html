@@ -1461,6 +1461,8 @@
      chargé dans TABLEAU. Les périodes déjà demandées sont gardées en cache. */
   const documentPeriodCache = new Map();
   let documentRecords = [];
+  let documentAllRecords = [];
+  let documentAllRecordsPromise = null;
   let documentsInitialized = false;
   let documentsLoadToken = 0;
   let documentAvailabilityReady = false;
@@ -1609,63 +1611,57 @@
     return rows;
   }
 
+  async function ensureAllDocumentFacts() {
+    if (documentAllRecords.length) return documentAllRecords;
+    if (documentAllRecordsPromise) return documentAllRecordsPromise;
+    documentAllRecordsPromise = (async function() {
+      if (!grist.docApi || typeof grist.docApi.fetchTable !== "function") {
+        throw new Error("API Grist fetchTable indisponible");
+      }
+      const raw = await grist.docApi.fetchTable(CURRENT_FE_TABLE);
+      documentAllRecords = normalizeFactRecords(tableDataToRows(raw));
+      return documentAllRecords;
+    })().finally(function(){ documentAllRecordsPromise = null; });
+    return documentAllRecordsPromise;
+  }
+
   async function ensureDocumentAvailability() {
-    /*
-      Index DOCUMENTS ultra-léger : aucune lecture massive de FE26_27_2.
-      Les NB et BRQ sont des documents calendaires. On construit donc leurs
-      dates localement, puis on ne lit dans Grist que les dates nécessaires
-      lorsque l'utilisateur ouvre un document.
-    */
+    /* Une seule lecture fiable de FE26_27_2 via docApi. Les sélecteurs NB/BRQ
+       sont ensuite construits à partir des FE réellement présents. */
     if (documentAvailabilityReady) return;
     if (documentAvailabilityLoading) return documentAvailabilityLoading;
 
     documentAvailabilityLoading = (async function() {
+      const all = await ensureAllDocumentFacts();
       documentAvailableDateKeys.clear();
       whiteNoteAvailableKeysByDepartment.clear();
       brqAvailableValues = [];
-
-      const today = parseGristDate(todayUtcKey());
-      const schoolEnd = parseGristDate(WHITE_NOTE_SCHOOL_YEAR_END_KEY);
-      const effectiveEnd = today && schoolEnd && today < schoolEnd ? today : schoolEnd;
       const departments = ["11","30","34","48","66"];
-
       departments.forEach(function(dep){ whiteNoteAvailableKeysByDepartment.set(dep, new Set()); });
+      const brqSet = new Set();
 
-      /*
-        NB : contrairement au calendrier théorique, une note n'existe que si
-        des FE réellement affichables l'alimentent pour le département concerné.
-        On lit la base FE une seule fois ici pour construire cet index. Cela ne
-        modifie pas documentRecords : les chargements NB/BRQ restent inchangés.
-      */
-      const availabilityRows = await fetchAllCurrentFacts();
-      const availabilityRecords = normalizeFactRecords(availabilityRows);
+      all.forEach(function(record) {
+        if (!record || !record._date) return;
+        if (record._dateKey) documentAvailableDateKeys.add(record._dateKey);
 
-      availabilityRecords.forEach(function(record) {
-        if (!record || !record._date || !record._departement) return;
-        if (!departments.includes(record._departement)) return;
-        if (!(record._degre === "1er" || record._degre === "2nd")) return;
+        const dep = record._departement;
+        if (departments.includes(dep) && (record._degre === "1er" || record._degre === "2nd")) {
+          const noteDate = getWhiteNoteDateForRecordDate(record._date);
+          if (noteDate) {
+            const noteKey = formatDateKey(noteDate);
+            if (noteKey >= WHITE_NOTE_FIRST_DATE_KEY && noteKey <= WHITE_NOTE_SCHOOL_YEAR_END_KEY) {
+              whiteNoteAvailableKeysByDepartment.get(dep).add(noteKey);
+            }
+          }
+        }
 
-        const noteDate = getWhiteNoteDateForRecordDate(record._date);
-        if (!noteDate) return;
-
-        const noteKey = formatDateKey(noteDate);
-        if (noteKey < WHITE_NOTE_FIRST_DATE_KEY || noteKey > WHITE_NOTE_SCHOOL_YEAR_END_KEY) return;
-        if (effectiveEnd && noteDate > effectiveEnd) return;
-
-        whiteNoteAvailableKeysByDepartment.get(record._departement).add(noteKey);
+        if (record._dateKey >= BRQ_START_DATE && !isBrqSchoolBreakDateKey(record._dateKey)) {
+          const brqDate = getBrqEffectiveDailyDate(record._date);
+          if (brqDate) brqSet.add("D:" + formatDateKey(brqDate));
+        }
       });
 
-      /* BRQ journalier : logique V9 conservée telle quelle. */
-      let d = parseGristDate("2026-09-03");
-      while (d && effectiveEnd && d <= effectiveEnd) {
-        const key = formatDateKey(d);
-        const day = d.getUTCDay();
-        if (day !== 0 && day !== 6 && !isBrqSchoolBreakDateKey(key)) {
-          brqAvailableValues.push("D:" + key);
-        }
-        d = addDaysUTC(d, 1);
-      }
-
+      brqAvailableValues = Array.from(brqSet).sort();
       documentAvailabilityReady = true;
     })().finally(function(){ documentAvailabilityLoading = null; });
 
@@ -1701,34 +1697,16 @@
 
   async function loadDocumentsForWhiteNote(noteKey) {
     selectedWhiteNoteDate = noteKey;
-    const noteDate = parseGristDate(noteKey);
-    const keys = noteDate ? getWhiteNoteSourceDates(noteDate).map(formatDateKey) : [];
-    const rows = keys.length ? await fetchDocumentDateKeys(keys) : [];
-    documentRecords = normalizeFactRecords(rows);
+    await ensureAllDocumentFacts();
+    documentRecords = documentAllRecords;
     documentsInitialized = true;
     renderWhiteNote();
   }
 
   async function loadDocumentsForBrq(value) {
     selectedBrqPeriod = value;
-    let keys = [];
-
-    if (value && value.startsWith("D:")) {
-      const range = getBrqDailySourceRange(value.slice(2));
-      if (range) {
-        let d = new Date(range.startDate.getTime());
-        while (d <= range.endDate) { keys.push(formatDateKey(d)); d = addDaysUTC(d, 1); }
-      }
-    } else if (value && value.startsWith("V:")) {
-      const period = BRQ_SCHOOL_BREAK_PERIODS.find(function(p){ return p.key === value.slice(2); });
-      if (period) {
-        let d = parseGristDate(period.start), e = parseGristDate(period.end);
-        while (d && e && d <= e) { keys.push(formatDateKey(d)); d = addDaysUTC(d, 1); }
-      }
-    }
-
-    const rows = keys.length ? await fetchDocumentDateKeys(keys) : [];
-    documentRecords = normalizeFactRecords(rows);
+    await ensureAllDocumentFacts();
+    documentRecords = documentAllRecords;
     documentsInitialized = true;
     renderBRQ();
   }
@@ -6165,9 +6143,16 @@
     const content = document.getElementById("weekly-stats-content");
     if (content) content.innerHTML = '<div class="weekly-stats-empty">Chargement des FE de la semaine…</div>';
     try {
-      const rows = await fetchFactsForWeek(selectedTableData, info.monday);
+      let normalizedRows;
+      if (selectedTableData === CURRENT_FE_TABLE) {
+        await ensureAllDocumentFacts();
+        normalizedRows = documentAllRecords.filter(function(record){ return record._weekKey === value; });
+      } else {
+        const rows = await fetchFactsForWeek(selectedTableData, info.monday);
+        normalizedRows = normalizeFactRecords(rows);
+      }
       if (token !== weeklyStatsLoadToken || selectedWeeklyStatsWeek !== value) return;
-      weeklyStatsRecords = normalizeFactRecords(rows);
+      weeklyStatsRecords = normalizedRows;
       renderWeeklyStats();
     } catch (error) {
       console.error("Chargement statistiques impossible", error);
