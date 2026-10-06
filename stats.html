@@ -2919,6 +2919,40 @@
     };
   }
 
+  function addEmasPdfBranding(doc) {
+    const totalPages = doc.getNumberOfPages();
+    const footerText = "Cellule Administrative et Renseignement - EMAS 34";
+
+    for (let pageIndex = 1; pageIndex <= totalPages; pageIndex += 1) {
+      doc.setPage(pageIndex);
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+
+      /* Filigrane central : volontairement très discret pour rester lisible. */
+      doc.saveGraphicsState();
+      try {
+        if (typeof doc.GState === "function" && typeof doc.setGState === "function") {
+          doc.setGState(new doc.GState({ opacity: 0.07 }));
+        }
+      } catch (e) {}
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(52);
+      doc.setTextColor(90, 100, 115);
+      doc.text("EMAS 34", pageWidth / 2, pageHeight / 2, {
+        align: "center",
+        angle: 0
+      });
+      doc.restoreGraphicsState();
+
+      /* Pied de page commun NB / BRQ / statistiques. */
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(6.8);
+      doc.setTextColor(128, 128, 128);
+      doc.text(footerText, 12, pageHeight - 5, { align: "left" });
+      doc.text("Page " + pageIndex + "/" + totalPages, pageWidth - 12, pageHeight - 5, { align: "right" });
+    }
+  }
+
   async function downloadSelectedBrqPdf() {
     const button = document.getElementById("brq-download");
     const meta = getSelectedBrqPdfMeta();
@@ -3211,19 +3245,7 @@
 
       departments.forEach(drawDepartment);
 
-      const totalPdfPages = doc.getNumberOfPages();
-      for (let pageIndex = 1; pageIndex <= totalPdfPages; pageIndex += 1) {
-        doc.setPage(pageIndex);
-        doc.setFont("helvetica", "normal");
-        doc.setFontSize(6.8);
-        doc.setTextColor(128, 128, 128);
-        doc.text(
-          "Page " + pageIndex + " / " + totalPdfPages,
-          pageWidth / 2,
-          pageHeight - 5,
-          { align: "center" }
-        );
-      }
+      addEmasPdfBranding(doc);
 
       /* Un slash n'est pas valide dans un nom de fichier Windows : on garde
          la forme demandée visuellement, avec un tiret dans le nom du fichier. */
@@ -5549,21 +5571,7 @@
       drawDegreeTable("1er", "1er degré");
       drawDegreeTable("2nd", "2nd degré");
 
-      /* Pied de page discret sur chaque page du PDF. */
-      const totalPdfPages = doc.getNumberOfPages();
-      for (let pageIndex = 1; pageIndex <= totalPdfPages; pageIndex += 1) {
-        doc.setPage(pageIndex);
-        doc.setFont("helvetica", "normal");
-        doc.setFontSize(6.8);
-        doc.setTextColor(128, 128, 128);
-
-        doc.text(
-          "Page " + pageIndex + " / " + totalPdfPages,
-          pageWidth / 2,
-          pageHeight - 5,
-          { align: "center" }
-        );
-      }
+      addEmasPdfBranding(doc);
 
       doc.save(filename);
     } catch (error) {
@@ -6301,7 +6309,7 @@
         }
         y+=7;
       });
-      const pages=doc.getNumberOfPages();for(let i=1;i<=pages;i++){doc.setPage(i);doc.setFont("helvetica","normal");doc.setFontSize(6.8);doc.setTextColor(128,128,128);doc.text(`Page ${i} / ${pages}`,pw/2,ph-5,{align:"center"});}
+      addEmasPdfBranding(doc);
       doc.save(`Statistiques établissements S${info?info.week:selectedWeeklyStatsWeek} année 2026-2027.pdf`);
     } catch(error){console.error("Erreur PDF statistiques hebdomadaires :",error);alert("Impossible de générer le PDF des statistiques pour le moment.");} finally {if(button){button.disabled=false;button.textContent="PDF";}}
   }
