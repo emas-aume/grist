@@ -2245,8 +2245,8 @@
        seule la valeur explicite false désactive le FE.
        Une cellule vide, null, undefined ou toute autre valeur laisse le FE actif.
        La chaîne "false" est aussi reconnue pour les imports texte/CSV. */
-    if (!record || !("actif_FE" in record)) return true;
-    const value = record.actif_FE;
+    if (!record || !("Actif_FE" in record)) return true;
+    const value = record.Actif_FE;
     if (value === false) return false;
     if (typeof value === "string" && value.trim().toLowerCase() === "false") return false;
     return true;
