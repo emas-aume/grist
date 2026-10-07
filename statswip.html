@@ -986,6 +986,16 @@
 
 
     .analytics-week-separator{stroke:#dbe3ef;stroke-width:1;stroke-dasharray:3 4;vector-effect:non-scaling-stroke}
+
+  /* V20 — résultats de recherche établissement, déclenchés uniquement avec Entrée */
+  .establishment-search-results{margin-top:8px;border:1px solid #d9e0ea;border-radius:12px;background:#fff;overflow:hidden;box-shadow:0 8px 22px rgba(15,23,42,.08)}
+  .establishment-search-title{padding:10px 12px;font-size:12px;font-weight:700;color:#667085;background:#f8fafc;border-bottom:1px solid #e4e7ec}
+  .establishment-search-item{display:block;width:100%;padding:11px 12px;border:0;border-bottom:1px solid #eef1f5;background:#fff;text-align:left;cursor:pointer;color:#172033}
+  .establishment-search-item:last-child{border-bottom:0}
+  .establishment-search-item:hover{background:#f8fafc}
+  .establishment-search-name{font-weight:700}
+  .establishment-search-meta{margin-top:3px;font-size:12px;color:#667085}
+
 </style>
 
 </head>
@@ -1095,8 +1105,10 @@
           class="search-input"
           type="search"
           placeholder="Toute l’année scolaire : établissement, n° FE, mot-clé (arme, harcèlement...)"
-          oninput="setSearch(this.value)"
+          oninput="handleSearchInput(this.value)"
+          onkeydown="handleSearchKeydown(event)"
         >
+        <div id="establishment-search-results" class="establishment-search-results" style="display:none"></div>
 
       </div>
 
@@ -4178,24 +4190,183 @@
   }
 
 
-  function setSearch(value) {
-    searchText = normalizeSearch(value);
-    currentPage = 1;
-    clearTimeout(searchLoadTimer);
+  let establishmentSearchCache = null;
+  let selectedEstablishmentSearch = null;
 
-    if (!searchText) {
+  function hideEstablishmentSearchResults() {
+    const box = document.getElementById("establishment-search-results");
+    if (!box) return;
+    box.style.display = "none";
+    box.innerHTML = "";
+  }
+
+  function handleSearchInput(value) {
+    /* Aucune requête pendant la frappe : la recherche ne part qu'avec Entrée. */
+    hideEstablishmentSearchResults();
+    selectedEstablishmentSearch = null;
+    if (String(value || "").trim()) return;
+    searchText = "";
+    ++searchLoadToken;
+    searchState = {tableId:null, query:"", offset:0, complete:true, rawMatches:[], loading:false};
+    loadDataTable(selectedTableData);
+  }
+
+  async function fetchEstablishmentSearchIndex(retry) {
+    if (Array.isArray(establishmentSearchCache)) return establishmentSearchCache;
+    const t = await getTokenInfo(false);
+    const qs = new URLSearchParams({cellFormat:"normal", limit:"5000", auth:t.token});
+    const url = t.baseUrl + "/tables/ETABLISSEMENTS/records?" + qs.toString();
+    const response = await fetch(url, {method:"GET", credentials:"omit"});
+    if (response.status === 401 && retry !== false) {
+      tokenInfo = null;
+      await getTokenInfo(true);
+      return fetchEstablishmentSearchIndex(false);
+    }
+    if (!response.ok) throw new Error("ETABLISSEMENTS : HTTP " + response.status);
+    const payload = await response.json();
+    establishmentSearchCache = (Array.isArray(payload.records) ? payload.records : []).map(function(r){
+      return Object.assign({id:r.id}, r.fields || {});
+    });
+    return establishmentSearchCache;
+  }
+
+  function establishmentSearchMatches(rows, query) {
+    const q = normalizeSearch(query);
+    const terms = q.split(/\s+/).filter(Boolean);
+    if (!terms.length) return [];
+    return (rows || []).filter(function(row){
+      const name = String(row.Etablissement || row.Nom_court || "");
+      if (normalizeSearch(name).startsWith("section enseignement general et technologique")) return false;
+      const hay = normalizeSearch([row.Etablissement,row.Nom_court,row.Ville,row.UAI,row.Departement].filter(Boolean).join(" "));
+      return terms.every(function(term){ return hay.includes(term); });
+    }).sort(function(a,b){
+      const an = normalizeSearch(a.Etablissement || a.Nom_court || "");
+      const bn = normalizeSearch(b.Etablissement || b.Nom_court || "");
+      const ae = an === q ? 0 : (an.startsWith(q) ? 1 : 2);
+      const be = bn === q ? 0 : (bn.startsWith(q) ? 1 : 2);
+      return ae - be || an.localeCompare(bn, "fr");
+    }).slice(0,12);
+  }
+
+  function renderEstablishmentSearchResults(matches, query) {
+    const box = document.getElementById("establishment-search-results");
+    if (!box) return;
+    if (!matches.length) { hideEstablishmentSearchResults(); return; }
+    box.innerHTML = '<div class="establishment-search-title">Établissements correspondant à « ' + escapeHtml(query) + ' »</div>' +
+      matches.map(function(e){
+        const name = e.Etablissement || e.Nom_court || e.UAI || "Établissement";
+        const meta = [e.UAI,e.Ville,e.Departement].filter(Boolean).join(" — ");
+        return '<button type="button" class="establishment-search-item" data-establishment-id="' + escapeHtml(String(e.id)) + '">' +
+          '<div class="establishment-search-name">' + escapeHtml(name) + '</div>' +
+          (meta ? '<div class="establishment-search-meta">' + escapeHtml(meta) + '</div>' : '') +
+          '</button>';
+      }).join("");
+    box.style.display = "block";
+    box.querySelectorAll("[data-establishment-id]").forEach(function(button){
+      button.addEventListener("click", function(){
+        const id = Number(button.getAttribute("data-establishment-id"));
+        const etab = matches.find(function(e){ return Number(e.id) === id; });
+        if (etab) loadFactsForSelectedEstablishment(etab);
+      });
+    });
+  }
+
+  function currentTablePeriodDateKeys() {
+    if (selectedDate && selectedDate !== "all") return [selectedDate];
+    if (!selectedWeek || selectedWeek === "all") return [];
+    const parts = String(selectedWeek).split("-");
+    const year = Number(parts[0]), week = Number(parts[1]);
+    if (!year || !week) return [];
+    const jan4 = new Date(Date.UTC(year, 0, 4));
+    const monday = addDaysUTC(jan4, -(jan4.getUTCDay() || 7) + 1 + (week - 1) * 7);
+    return Array.from({length:7}, function(_,i){ return formatDateKey(addDaysUTC(monday,i)); });
+  }
+
+  async function fetchFactsForEstablishmentPeriod(tableId, establishment, retry) {
+    const rowId = Number(establishment && establishment.id);
+    if (!Number.isFinite(rowId)) return [];
+    const dateKeys = currentTablePeriodDateKeys();
+    const filterObject = {[FIELD.UAI]: [rowId]};
+    if (dateKeys.length) filterObject[FIELD.DATE_SAISIE] = dateKeys.map(dateKeyToEpoch).filter(Number.isFinite);
+    const t = await getTokenInfo(false);
+    const qs = new URLSearchParams({cellFormat:"normal", filter:JSON.stringify(filterObject), sort:"-Date_de_saisie,-Numero_FE", auth:t.token});
+    const url = t.baseUrl + "/tables/" + encodeURIComponent(tableId) + "/records?" + qs.toString();
+    const response = await fetch(url, {method:"GET", credentials:"omit"});
+    if (response.status === 401 && retry !== false) {
+      tokenInfo = null;
+      await getTokenInfo(true);
+      return fetchFactsForEstablishmentPeriod(tableId, establishment, false);
+    }
+    if (!response.ok) throw new Error("HTTP " + response.status);
+    const payload = await response.json();
+    return (Array.isArray(payload.records) ? payload.records : []).map(function(r){ return Object.assign({id:r.id}, r.fields || {}); });
+  }
+
+  async function loadFactsForSelectedEstablishment(establishment) {
+    hideEstablishmentSearchResults();
+    selectedEstablishmentSearch = establishment;
+    const name = establishment.Etablissement || establishment.Nom_court || establishment.UAI || "établissement";
+    showDiagnostic("Chargement des FE de " + name + " pour la période sélectionnée…", "");
+    try {
+      const rows = await fetchFactsForEstablishmentPeriod(selectedTableData, establishment);
+      /* La période choisie reste inchangée. On ne transforme pas cette sélection
+         d'établissement en recherche textuelle sur toute l'année. */
+      searchText = "";
+      searchState = {tableId:null, query:"", offset:0, complete:true, rawMatches:[], loading:false};
+      ingestRecords(rows);
+      currentPage = 1;
+      showDiagnostic(rows.length + " FE trouvé" + (rows.length > 1 ? "s" : "") + " pour " + name + " sur la période sélectionnée.", rows.length ? "ok" : "");
+    } catch (error) {
+      console.error("Recherche établissement impossible", error);
+      showDiagnostic("Impossible de charger les FE de cet établissement.", "error");
+    }
+  }
+
+  async function runEnteredSearch() {
+    const input = document.getElementById("text-search");
+    const raw = String(input ? input.value : "").trim();
+    hideEstablishmentSearchResults();
+    selectedEstablishmentSearch = null;
+    if (!raw) {
+      searchText = "";
       ++searchLoadToken;
       searchState = {tableId:null, query:"", offset:0, complete:true, rawMatches:[], loading:false};
-      loadDataTable(selectedTableData);
+      await loadDataTable(selectedTableData);
       return;
     }
 
-    /* Recherche à la demande par petits lots : on ne charge jamais toute l’année
-       en mémoire simplement parce que l’utilisateur saisit un mot. */
-    searchLoadTimer = setTimeout(function() {
-      loadSearchScope(selectedTableData);
-    }, 250);
+    searchText = normalizeSearch(raw);
+    currentPage = 1;
+
+    /* Les numéros FE restent prioritaires. Pour le reste, on propose d'abord
+       les établissements (nom, ville ou UAI). S'il n'y en a aucun, on lance
+       la recherche textuelle FE habituelle. */
+    if (/^\d{6,}$/.test(raw) || /^\d{4}-\d{3}-\d{5,}$/.test(raw)) {
+      await loadSearchScope(selectedTableData);
+      return;
+    }
+
+    try {
+      showDiagnostic("Recherche de l’établissement…", "");
+      const index = await fetchEstablishmentSearchIndex();
+      const matches = establishmentSearchMatches(index, raw);
+      if (matches.length) {
+        renderEstablishmentSearchResults(matches, raw);
+        showDiagnostic(matches.length + " établissement" + (matches.length > 1 ? "s" : "") + " correspondant" + (matches.length > 1 ? "s" : "") + ". Sélectionnez un établissement.", "ok");
+        return;
+      }
+    } catch (error) {
+      console.warn("Recherche établissement indisponible, bascule vers la recherche FE", error);
+    }
+    await loadSearchScope(selectedTableData);
   }
+
+  function handleSearchKeydown(event) {
+    if (!event || event.key !== "Enter") return;
+    event.preventDefault();
+    runEnteredSearch();
+  }
+
 
 
   /*
