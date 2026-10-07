@@ -1,5 +1,6 @@
 
 
+
 <!DOCTYPE html>
 <html lang="fr">
 
@@ -2048,6 +2049,7 @@
   }
 
   function rawRecordMatchesSearch(record, query) {
+    if (!isActiveFactRecord(record)) return false;
     const numeroFeSearch = normalizeText(record && record[FIELD.NUMERO_FE] || "");
     if (numeroFeSearch.includes(normalizeText(query || ""))) return true;
     const terms = normalizeSearch(query).split(/\s+/).filter(Boolean);
@@ -2083,7 +2085,7 @@
     const payload = await response.json();
     return (Array.isArray(payload.records) ? payload.records : []).map(function(r){
       return Object.assign({id:r.id}, r.fields || {});
-    });
+    }).filter(isActiveFactRecord);
   }
 
   /* Conservé pour compatibilité avec un éventuel ancien bouton. */
@@ -2238,10 +2240,22 @@
     ==================================================
   */
 
+  function isActiveFactRecord(record) {
+    /* Règle métier :
+       seule la valeur explicite false désactive le FE.
+       Une cellule vide, null, undefined ou toute autre valeur laisse le FE actif.
+       La chaîne "false" est aussi reconnue pour les imports texte/CSV. */
+    if (!record || !("actif_FE" in record)) return true;
+    const value = record.actif_FE;
+    if (value === false) return false;
+    if (typeof value === "string" && value.trim().toLowerCase() === "false") return false;
+    return true;
+  }
+
   function normalizeFactRecords(records) {
     if (!Array.isArray(records)) return [];
     return records
-      .filter(function(record){ return getNumeroFE(record && record[FIELD.NUMERO_FE]) > 0; })
+      .filter(function(record){ return isActiveFactRecord(record) && getNumeroFE(record && record[FIELD.NUMERO_FE]) > 0; })
       .map(function(record) {
         const rawDate = record[FIELD.DATE_SAISIE];
         const date = parseGristDate(rawDate);
@@ -4309,13 +4323,14 @@
     showDiagnostic("Chargement des FE de " + name + " pour la période sélectionnée…", "");
     try {
       const rows = await fetchFactsForEstablishmentPeriod(selectedTableData, establishment);
+      const activeRows = rows.filter(isActiveFactRecord);
       /* La période choisie reste inchangée. On ne transforme pas cette sélection
          d'établissement en recherche textuelle sur toute l'année. */
       searchText = "";
       searchState = {tableId:null, query:"", offset:0, complete:true, rawMatches:[], loading:false};
-      ingestRecords(rows);
+      ingestRecords(activeRows);
       currentPage = 1;
-      showDiagnostic(rows.length + " FE trouvé" + (rows.length > 1 ? "s" : "") + " pour " + name + " sur la période sélectionnée.", rows.length ? "ok" : "");
+      showDiagnostic(activeRows.length + " FE trouvé" + (activeRows.length > 1 ? "s" : "") + " pour " + name + " sur la période sélectionnée.", activeRows.length ? "ok" : "");
     } catch (error) {
       console.error("Recherche établissement impossible", error);
       showDiagnostic("Impossible de charger les FE de cet établissement.", "error");
