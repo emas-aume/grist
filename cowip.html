@@ -779,6 +779,13 @@ async function loadSuiviFor(facts){
 const FE_NOTIFY_POLL_MS=15000,feNoticeHistory=[],feSeenIds=new Set();
 // Suivi des changements de contenu sur les lignes Grist déjà utilisées.
 const feNoticeRowSnapshot=new Map();
+// Le suivi des lignes vides/remplies survit à un rechargement du même onglet.
+const FE_ROW_SNAPSHOT_KEY="emas_fe_recent_row_states_v82";
+try{
+  const stored=JSON.parse(sessionStorage.getItem(FE_ROW_SNAPSHOT_KEY)||"[]");
+  if(Array.isArray(stored))for(const entry of stored.slice(-500))if(Array.isArray(entry)&&Number.isFinite(Number(entry[0])))feNoticeRowSnapshot.set(Number(entry[0]),String(entry[1]||""));
+}catch(e){console.warn("Suivi des lignes FE non restauré",e)}
+function saveFeNoticeRowSnapshot(){try{sessionStorage.setItem(FE_ROW_SNAPSHOT_KEY,JSON.stringify([...feNoticeRowSnapshot.entries()].slice(-500)))}catch(e){console.warn("Suivi des lignes FE non sauvegardé",e)}}
 let feNoticeBusy=false,feNoticeTimer=null,feNoticeUnread=0,feNoticeReady=false,feNoticeState=null,feNoticeEmail="",feNoticeLastId=0;
 function feNoticeTime(ts){return new Intl.DateTimeFormat("fr-FR",{hour:"2-digit",minute:"2-digit",day:"2-digit",month:"2-digit"}).format(new Date(ts))}
 function feNoticeVisible(){return feNoticeHistory.filter(x=>!x.deleted&&feNoticeAllowedDepartment(x))}
@@ -868,10 +875,10 @@ function feNoticeMergeHistory(local,remote){
     if(!prev){byId.set(key,item);continue}
     // A genuinely new FE in a reused Grist row supersedes the previous
     // notification (including one that had been deleted or marked read).
-    if(String(item.numero||"")!==String(prev.numero||"")&&Number(item.arrived)>Number(prev.arrived)){
+    if((String(item.numero||"")!==String(prev.numero||"")||String(item.occurrence||"")!==String(prev.occurrence||""))&&Number(item.arrived)>Number(prev.arrived)){
       byId.set(key,item);continue;
     }
-    if(String(item.numero||"")!==String(prev.numero||"")&&Number(prev.arrived)>Number(item.arrived))continue;
+    if((String(item.numero||"")!==String(prev.numero||"")||String(item.occurrence||"")!==String(prev.occurrence||""))&&Number(prev.arrived)>Number(item.arrived))continue;
     if(item.deleted&&!prev.deleted)byId.set(key,item);
     else if(item.read&&!prev.read)byId.set(key,{...prev,read:true});
     else if(Number(item.arrived)<Number(prev.arrived))byId.set(key,item);
@@ -906,27 +913,52 @@ function feNoticePersist(viewedAt=null){
   });
   feNoticeWriteQueue=pending;return pending;
 }
+let feNoticeInitPromise=null;
 async function feNoticeInitialize(){
-  feNoticeEmail=feNoticeIdentity();
-  let found=await api(T.NOTIF,{filter:{Email:[feNoticeEmail]},limit:10});
-  if(found.length>1)throw new Error("Plusieurs lignes de notifications existent pour ce compte Grist.");
-  if(!found.length){
-    const recent=await api(T.CUR,{sort:"-id",limit:1});
-    const baseline=Math.max(0,...recent.map(f=>Number(f.id)||0));
-    // Relire juste avant l'ajout pour réduire les doublons lors d'une première ouverture parallèle.
-    found=await api(T.NOTIF,{filter:{Email:[feNoticeEmail]},limit:10});
+  if(feNoticeReady)return;
+  if(feNoticeInitPromise)return feNoticeInitPromise;
+  feNoticeInitPromise=(async()=>{
+    feNoticeEmail=feNoticeIdentity();
+    let found=await api(T.NOTIF,{filter:{Email:[feNoticeEmail]},limit:100});
     if(!found.length){
-      await grist.docApi.applyUserActions([["AddRecord",T.NOTIF,null,{Email:feNoticeEmail,Dernier_FE_ID:baseline,Derniere_consultation:Date.now(),Historique_JSON:"[]"}]]);
-      found=await api(T.NOTIF,{filter:{Email:[feNoticeEmail]},limit:10});
+      const recent=await api(T.CUR,{sort:"-id",limit:1});
+      const baseline=Math.max(0,...recent.map(f=>Number(f.id)||0));
+      // Plusieurs onglets peuvent initialiser simultanément : relire avant insertion.
+      found=await api(T.NOTIF,{filter:{Email:[feNoticeEmail]},limit:100});
+      if(!found.length){
+        await grist.docApi.applyUserActions([["AddRecord",T.NOTIF,null,{Email:feNoticeEmail,Dernier_FE_ID:baseline,Derniere_consultation:Date.now(),Historique_JSON:"[]"}]]);
+        found=await api(T.NOTIF,{filter:{Email:[feNoticeEmail]},limit:100});
+      }
     }
-  }
-  if(found.length!==1)throw new Error("Initialisation ambiguë des notifications : vérifiez les lignes en doublon dans Grist.");
-  feNoticeRestore(found[0]);feNoticeReady=true;
+    if(!found.length)throw new Error("Impossible de créer la boîte de notifications.");
+    if(found.length>1){
+      // Réconcilier les doublons avant de poursuivre : une seule ligne par compte.
+      // Ne jamais effacer un historique : fusionner les données avant suppression.
+      const ordered=[...found].sort((a,b)=>Number(a.id)-Number(b.id));
+      const primary=ordered[0];
+      let combined=[],cursor=0,viewed=0;
+      for(const row of ordered){
+        let history=[];
+        try{const parsed=JSON.parse(String(row.Historique_JSON||"[]"));if(Array.isArray(parsed))history=parsed}catch(e){throw new Error("Historique JSON invalide : doublons non supprimés.")}
+        combined=feNoticeMergeHistory(combined,history);
+        cursor=Math.max(cursor,Number(row.Dernier_FE_ID)||0);
+        viewed=Math.max(viewed,Number(row.Derniere_consultation)||0);
+      }
+      await grist.docApi.applyUserActions([["UpdateRecord",T.NOTIF,primary.id,{Dernier_FE_ID:cursor,Derniere_consultation:viewed,Historique_JSON:JSON.stringify(combined)}]]);
+      const check=await api(T.NOTIF,{filter:{id:[Number(primary.id)]},limit:1});
+      if(check.length!==1||String(check[0].Historique_JSON||"")!==JSON.stringify(combined))throw new Error("Fusion des doublons non confirmée : aucune suppression effectuée.");
+      await grist.docApi.applyUserActions(ordered.slice(1).map(row=>["RemoveRecord",T.NOTIF,row.id]));
+      found=await api(T.NOTIF,{filter:{Email:[feNoticeEmail]},limit:100});
+    }
+    if(found.length!==1)throw new Error("Doublons de notifications persistants : vérifiez la table Grist.");
+    feNoticeRestore(found[0]);feNoticeReady=true;
+  })();
+  try{return await feNoticeInitPromise}finally{feNoticeInitPromise=null}
 }
-// Lecture mutualisée entre cloche et tableau : une seule requête récente par cycle.
+
 let recentFECache={at:0,rows:[],promise:null};
-async function recentFE(){
-  if(Date.now()-recentFECache.at<12000&&recentFECache.rows.length)return recentFECache.rows;
+async function recentFE(force=false){
+  if(!force&&Date.now()-recentFECache.at<12000&&recentFECache.rows.length)return recentFECache.rows;
   if(recentFECache.promise)return recentFECache.promise;
   recentFECache.promise=(async()=>{
     const list=await api(T.CUR,{sort:"-id",limit:100});
@@ -944,7 +976,7 @@ async function pollNewFE(){
   feNoticeBusy=true;
   try{
     // Pagination jusqu'au curseur : aucun plafond fixe à 100/1000 nouveaux FE.
-    const recent=await recentFE();
+    const recent=await recentFE(true);
     if(!recent.length)return;
     // Une ligne Grist déjà existante peut passer de vide à remplie : son id ne change pas.
     const reused=[];
@@ -962,6 +994,7 @@ async function pollNewFE(){
     }
     // Éviter que le cache de suivi augmente sans limite.
     if(feNoticeRowSnapshot.size>500){const ids=new Set(recent.map(f=>Number(f.id)));for(const id of feNoticeRowSnapshot.keys())if(!ids.has(id))feNoticeRowSnapshot.delete(id)}
+    saveFeNoticeRowSnapshot();
     if(Number(recent[0].id)<=feNoticeLastId&&!reused.length)return;
     const newer=[];let offset=0,stop=false;
     // Le cas courant ne demande qu'une lecture mutualisée de 100 FE.
@@ -988,7 +1021,7 @@ async function pollNewFE(){
         if(!reused.some(x=>Number(x.id)===Number(f.id)))continue;
         feNoticeHistory.splice(feNoticeHistory.indexOf(existing),1);
       }
-      const item={id:Number(f.id),numero:String(f.Numero_FE||""),niveau:String(f.Niveau||"—"),etab:String(f.Etablissement||"Établissement non renseigné"),ville:String(f.Ville||""),departement:factDept(f),arrived:Date.now(),reentered:reused.some(x=>Number(x.id)===Number(f.id))};
+      const item={id:Number(f.id),occurrence:`${Number(f.id)}:${Date.now()}:${Math.random().toString(36).slice(2,8)}`,numero:String(f.Numero_FE||""),niveau:String(f.Niveau||"—"),etab:String(f.Etablissement||"Établissement non renseigné"),ville:String(f.Ville||""),departement:factDept(f),arrived:Date.now(),reentered:reused.some(x=>Number(x.id)===Number(f.id))};
       feNoticeHistory.unshift(item);added.push(item);
     }
     feNoticeHistory.splice(0,feNoticeHistory.length,...feNoticeTrim(feNoticeHistory));
