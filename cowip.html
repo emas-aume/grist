@@ -66,6 +66,16 @@ select{background-color:#fff!important;color-scheme:light!important;}
 .toast[data-fe-key]{cursor:pointer}
 @keyframes toastDrain{from{transform:scaleX(1)}to{transform:scaleX(0)}}
 #toastStack{top:76px}
+/* Journal discret des anomalies */
+#issueButton{display:inline-flex;align-items:center;gap:7px;padding:7px 10px;font-size:12px}
+#issueCount{font-weight:700;color:#b42318}
+#issuePanel{position:fixed;inset:0;background:#10182877;z-index:10020;display:flex;align-items:center;justify-content:center;padding:18px}
+#issuePanel[hidden]{display:none}
+.issue-box{width:min(750px,100%);max-height:85vh;overflow:auto;background:white;border-radius:12px;padding:18px;box-shadow:0 15px 50px #0003}
+.issue-head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px}
+.issue-row{border-top:1px solid #e4e7ec;padding:12px 3px;overflow-wrap:anywhere}
+.issue-row small{color:#667085;display:block;margin-bottom:5px}
+.issue-row strong{display:block;margin-bottom:4px}
 </style>
 </head><body><div id="notificationHub"><button id="bellButton" type="button" aria-label="Centre d’information" title="Nouveaux FE">🔔<span id="bellCount" hidden>0</span></button><div id="notificationPanel" hidden><div class="bellHead"><strong>Nouveaux FE</strong><button type="button" id="bellClose">Fermer</button></div><div id="bellItems"></div></div></div><div id="toastStack" aria-live="polite" aria-atomic="false"></div><main class="page">
 <section id="listView" class="card">
@@ -85,7 +95,7 @@ select{background-color:#fff!important;color-scheme:light!important;}
  <div id="etabMatches" class="hidden" style="margin-top:10px"></div>
  <div id="notice" class="hidden" aria-live="polite"></div>
  <div class="tablewrap" style="margin-top:14px"><table><thead><tr><th>Date</th><th>Niveau</th><th>Type de fait</th><th>Établissement</th><th>Ville</th><th>Statut</th><th>Équipier</th><th>N° FE</th><th></th></tr></thead><tbody id="body"><tr><td colspan="9" class="loading">Chargement…</td></tr></tbody></table></div>
- <div class="pagination"><span id="count" class="muted"></span><div class="actions"><button id="prev" class="btn">Précédent</button><span id="pageInfo" class="muted"></span><button id="next" class="btn">Suivant</button></div></div>
+ <div class="pagination"><div class="actions"><button id="issueButton" class="btn" type="button" title="Consulter le journal des anomalies" aria-label="Journal des anomalies">☷ <span id="issueCount" hidden>0</span></button><span id="count" class="muted"></span></div><div class="actions"><button id="prev" class="btn">Précédent</button><span id="pageInfo" class="muted"></span><button id="next" class="btn">Suivant</button></div></div>
 </section>
 <section id="detailView" class="hidden">
  <div class="card"><div class="top"><div class="actions"><button id="back" class="btn">← Retour</button><button id="openEtab" class="btn">Voir l’établissement</button></div><div class="actions"><span id="detailStatus"></span><button id="exportFePdf" class="btn" type="button" title="Exporter la fiche FE et son suivi au format PDF">PDF</button></div></div>
@@ -118,18 +128,103 @@ select{background-color:#fff!important;color-scheme:light!important;}
  <div class="card ambiance-card"><div class="ambiance-head"><h2>Renseignements d’ambiance</h2><button id="ambianceEdit" class="ambiance-edit-btn" type="button" title="Modifier les renseignements d’ambiance" aria-label="Modifier les renseignements d’ambiance">✎</button></div><div id="ambianceDisplay"><div class="ambiance-text ambiance-empty">Aucun renseignement d’ambiance</div></div><div id="ambianceEditor" class="ambiance-editor hidden"><textarea id="ambianceText" placeholder="Saisir un renseignement d’ambiance…"></textarea><div class="ambiance-editor-actions"><button id="ambianceCancel" class="btn" type="button">Annuler</button><button id="ambianceSave" class="btn primary" type="button">Enregistrer</button></div></div></div>
  <div class="card"><h2>Historique des faits</h2><div id="history" class="timeline" style="margin-top:16px"></div></div>
 </section>
-</main>
+</main><div id="issuePanel" hidden role="dialog" aria-modal="true" aria-label="Journal des anomalies"><div class="issue-box"><div class="issue-head"><h2>Journal des anomalies</h2><div class="actions"><button class="btn" id="issueClear" type="button">Effacer ce journal</button><button class="btn" id="issueClose" type="button">Fermer</button></div></div><p class="muted" id="issueScope">Journal local ; synchronisation partagée en attente.</p><div id="issueItems"></div></div></div>
 <div id="appModal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="appModalTitle"><div id="appModalBox" class="modal-box"><div id="appModalTitle" class="modal-title"></div><div id="appModalMessage" class="modal-message"></div><div id="appModalActions" class="modal-actions"></div></div></div>
 <!-- CO-EMAS V49 — correction libellé après remise à zéro -->
 <script>
 "use strict";
-const T={CUR:"FE26_27_2",OLD:"FE25_26",OLD2:"FE24_25",SUIVI:"SUIVI_FE26_27",EQ:"EQUIPIERS",ETAB:"ETABLISSEMENTS",ACT_D1:"ACTIVITE_D1_EMS34_48",ACT_D2:"ACTIVITE_D2_EMS34_48",SUIVI_ETAB:"SUIVI_ETABLISSEMENTS",ID_FE:"ID_FE",CLAIM:"PRISE_EN_CHARGE_FE",LOCK:"VERROUS_EDITION",NOTIF:"NOTIFICATIONS_UTILISATEURS"};
+const T={CUR:"FE26_27_2",OLD:"FE25_26",OLD2:"FE24_25",SUIVI:"SUIVI_FE26_27",EQ:"EQUIPIERS",ETAB:"ETABLISSEMENTS",ACT_D1:"ACTIVITE_D1_EMS34_48",ACT_D2:"ACTIVITE_D2_EMS34_48",SUIVI_ETAB:"SUIVI_ETABLISSEMENTS",ID_FE:"ID_FE",CLAIM:"PRISE_EN_CHARGE_FE",LOCK:"VERROUS_EDITION",NOTIF:"NOTIFICATIONS_UTILISATEURS",JOURNAL:"JOURNAL_ANOMALIES"};
 const ALLOWED_EQUIPIER_NAMES=["Guillaume","Gilles","Patrick","Mathilde","Jean-Marc","Christophe","Bastien","Rachida","François","Frederic","Thierry","Philippe"];
 function isAllowedEquipier(e){return !!e&&ALLOWED_EQUIPIER_NAMES.some(n=>norm(n)===norm(e.Nom));}
-const PAGE=25; let tokenInfo=null,currentRows=[],rows=[],suiviMap=new Map(),eqMap=new Map(),etabMap=new Map(),page=1,selected=null,selectedSuivi=null,selectedEtab=null,selectedEtabSuivi=null,etabReturnTarget="list",equipierSelectionTouched=false,opsCleanSnapshot=null,ambianceCleanSnapshot=null,idFeRows=[],idByNumero=new Map(),numeroById=new Map();
+const PAGE=25; let tokenInfo=null,currentRows=[],rows=[],suiviMap=new Map(),eqMap=new Map(),etabMap=new Map(),page=1,selected=null,selectedSuivi=null,selectedEtab=null,selectedEtabSuivi=null,etabReturnTarget="list",equipierSelectionTouched=false,opsCleanSnapshot=null,ambianceCleanSnapshot=null,idFeRows=[],idByNumero=new Map(),numeroById=new Map(),idConflictingFe=new Set(),idConflictingIds=new Set(),idOccupied=new Set();
 const $=id=>document.getElementById(id); grist.ready({requiredAccess:"full"});
 
+const ISSUE_STORE="emas_co_issue_journal_v56";
+const ISSUE_PENDING_STORE="emas_co_issue_pending_v59";
+let issueEntries=[],sharedIssueEntries=[],issuePending=[],issueSyncBusy=false,issueSharedEnabled=true,issueLastPoll=0;
+try{const v=JSON.parse(sessionStorage.getItem(ISSUE_STORE)||"[]");if(Array.isArray(v))issueEntries=v.slice(-200)}catch(e){}
+try{const v=JSON.parse(sessionStorage.getItem(ISSUE_PENDING_STORE)||"[]");if(Array.isArray(v))issuePending=v.filter(x=>x&&x.eventId&&x.time&&x.message).slice(-200)}catch(e){}
+function issueSavePending(){try{sessionStorage.setItem(ISSUE_PENDING_STORE,JSON.stringify(issuePending.slice(-200)))}catch(e){console.warn("File attente non persistante",e)}}
+function issueSave(){try{sessionStorage.setItem(ISSUE_STORE,JSON.stringify(issueEntries.slice(-200)))}catch(e){console.warn("Journal local non persistant",e)}}
+function issueAdd(kind,message,fe=""){
+  const msg=String(message||"Erreur non détaillée").slice(0,700);
+  if(!msg.trim())return;
+  const last=issueEntries[issueEntries.length-1];
+  if(last&&last.kind===kind&&last.message===msg&&last.fe===fe&&Date.now()-last.time<15000)return;
+  const eventId="e"+Date.now().toString(36)+"-"+Math.random().toString(36).slice(2,12);
+  issueEntries.push({time:Date.now(),kind:String(kind||"Erreur"),message:msg,fe:String(fe||""),eventId});
+  if(issueEntries.length>200)issueEntries=issueEntries.slice(-200);
+  issueSave();issueRender();
+  // La collecte reste locale si Grist est inaccessible ; aucune erreur de journalisation ne se journalise elle-même.
+  issuePending.push(issueEntries[issueEntries.length-1]);
+  if(issuePending.length>200)issuePending=issuePending.slice(-200);
+  issueSavePending();
+  // Les événements en attente seront envoyés après l'identification de la session.
+}
+function issueRender(){
+  const shared=sharedIssueEntries.map(r=>({time:(Number(r.Date_heure)||0)*1000,kind:String(r.Operation||r.Niveau||"Erreur"),message:String(r.Message||""),fe:String(r.Numero_FE||""),source:String(r.Equipier||r.Utilisateur||"Autre session"),id:r.id}));
+  const combined=[...shared,...issueEntries.filter(local=>!shared.some(remote=>remote.time===local.time&&remote.message===local.message&&remote.fe===local.fe))].sort((a,b)=>b.time-a.time);
+  const badge=$("issueCount");if(badge){badge.textContent=String(combined.length);badge.hidden=!combined.length}
+  const scope=$("issueScope");if(scope)scope.textContent=issueSharedEnabled?"Anomalies partagées entre équipiers (actualisation périodique). Le bouton Effacer ne supprime que le journal local.":"Journal local uniquement : table JOURNAL_ANOMALIES indisponible ou droits insuffisants.";
+  const box=$("issueItems");if(!box)return;
+  box.replaceChildren();
+  if(!combined.length){const p=document.createElement("p");p.className="muted";p.textContent="Aucune anomalie enregistrée.";box.appendChild(p);return}
+  for(const item of combined.slice(0,250)){
+    const div=document.createElement("div");div.className="issue-row";
+    const meta=document.createElement("small");meta.textContent=new Date(item.time).toLocaleString("fr-FR")+(item.source?" — "+item.source:"")+(item.fe?" — FE "+item.fe:"");
+    const title=document.createElement("strong");title.textContent=item.kind;
+    const msg=document.createElement("div");msg.textContent=item.message;
+    div.append(meta,title,msg);box.appendChild(div);
+  }
+}
+// V58 : journal partagé Grist, volontairement non bloquant pour les opérations métier.
+// Date_heure est un horodatage Unix en secondes (colonne numérique dans Grist).
+async function issueSync(force=false){
+  if(issueSyncBusy||typeof api!=="function")return;
+  if(!issueSharedEnabled){if(Date.now()-issueLastPoll<60000)return;issueSharedEnabled=true}
+  if(!force&&!issuePending.length&&Date.now()-issueLastPoll<30000)return;
+  issueSyncBusy=true;
+  try{
+    // Relire avant écriture : une réponse réseau perdue peut masquer un AddRecord réussi.
+    // Details porte uniquement un identifiant aléatoire d'événement, jamais une pile d'erreur.
+    for(const item of issuePending.slice(0,20)){
+      const already=await api(T.JOURNAL,{filter:{Details:[item.eventId]},limit:2});
+      if(already.length>0){
+        issuePending=issuePending.filter(x=>x.eventId!==item.eventId);issueSavePending();
+        continue;
+      }
+      const equipier=String(currentEquipier?.Nom||"");
+      const utilisateur=String(currentUserProfile?.email||currentUserProfile?.loginEmail||"");
+      const record={Date_heure:Math.floor(item.time/1000),Equipier:equipier,Utilisateur:utilisateur,Session_ID:currentClaimSession,Numero_FE:item.fe,Operation:item.kind,Niveau:"Erreur",Message:item.message,Details:item.eventId,Statut:"Nouvelle",Date_resolution:null};
+      await grist.docApi.applyUserActions([["AddRecord",T.JOURNAL,null,record]]);
+      // Confirmer l'écriture avant de retirer l'événement de la file d'attente.
+      const verified=await api(T.JOURNAL,{filter:{Details:[item.eventId]},limit:2});
+      if(verified.length!==1)throw new Error("Écriture du journal non confirmée");
+      issuePending=issuePending.filter(x=>x.eventId!==item.eventId);issueSavePending();
+    }
+    const remote=await api(T.JOURNAL,{sort:"-Date_heure",limit:250});
+    sharedIssueEntries=remote;
+    issueLastPoll=Date.now();
+    issueRender();
+  }catch(e){
+    // Une erreur du journal ne doit jamais interrompre l'interface ou générer une boucle.
+    console.warn("Journal partagé Grist non disponible ; conservation locale",e);
+    issueSharedEnabled=false;
+    issueLastPoll=Date.now();
+    issueRender();
+  }finally{issueSyncBusy=false}
+}
+function initIssueJournal(){
+  $("issueButton").onclick=()=>{$("issuePanel").hidden=false;issueRender();void issueSync(true)};
+  $("issueClose").onclick=()=>{$("issuePanel").hidden=true};
+  $("issuePanel").onclick=e=>{if(e.target===$("issuePanel"))$("issuePanel").hidden=true};
+  $("issueClear").onclick=()=>{issueEntries=[];issueSave();issueRender()};
+  window.addEventListener("error",e=>issueAdd("Erreur JavaScript",e.message));
+  window.addEventListener("unhandledrejection",e=>issueAdd("Opération asynchrone",e.reason?.message||String(e.reason)));
+  issueRender();
+}
 function toast(message,type="info",title="",duration=10000,onOpen=null){
+  if(type==="error"||type==="warning")issueAdd(title||"Erreur",message,selected?.Numero_FE||"");
   const stack=$("toastStack");if(!stack)return;
   const el=document.createElement("div"),kind=type==="error"||type==="warning"?"error":"info";
   el.className=`toast toast-${kind}`;
@@ -151,7 +246,14 @@ function esc(v){return String(v??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").
 function norm(v){return String(v??"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/\s+/g," ").trim()}
 function date(v){if(!v)return null;if(typeof v==="number")return new Date(v*1000);let d=new Date(v);return isNaN(d)?null:d}
 function dateFR(v){let d=date(v);return d?new Intl.DateTimeFormat("fr-FR").format(d):"—"}
-function notice(s,type=""){let n=$("notice");if(!n)return;n.textContent=s;n.className="notice"+(type?" "+type:"")}
+function notice(s,type=""){
+  if(type==="error"){
+    issueAdd("Erreur Grist / opération",s,selected?.Numero_FE||"");
+    const n=$("notice");if(n){n.textContent="";n.className="hidden"}
+    return;
+  }
+  let n=$("notice");if(!n)return;n.textContent=s;n.className="notice"+(type?" "+type:"");
+}
 async function getTokenInfo(force=false){
   const now=Date.now();
   if(!force && tokenInfo && tokenInfo._expiresAt && now < tokenInfo._expiresAt-30000)return tokenInfo;
@@ -909,20 +1011,37 @@ function startEditLockHeartbeat(){if(editLockHeartbeatTimer)clearInterval(editLo
 async function loadOperationalIds(){
   let data=[];
   try{data=await apiAllPaged(T.ID_FE,{pageSize:1000,maxRows:10000})}catch(e){throw new Error("Table ID_FE : "+e.message)}
+  const byFe=new Map(),byId=new Map();
   idFeRows=data;idByNumero=new Map();numeroById=new Map();
+  idConflictingFe=new Set();idConflictingIds=new Set();idOccupied=new Set();
   for(const r of data){
     const numero=String(r.Numero_FE??"").trim();
     const oid=Number(r.ID_Centre_Op);
-    if(!numero||!Number.isFinite(oid))continue;
-    if(idByNumero.has(numero)&&idByNumero.get(numero)!==oid)throw new Error(`Plusieurs ID opérationnels différents existent pour le FE ${numero}.`);
-    if(numeroById.has(oid)&&numeroById.get(oid)!==numero)throw new Error(`L’ID opérationnel ${oid} est utilisé par plusieurs FE.`);
+    if(!numero||!Number.isSafeInteger(oid)||oid<=0)continue;
+    idOccupied.add(oid);
+    if(!byFe.has(numero))byFe.set(numero,new Set());
+    if(!byId.has(oid))byId.set(oid,new Set());
+    byFe.get(numero).add(oid);byId.get(oid).add(numero);
+  }
+  for(const [numero,ids] of byFe)if(ids.size>1)idConflictingFe.add(numero);
+  for(const [oid,nums] of byId)if(nums.size>1){idConflictingIds.add(oid);for(const numero of nums)idConflictingFe.add(numero)}
+  for(const [numero,ids] of byFe){
+    if(idConflictingFe.has(numero))continue;
+    const oid=[...ids][0];
+    if(idConflictingIds.has(oid))continue;
     idByNumero.set(numero,oid);numeroById.set(oid,numero);
   }
+  if(idConflictingFe.size){
+    console.warn("ID_FE : correspondances ambiguës ignorées",[...idConflictingFe]);
+    for(const numero of idConflictingFe)issueAdd("Conflit ID_FE","Correspondances d’ID opérationnels ambiguës dans ID_FE. Aucun ID attribué automatiquement.",numero);
+  }
 }
+
 function operationalIdFor(f){return f?idByNumero.get(String(f.Numero_FE??"").trim())??null:null}
 async function searchOperationalId(id){
   const oid=Number(id);notice("Recherche de l’ID opérationnel "+oid+"…");
   await loadOperationalIds();
+  if(idConflictingIds.has(oid)){notice("L’ID opérationnel "+oid+" est associé à plusieurs FE dans ID_FE. Corrigez la table avant la recherche.","error");return}
   const numero=numeroById.get(oid);
   if(!numero){notice("Aucun FE n’est associé à l’ID opérationnel "+oid+".","error");return}
   let found=(await api(T.CUR,{filter:{Numero_FE:[numero]},limit:10})).filter(isActiveFact);
@@ -946,7 +1065,8 @@ async function assignOperationalId(){
   if(!selected||isArchivedFact(selected)||!isActiveFact(selected))return;
   const numero=String(selected.Numero_FE??"").trim();
   const targetRowId=Number(selected.id);
-  const assertSameFact=()=>{if(!selected||targetRowId!==targetRowId||String(selected.Numero_FE??"").trim()!==numero)throw new Error("La fiche affichée a changé pendant l’attribution. Opération annulée.")};
+  const assertNoIdConflict=()=>{if(idConflictingFe.has(numero))throw new Error("Plusieurs ID opérationnels sont associés à ce FE dans ID_FE. Corrigez la table avant toute attribution.")};
+  const assertSameFact=()=>{if(!selected||Number(selected.id)!==targetRowId||String(selected.Numero_FE??"").trim()!==numero)throw new Error("La fiche affichée a changé pendant l’attribution. Opération annulée.")};
   const btn=$("assignOperationalId");if(btn)btn.disabled=true;
   let lockHeld=false;
   try{
@@ -954,10 +1074,10 @@ async function assignOperationalId(){
     if(!liveFact.length||!isActiveFact(liveFact[0]))throw new Error("Ce FE a été désactivé ou n’existe plus dans la base courante.");
 
     // L'affichage avant confirmation reste indicatif : le numéro définitif est calculé sous verrou.
-    await loadOperationalIds();
+    await loadOperationalIds();assertNoIdConflict();
     const existing=idByNumero.get(numero);
     if(existing!=null){renderOperationalId();return}
-    const preview=Math.max(0,...[...numeroById.keys()].filter(Number.isFinite))+1;
+    const preview=Math.max(0,...idOccupied)+1;
     const ok=await showModal({title:"Attribuer un ID opérationnel ?",message:`Le prochain ID disponible est actuellement ${preview}. L’ID définitif sera recalculé au moment de l’attribution.`,confirmText:"Attribuer un ID",cancelText:"Annuler"});
     if(!ok)return;
     assertSameFact();
@@ -972,11 +1092,11 @@ async function assignOperationalId(){
     const factAgain=await api(T.CUR,{filter:{id:[targetRowId]},limit:1});
     if(!factAgain.length||!isActiveFact(factAgain[0]))throw new Error("Ce FE a été désactivé pendant l’attribution.");
 
-    await loadOperationalIds();
+    await loadOperationalIds();assertNoIdConflict();
     if(idByNumero.has(numero)){renderOperationalId();return}
 
-    let candidate=Math.max(0,...[...numeroById.keys()].filter(Number.isFinite))+1;
-    while(numeroById.has(candidate))candidate++;
+    let candidate=Math.max(0,...idOccupied)+1;
+    while(idOccupied.has(candidate))candidate++;
 
     // Dernière relecture sous verrou : ni le FE ni le candidat ne doivent avoir été pris.
     await requireOwnedEditLock("ID_GLOBAL","ATTRIBUTION");
@@ -1020,6 +1140,8 @@ async function assignOperationalId(){
 function renderOperationalId(){
   const box=$("operationalId"),btn=$("assignOperationalId");if(!box||!btn)return;
   const oid=operationalIdFor(selected);
+  const conflict=!!selected&&idConflictingFe.has(String(selected.Numero_FE??"").trim());
+  if(conflict){box.textContent="ID opérationnel : conflit dans ID_FE";box.classList.remove("hidden");btn.classList.add("hidden");return}
   box.classList.toggle("level3",!!selected&&displayLevel(selected.Niveau)==="3");
   if(oid!=null){box.textContent="ID opérationnel : "+oid;box.classList.remove("hidden");btn.classList.add("hidden")}
   else{box.textContent="";box.classList.add("hidden");btn.classList.toggle("hidden",!selected||isArchivedFact(selected)||!isActiveFact(selected))}
@@ -1922,8 +2044,8 @@ $("ambianceSave").onclick=saveAmbiance;
 $("q").onkeydown=async e=>{if(e.key!=="Enter")return;e.preventDefault();let raw=$("q").value.trim();if(!raw){rows=[...currentRows];page=1;render();return}let idMatch=/^id\s*=\s*(\d+)$/i.exec(raw);if(idMatch){await searchOperationalId(idMatch[1])}else if(/^\d{6,}$/.test(raw)){await searchExactFE(raw)}else{rows=[...currentRows];page=1;render();await renderEtabMatches(raw)}};
 $("equipier").onchange=()=>{equipierSelectionTouched=true};["dep","degree","level","status","equipierFilter"].forEach(id=>$(id).onchange=()=>{page=1;render()});$("daySelect").onchange=()=>{if($("daySelect").value)$("weekSelect").value="";loadCurrent()};$("weekSelect").onchange=()=>{if($("weekSelect").value)$("daySelect").value="";loadCurrent()};$("prev").onclick=()=>{page--;render()};$("next").onclick=()=>{page++;render()};$("exportFePdf").onclick=exportCurrentFePdf;$("assignOperationalId").onclick=assignOperationalId;
 $("back").onclick=async()=>{if(!(await confirmLeaveIfDirty()))return;await releaseCurrentEditResources();opsCleanSnapshot=null;ambianceCleanSnapshot=null;const wasOperationalSearch=/^id\s*=\s*\d+$/i.test($("q").value.trim());if(wasOperationalSearch){$("q").value="";rows=[...currentRows];page=1;notice("")}$("detailView").classList.add("hidden");$("listView").classList.remove("hidden");render()};$("openEtab").onclick=showEstablishment;$("etabBack").onclick=async()=>{if(!(await confirmLeaveIfDirty()))return;const lockUai=String(selectedEtab?.UAI||"").trim();await releaseEditLock("ETAB",lockUai);currentEtabLock=null;ambianceCleanSnapshot=null;$("etabView").classList.add("hidden");if(etabReturnTarget==="detail"&&selected){$("detailView").classList.remove("hidden");markOpsClean()}else{$("listView").classList.remove("hidden");render()}};$("save").onclick=saveOps;$("toggleDone").onclick=toggleDone;$("resetFollowup").onclick=resetFollowup;
-(async()=>{try{initActivityFields();
+(async()=>{try{initIssueJournal();initActivityFields();
 // Chargements indépendants en parallèle : référentiels, identifiants et index des périodes.
 await Promise.all([loadSmallTables(),loadOperationalIds(),loadPeriodOptions()]);
-await detectCurrentEquipier();await loadCurrent();wireTemporaryClaimTriggers();startLiveRefresh();initFeBell();startClaimHeartbeat();startEditLockHeartbeat();setInterval(retryDeferredActivity,30000);repairLegacyChoiceLists()}catch(e){console.error(e);notice("Erreur Grist : "+e.message,"error");$("body").innerHTML='<tr><td colspan="9" class="loading">Impossible de charger les données.</td></tr>'}})();
+await detectCurrentEquipier();void issueSync(true);setInterval(()=>{if(!document.hidden)void issueSync(true)},30000);await loadCurrent();wireTemporaryClaimTriggers();startLiveRefresh();initFeBell();startClaimHeartbeat();startEditLockHeartbeat();setInterval(retryDeferredActivity,30000);repairLegacyChoiceLists()}catch(e){console.error(e);notice("Erreur Grist : "+e.message,"error");$("body").innerHTML='<tr><td colspan="9" class="loading">Impossible de charger les données.</td></tr>'}})();
 </script></body></html>
