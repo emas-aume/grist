@@ -140,16 +140,18 @@ function isAllowedEquipier(e){return !!e&&ALLOWED_EQUIPIER_NAMES.some(n=>norm(n)
 const PAGE=25; let tokenInfo=null,currentRows=[],rows=[],suiviMap=new Map(),eqMap=new Map(),etabMap=new Map(),page=1,selected=null,selectedSuivi=null,selectedEtab=null,selectedEtabSuivi=null,etabReturnTarget="list",equipierSelectionTouched=false,opsCleanSnapshot=null,ambianceCleanSnapshot=null,idFeRows=[],idByNumero=new Map(),numeroById=new Map(),idConflictingFe=new Set(),idConflictingIds=new Set(),idOccupied=new Set();
 const $=id=>document.getElementById(id); grist.ready({requiredAccess:"full"});
 
-const ISSUE_STORE="emas_co_issue_journal_v56";
-const ISSUE_PENDING_STORE="emas_co_issue_pending_v59";
+// V74 : le journal Grist est la seule source historique.
+// Ne pas réinjecter des anomalies effacées depuis un ancien sessionStorage.
+const ISSUE_STORE="emas_co_issue_journal_v74";
+const ISSUE_PENDING_STORE="emas_co_issue_pending_v74";
 let issueEntries=[],sharedIssueEntries=[],issuePending=[],issueSyncBusy=false,issueSharedEnabled=true,issueLastPoll=0;
-try{const v=JSON.parse(sessionStorage.getItem(ISSUE_STORE)||"[]");if(Array.isArray(v))issueEntries=v.slice(-200)}catch(e){}
-try{const v=JSON.parse(sessionStorage.getItem(ISSUE_PENDING_STORE)||"[]");if(Array.isArray(v))issuePending=v.filter(x=>x&&x.eventId&&x.time&&x.message).slice(-200)}catch(e){}
 function issueSavePending(){try{sessionStorage.setItem(ISSUE_PENDING_STORE,JSON.stringify(issuePending.slice(-200)))}catch(e){console.warn("File attente non persistante",e)}}
 function issueSave(){try{sessionStorage.setItem(ISSUE_STORE,JSON.stringify(issueEntries.slice(-200)))}catch(e){console.warn("Journal local non persistant",e)}}
 function issueAdd(kind,message,fe=""){
   const msg=String(message||"Erreur non détaillée").slice(0,700);
   if(!msg.trim())return;
+  // Un conflit de correspondance ID_FE est un état de données, pas un incident à historiser.
+  if(kind==="Conflit ID_FE")return;
   // Une anomalie persistante ID_FE est un état, pas un nouvel événement à chaque rechargement.
   if(kind==="Conflit ID_FE"&&issueEntries.some(x=>x.kind===kind&&x.fe===fe))return;
   const last=issueEntries[issueEntries.length-1];
@@ -174,7 +176,9 @@ function issueDateMillis(raw){
 function issueRender(){
   const shared=sharedIssueEntries.map(r=>({time:issueDateMillis(r.Date_heure),kind:String(r.Operation||r.Niveau||"Erreur"),message:String(r.Message||""),fe:String(r.Numero_FE||""),source:String(r.Equipier||r.Utilisateur||"Autre session"),id:r.id,eventId:String(r.Details||"")}));
   const remoteIds=new Set(shared.map(x=>x.eventId).filter(Boolean));
-  const merged=[...shared,...issueEntries.filter(x=>!remoteIds.has(x.eventId))];
+  // Les entrées locales ne sont montrées que tant qu'elles attendent réellement l'écriture.
+  const pendingIds=new Set(issuePending.map(x=>x.eventId));
+  const merged=[...shared,...issueEntries.filter(x=>pendingIds.has(x.eventId)&&!remoteIds.has(x.eventId))];
   const seen=new Set();
   const combined=merged.sort((a,b)=>b.time-a.time).filter(x=>{
     // Pour ID_FE, une seule entrée par FE, même si plusieurs sessions ont remonté le même état.
@@ -236,6 +240,7 @@ async function issueSync(force=false){
     // Une erreur du journal ne doit jamais interrompre l'interface ou générer une boucle.
     console.warn("Journal partagé Grist non disponible ; conservation locale",e);
     issueSharedEnabled=false;
+    sharedIssueEntries=[];
     issueLastPoll=Date.now();
     issueRender();
   }finally{issueSyncBusy=false}
@@ -244,7 +249,7 @@ function initIssueJournal(){
   $("issueButton").onclick=()=>{$("issuePanel").hidden=false;issueRender();void issueSync(true)};
   $("issueClose").onclick=()=>{$("issuePanel").hidden=true};
   $("issuePanel").onclick=e=>{if(e.target===$("issuePanel"))$("issuePanel").hidden=true};
-  $("issueClear").onclick=()=>{issueEntries=[];issueSave();issueRender()};
+  $("issueClear").onclick=()=>{issueEntries=[];issuePending=[];issueSave();issueSavePending();issueRender()};
   window.addEventListener("error",e=>issueAdd("Erreur JavaScript",e.message));
   window.addEventListener("unhandledrejection",e=>issueAdd("Opération asynchrone",e.reason?.message||String(e.reason)));
   issueRender();
@@ -1178,14 +1183,9 @@ async function loadOperationalIds(){
     idByNumero.set(numero,oid);numeroById.set(oid,numero);
   }
   if(idConflictingFe.size){
+    // Affichage uniquement dans la console technique : ne pas recréer les lignes
+    // du journal partagé après qu'un administrateur l'a vidé.
     console.warn("ID_FE : correspondances ambiguës ignorées",[...idConflictingFe]);
-    for(const numero of idConflictingFe){
-      if(issueEntries.some(x=>x.kind==="Conflit ID_FE"&&x.fe===numero))continue;
-      const item={time:Date.now(),kind:"Conflit ID_FE",message:"Correspondances d’ID opérationnels ambiguës dans ID_FE. Aucun ID attribué automatiquement.",fe:numero,eventId:"e"+Date.now().toString(36)+"-"+Math.random().toString(36).slice(2,12)};
-      issueEntries.push(item);issuePending.push(item);
-    }
-    issueEntries=issueEntries.slice(-200);issuePending=issuePending.slice(-200);
-    issueSave();issueSavePending();issueRender();
   }
 }
 
