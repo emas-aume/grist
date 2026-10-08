@@ -720,49 +720,30 @@ async function findFactBySuffix(table,query,suffix,limit=10){
   }
   return out;
 }
-async function loadPeriodOptions(){
-  const selectedDayBefore=$("daySelect").value,selectedWeekBefore=$("weekSelect").value;
-  // Grist ne fournit pas de DISTINCT sur les dates via cet endpoint : on construit
-  // une fois l'index des périodes à partir de FE26_27_2, puis les FE affichés sont
-  // toujours rechargés à la demande pour la période choisie.
-  // Parcours chronologique borné à l'année scolaire courante.
-  // On ne télécharge pas les années antérieures lorsque le tri décroissant est fiable.
-  const bounds=schoolYearBounds(),all=[];
-  const batchSize=1000,maxRows=50000;
-  let previousDate=Infinity,ordered=true;
-  for(let offset=0;offset<maxRows;offset+=batchSize){
-    const batch=await api(T.CUR,{sort:"-Date_de_saisie",limit:batchSize,offset});
-    if(!batch.length)break;
-    let olderOnly=true;
-    for(const f of batch){
-      const d=date(f.Date_de_saisie),time=d?.getTime();
-      if(!Number.isFinite(time)){ordered=false;olderOnly=false;continue}
-      if(time>previousDate)ordered=false;
-      previousDate=time;
-      if(d>=bounds.start)olderOnly=false;
-      if(isCurrentOperationalFact(f))all.push(f);
-    }
-    // Arrêt anticipé uniquement si l'ensemble du lot est antérieur et le tri vérifié.
-    if(ordered&&olderOnly)break;
-    if(batch.length<batchSize)break;
+// Les options de calendrier sont construites sans lire la table des FE.
+// Les données de chaque période sont chargées uniquement lors de sa sélection.
+function populateDayOptions(weekKey,preferredDay=""){
+  let dates=[];
+  const m=/^(\d{4})-W(\d{2})$/.exec(weekKey||"");
+  if(m){const start=isoWeekStart(+m[1],+m[2]);for(let i=0;i<7;i++){let d=new Date(start);d.setUTCDate(d.getUTCDate()+i);dates.push(d)}}
+  $("daySelect").innerHTML='<option value="">Choisir un jour</option>'+dates.map(d=>{let k=ymdUTC(d);return `<option value="${k}">${new Intl.DateTimeFormat("fr-FR",{timeZone:"UTC"}).format(d)}</option>`}).join("");
+  if(preferredDay&&dates.some(d=>ymdUTC(d)===preferredDay))$("daySelect").value=preferredDay;
+}
+function loadPeriodOptions(){
+  const current=isoWeekInfo(new Date()),currentKey=`${current.year}-W${String(current.week).padStart(2,"0")}`;
+  const bounds=schoolYearBounds(),first=isoWeekInfo(bounds.start),last=isoWeekInfo(bounds.end);
+  const firstMonday=isoWeekStart(first.year,first.week),lastMonday=isoWeekStart(last.year,last.week);
+  const selected=$("weekSelect").value||currentKey;
+  let options=[];
+  for(let ms=lastMonday.getTime();ms>=firstMonday.getTime();ms-=7*86400000){
+    const d=new Date(ms),w=isoWeekInfo(d),key=`${w.year}-W${String(w.week).padStart(2,"0")}`;
+    if(d>new Date())continue;
+    const end=new Date(ms+6*86400000);
+    options.push(`<option value="${key}">S${String(w.week).padStart(2,"0")} — ${frShortUTC(d)} à ${frShortUTC(end)}</option>`);
   }
-  availableDays.clear();availableWeeks.clear();
-  for(const f of all){
-    let d=date(f.Date_de_saisie);if(!d)continue;
-    let du=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));
-    let ymd=ymdUTC(du);availableDays.set(ymd,(availableDays.get(ymd)||0)+1);
-    let wi=isoWeekInfo(du),key=`${wi.year}-W${String(wi.week).padStart(2,"0")}`;
-    let rec=availableWeeks.get(key)||{year:wi.year,week:wi.week,count:0};rec.count++;availableWeeks.set(key,rec);
-  }
-  let dayKeys=[...availableDays.keys()].sort().reverse();
-  $("daySelect").innerHTML='<option value="">Choisir un jour</option>'+dayKeys.map(k=>{let [y,m,d]=k.split("-");return `<option value="${k}">${d}/${m}/${y}</option>`}).join("");
-  let weeks=[...availableWeeks.entries()].sort((a,b)=>b[0].localeCompare(a[0]));
-  $("weekSelect").innerHTML='<option value="">Choisir une semaine</option>'+weeks.map(([key,w])=>{let st=isoWeekStart(w.year,w.week),en=new Date(st.getTime()+6*86400000);return `<option value="${key}">S${String(w.week).padStart(2,"0")} — ${frShortUTC(st)} à ${frShortUTC(en)}</option>`}).join("");
-  // Par défaut : semaine courante si elle contient des FE, sinon dernière semaine disponible.
-  let now=isoWeekInfo(new Date()),cur=`${now.year}-W${String(now.week).padStart(2,"0")}`;
-  $("weekSelect").value=selectedDayBefore?"":(availableWeeks.has(selectedWeekBefore)?selectedWeekBefore:(availableWeeks.has(cur)?cur:(weeks[0]?.[0]||"")));
-  $("daySelect").value=availableDays.has(selectedDayBefore)?selectedDayBefore:"";
-  if(selectedDayBefore&&!availableDays.has(selectedDayBefore))$("weekSelect").value=availableWeeks.has(cur)?cur:(weeks[0]?.[0]||"");
+  $("weekSelect").innerHTML='<option value="">Choisir une semaine</option>'+options.join("");
+  $("weekSelect").value=selected;
+  populateDayOptions(selected);
 }
 function periodSpec(){
   let day=$("daySelect").value,week=$("weekSelect").value;
@@ -1300,11 +1281,12 @@ async function openEstablishmentFromFact(key){
   if(!(await confirmLeaveIfDirty()))return;
   await releaseCurrentEditResources();
   opsCleanSnapshot=null;ambianceCleanSnapshot=null;
-  etabReturnTarget="detail";
+  // Depuis le tableau, le retour doit mener au tableau et non à une fiche FE non ouverte.
+  etabReturnTarget="list";
   let [source,id]=key.split(":");
   let f=rows.find(x=>x._source===source&&x.id===Number(id));
   if(!f)return;
-  selected=f;
+  selected=null;
   let ref=Number(f.UAI);
   let e=etabMap.get(ref);
   if(!e){notice("Établissement introuvable dans ETABLISSEMENTS.","error");return}
@@ -2076,7 +2058,7 @@ async function saveAmbiance(){
 }
 
 let establishmentLoadGeneration=0;
-async function openEstablishment(e,ref){const generation=++establishmentLoadGeneration;selectedEtab=e||etabMap.get(Number(ref))||null;$("etabBack").textContent=etabReturnTarget==="detail"?"← Retour à la fiche":"← Retour";$("detailView").classList.add("hidden");$("etabView").classList.remove("hidden");$("etabTitle").textContent=e?.Etablissement||selected.Etablissement||"Établissement";$("etabSub").textContent=[e?.UAI,e?.Ville,e?.Departement].filter(Boolean).join(" — ");$("etabGrid").innerHTML=[info("UAI",e?.UAI),info("Degré",e?.Degre),info("Ville",e?.Ville),info("Département",e?.Departement),info("Bassin",e?.Bassin),info("Type",e?.Type_etablissement),info("Secteur",e?.Secteur),info("Code postal",e?.Code_postal)].join("");$("history").innerHTML='<div class="loading">Chargement de l’historique par UAI…</div>';$("etabCounts").textContent="Chargement du nombre de faits…";$("ambianceDisplay").classList.remove("hidden");$("ambianceEditor").classList.add("hidden");$("ambianceDisplay").innerHTML='<div class="loading">Chargement…</div>';loadAmbiance(e);try{let [cur,old,old2]=await Promise.all([apiAllPaged(T.CUR,{filter:{UAI:[ref]},sort:"-Date_de_saisie"}),apiAllPaged(T.OLD,{filter:{UAI:[ref]},sort:"-Date_de_saisie"}),apiAllPaged(T.OLD2,{filter:{UAI:[ref]},sort:"-Date_de_saisie"})]);if(generation!==establishmentLoadGeneration)return;cur=cur.filter(isActiveFact);$("etabCounts").innerHTML=`<strong>Nombre de faits établissement :</strong> 2026-2027 : <strong>${cur.length}</strong> &nbsp;•&nbsp; 2025-2026 : <strong>${old.length}</strong> &nbsp;•&nbsp; 2024-2025 : <strong>${old2.length}</strong>`;let all=[...cur,...old,...old2].sort((a,b)=>(date(b.Date_de_saisie)?.getTime()||0)-(date(a.Date_de_saisie)?.getTime()||0));await loadSuiviFor(cur);if(generation!==establishmentLoadGeneration)return;let lastSchoolYear=null;$("history").innerHTML=all.length?all.map(f=>{const level=displayLevel(f.Niveau);const warning=level==="3"?'<span class="level-warning" title="Fait de niveau 3" aria-label="Fait de niveau 3">⚠</span>':"";const schoolYear=String(f.Annee_scolaire|| (f._source===T.CUR?"2026-2027":f._source===T.OLD?"2025-2026":"2024-2025"));const separator=schoolYear!==lastSchoolYear?`<div class="school-year-separator"><span>Année scolaire ${esc(schoolYear)}</span></div>`:"";lastSchoolYear=schoolYear;const oldYear=isArchivedFact(f);return `${separator}<div class="event ${oldYear?"old-school-year":""}"><div class="event-title">FE n°${esc(f.Numero_FE)} — <span class="${level==="3"?"event-level3":""}">Niveau ${esc(level)}</span> ${warning}</div><div class="event-meta">${dateFR(f.Date_de_saisie)} — ${esc(schoolYear)} — Équipier : ${esc(isArchivedFact(f)?(String(f.Equipier||"N/A").trim()||"N/A"):eqName(suiviMap.get(feNumericKey(f.Numero_FE)) ? suiviMap.get(feNumericKey(f.Numero_FE)).Equipier : f.Equipier))}</div>${historyTypeBadges(f,level)}<div>${esc(cleanDisplayText((isArchivedFact(f) && (!String(f.Resume_du_fait||"").trim() || norm(f.Resume_du_fait).includes("resume non renseigne"))) ? (f.Expose_des_faits||"Résumé non renseigné") : (f.Resume_du_fait||"Résumé non renseigné")))}</div><button class="btn" style="margin-top:7px" data-hist="${f._source}:${f.id}">Ouvrir la fiche</button></div>`}).join(""):'<div class="muted">Aucun fait trouvé pour cet UAI.</div>';if(generation!==establishmentLoadGeneration)return;const existing=new Set(rows.map(r=>`${r._source}:${r.id}`));all.forEach(f=>{const key=`${f._source}:${f.id}`;if(!existing.has(key)){rows.push(f);existing.add(key)}});document.querySelectorAll("[data-hist]").forEach(b=>b.onclick=()=>openFact(b.dataset.hist))}catch(e){if(generation===establishmentLoadGeneration)$("history").innerHTML='<div class="notice error">Impossible de charger l’historique : '+esc(e.message)+'</div>'}}
+async function openEstablishment(e,ref){const generation=++establishmentLoadGeneration;selectedEtab=e||etabMap.get(Number(ref))||null;$("etabBack").textContent=etabReturnTarget==="detail"?"← Retour à la fiche":"← Retour";$("detailView").classList.add("hidden");$("etabView").classList.remove("hidden");$("etabTitle").textContent=e?.Etablissement||selected?.Etablissement||"Établissement";$("etabSub").textContent=[e?.UAI,e?.Ville,e?.Departement].filter(Boolean).join(" — ");$("etabGrid").innerHTML=[info("UAI",e?.UAI),info("Degré",e?.Degre),info("Ville",e?.Ville),info("Département",e?.Departement),info("Bassin",e?.Bassin),info("Type",e?.Type_etablissement),info("Secteur",e?.Secteur),info("Code postal",e?.Code_postal)].join("");$("history").innerHTML='<div class="loading">Chargement de l’historique par UAI…</div>';$("etabCounts").textContent="Chargement du nombre de faits…";$("ambianceDisplay").classList.remove("hidden");$("ambianceEditor").classList.add("hidden");$("ambianceDisplay").innerHTML='<div class="loading">Chargement…</div>';loadAmbiance(e);try{let [cur,old,old2]=await Promise.all([apiAllPaged(T.CUR,{filter:{UAI:[ref]},sort:"-Date_de_saisie"}),apiAllPaged(T.OLD,{filter:{UAI:[ref]},sort:"-Date_de_saisie"}),apiAllPaged(T.OLD2,{filter:{UAI:[ref]},sort:"-Date_de_saisie"})]);if(generation!==establishmentLoadGeneration)return;cur=cur.filter(isActiveFact);$("etabCounts").innerHTML=`<strong>Nombre de faits établissement :</strong> 2026-2027 : <strong>${cur.length}</strong> &nbsp;•&nbsp; 2025-2026 : <strong>${old.length}</strong> &nbsp;•&nbsp; 2024-2025 : <strong>${old2.length}</strong>`;let all=[...cur,...old,...old2].sort((a,b)=>(date(b.Date_de_saisie)?.getTime()||0)-(date(a.Date_de_saisie)?.getTime()||0));await loadSuiviFor(cur);if(generation!==establishmentLoadGeneration)return;let lastSchoolYear=null;$("history").innerHTML=all.length?all.map(f=>{const level=displayLevel(f.Niveau);const warning=level==="3"?'<span class="level-warning" title="Fait de niveau 3" aria-label="Fait de niveau 3">⚠</span>':"";const schoolYear=String(f.Annee_scolaire|| (f._source===T.CUR?"2026-2027":f._source===T.OLD?"2025-2026":"2024-2025"));const separator=schoolYear!==lastSchoolYear?`<div class="school-year-separator"><span>Année scolaire ${esc(schoolYear)}</span></div>`:"";lastSchoolYear=schoolYear;const oldYear=isArchivedFact(f);return `${separator}<div class="event ${oldYear?"old-school-year":""}"><div class="event-title">FE n°${esc(f.Numero_FE)} — <span class="${level==="3"?"event-level3":""}">Niveau ${esc(level)}</span> ${warning}</div><div class="event-meta">${dateFR(f.Date_de_saisie)} — ${esc(schoolYear)} — Équipier : ${esc(isArchivedFact(f)?(String(f.Equipier||"N/A").trim()||"N/A"):eqName(suiviMap.get(feNumericKey(f.Numero_FE)) ? suiviMap.get(feNumericKey(f.Numero_FE)).Equipier : f.Equipier))}</div>${historyTypeBadges(f,level)}<div>${esc(cleanDisplayText((isArchivedFact(f) && (!String(f.Resume_du_fait||"").trim() || norm(f.Resume_du_fait).includes("resume non renseigne"))) ? (f.Expose_des_faits||"Résumé non renseigné") : (f.Resume_du_fait||"Résumé non renseigné")))}</div><button class="btn" style="margin-top:7px" data-hist="${f._source}:${f.id}">Ouvrir la fiche</button></div>`}).join(""):'<div class="muted">Aucun fait trouvé pour cet UAI.</div>';if(generation!==establishmentLoadGeneration)return;const existing=new Set(rows.map(r=>`${r._source}:${r.id}`));all.forEach(f=>{const key=`${f._source}:${f.id}`;if(!existing.has(key)){rows.push(f);existing.add(key)}});document.querySelectorAll("[data-hist]").forEach(b=>b.onclick=()=>openFact(b.dataset.hist))}catch(e){if(generation===establishmentLoadGeneration)$("history").innerHTML='<div class="notice error">Impossible de charger l’historique : '+esc(e.message)+'</div>'}}
 document.querySelectorAll("[data-inline-edit]").forEach(b=>b.onclick=()=>editInlineField(b.dataset.inlineEdit));
 document.querySelectorAll("[data-inline-cancel]").forEach(b=>b.onclick=()=>cancelInlineField(b.dataset.inlineCancel));
 document.querySelectorAll("[data-inline-save]").forEach(b=>b.onclick=()=>saveInlineField(b.dataset.inlineSave));
@@ -2086,7 +2068,7 @@ $("ambianceCancel").onclick=cancelAmbiance;
 $("ambianceSave").onclick=saveAmbiance;
 
 $("q").onkeydown=async e=>{if(e.key!=="Enter")return;e.preventDefault();let raw=$("q").value.trim();if(!raw){rows=[...currentRows];page=1;render();return}let idMatch=/^id\s*=\s*(\d+)$/i.exec(raw);if(idMatch){await searchOperationalId(idMatch[1])}else if(/^\d{6,}$/.test(raw)){await searchExactFE(raw)}else{rows=[...currentRows];page=1;render();await renderEtabMatches(raw)}};
-$("equipier").onchange=()=>{equipierSelectionTouched=true};["dep","degree","level","status","equipierFilter"].forEach(id=>$(id).onchange=()=>{page=1;render()});$("daySelect").onchange=()=>{if($("daySelect").value)$("weekSelect").value="";loadCurrent()};$("weekSelect").onchange=()=>{if($("weekSelect").value)$("daySelect").value="";loadCurrent()};$("prev").onclick=()=>{page--;render()};$("next").onclick=()=>{page++;render()};$("exportFePdf").onclick=exportCurrentFePdf;$("assignOperationalId").onclick=assignOperationalId;
+$("equipier").onchange=()=>{equipierSelectionTouched=true};["dep","degree","level","status","equipierFilter"].forEach(id=>$(id).onchange=()=>{page=1;render()});$("daySelect").onchange=()=>{loadCurrent()};$("weekSelect").onchange=()=>{populateDayOptions($("weekSelect").value);loadCurrent()};$("prev").onclick=()=>{page--;render()};$("next").onclick=()=>{page++;render()};$("exportFePdf").onclick=exportCurrentFePdf;$("assignOperationalId").onclick=assignOperationalId;
 $("back").onclick=async()=>{if(!(await confirmLeaveIfDirty()))return;await releaseCurrentEditResources();opsCleanSnapshot=null;ambianceCleanSnapshot=null;const wasOperationalSearch=/^id\s*=\s*\d+$/i.test($("q").value.trim());if(wasOperationalSearch){$("q").value="";rows=[...currentRows];page=1;notice("")}$("detailView").classList.add("hidden");$("listView").classList.remove("hidden");render()};$("openEtab").onclick=showEstablishment;$("etabBack").onclick=async()=>{if(!(await confirmLeaveIfDirty()))return;const lockUai=String(selectedEtab?.UAI||"").trim();await releaseEditLock("ETAB",lockUai);currentEtabLock=null;ambianceCleanSnapshot=null;$("etabView").classList.add("hidden");if(etabReturnTarget==="detail"&&selected){$("detailView").classList.remove("hidden");markOpsClean()}else{$("listView").classList.remove("hidden");render()}};$("save").onclick=saveOps;$("toggleDone").onclick=toggleDone;$("resetFollowup").onclick=resetFollowup;
 (async()=>{try{initIssueJournal();initActivityFields();
 // Chargements indépendants en parallèle : référentiels, identifiants et index des périodes.
@@ -2094,10 +2076,11 @@ await loadSmallTables();
 const startupWeek=isoWeekInfo(new Date()),startupKey=`${startupWeek.year}-W${String(startupWeek.week).padStart(2,"0")}`;
 $("weekSelect").innerHTML=`<option value="${startupKey}">S${String(startupWeek.week).padStart(2,"0")} — semaine actuelle</option>`;
 $("weekSelect").value=startupKey;
+loadPeriodOptions();
 await loadCurrent();
 // Les tâches volumineuses sont lancées après l'affichage initial et ne bloquent plus les FE.
 void loadOperationalIds().catch(e=>console.warn("Index ID_FE indisponible",e));
-void loadPeriodOptions().catch(e=>console.warn("Index périodes indisponible",e));
+// Aucun balayage annuel des FE : les périodes sont un calendrier local.
 void detectCurrentEquipier().then(()=>issueSync(true)).catch(e=>console.warn(e));
 setInterval(()=>{if(!document.hidden)void issueSync()},60000);wireTemporaryClaimTriggers();startLiveRefresh();initFeBell();startClaimHeartbeat();startEditLockHeartbeat();setInterval(retryDeferredActivity,30000);repairLegacyChoiceLists()}catch(e){console.error(e);notice("Erreur Grist : "+e.message,"error");$("body").innerHTML='<tr><td colspan="9" class="loading">Impossible de charger les données.</td></tr>'}})();
 </script></body></html>
