@@ -59,7 +59,7 @@ select{background-color:#fff!important;color-scheme:light!important;}
 .bellHead{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
 .bellItem{width:100%;text-align:left;border:1px solid #c9d9ee;background:#f2f7ff;color:#294b73;border-radius:8px;padding:10px;margin:4px 0;cursor:pointer;font-size:12px;line-height:1.5}
 .bellItem strong{display:block}
-.bellRow{display:flex;align-items:stretch;gap:6px}.bellRow .bellItem{flex:1;min-width:0}.bellDelete{align-self:center;border:1px solid #e4c9c9;background:#fff7f7;color:#9c3434;border-radius:7px;padding:9px;cursor:pointer}.bellDelete:hover{background:#fee2e2}.bellClear{font-size:12px;border:1px solid #d3dce8;border-radius:6px;background:white;padding:5px 7px;cursor:pointer}
+.bellRow{display:flex;align-items:stretch;gap:6px}.bellRow .bellItem{flex:1;min-width:0}.bellDelete{align-self:center;border:1px solid #e4c9c9;background:#fff7f7;color:#9c3434;border-radius:7px;padding:9px;cursor:pointer}.bellDelete:hover{background:#fee2e2}.bellClear{font-size:12px;border:1px solid #d3dce8;border-radius:6px;background:#fff;color:#344054!important;padding:5px 7px;cursor:pointer;white-space:nowrap;min-width:max-content}.bellClear:disabled{color:#667085!important;opacity:.65;cursor:not-allowed}.bellHead>span{display:flex;align-items:center;gap:5px}
 .bellEmpty{font-size:12px;color:#64748b;padding:12px}
 .toast{position:relative;overflow:hidden}
 .toast-progress{position:absolute;bottom:0;left:0;height:3px;background:currentColor;opacity:.5;width:100%;transform-origin:left;animation:toastDrain var(--toast-duration,10s) linear forwards}
@@ -78,7 +78,7 @@ select{background-color:#fff!important;color-scheme:light!important;}
 .issue-row small{color:#667085;display:block;margin-bottom:5px}
 .issue-row strong{display:block;margin-bottom:4px}
 </style>
-</head><body><div id="notificationHub"><button id="bellButton" type="button" aria-label="Centre d’information" title="Nouveaux FE">🔔<span id="bellCount" hidden>0</span></button><div id="notificationPanel" hidden><div class="bellHead"><strong>Nouveaux FE</strong><span><button type="button" class="bellClear" id="bellClear">Tout supprimer</button> <button type="button" id="bellClose">Fermer</button></span></div><div id="bellItems"></div></div></div><div id="toastStack" aria-live="polite" aria-atomic="false"></div><main class="page">
+</head><body><div id="notificationHub"><button id="bellButton" type="button" aria-label="Centre d’information" title="Nouveaux FE">🔔<span id="bellCount" hidden>0</span></button><div id="notificationPanel" hidden><div class="bellHead"><strong>Nouveaux FE</strong><span><button type="button" class="bellClear" id="bellClear">Tout supprimer</button></span></div><div id="bellItems"></div></div></div><div id="toastStack" aria-live="polite" aria-atomic="false"></div><main class="page">
 <section id="listView" class="card">
  <div class="top"><div><h1>Bureau des légendes</h1><div class="muted">Car vous êtes des légendes — Consultation et suivi des faits d’établissement — 34 et 48</div></div></div>
  <div class="periodbar">
@@ -968,7 +968,6 @@ async function feNoticeMarkViewed(){
 }
 async function initFeBell(){
   $("bellButton").onclick=async()=>{const panel=$("notificationPanel");panel.hidden=!panel.hidden;if(!panel.hidden){if(!feNoticeState){try{if(!currentEquipier)await detectCurrentEquipier();await feNoticeInitialize();if(!feNoticeTimer)feNoticeTimer=setInterval(pollNewFE,FE_NOTIFY_POLL_MS)}catch(e){console.warn("Notifications : identité Grist toujours indisponible",e);return}}await feNoticeMarkViewed()}};
-  $("bellClose").onclick=()=>$("notificationPanel").hidden=true;
   $("bellClear").onclick=()=>void feNoticeDelete(feNoticeVisible().map(x=>x.id));
   renderFeBell();
   try{
