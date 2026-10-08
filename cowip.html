@@ -59,6 +59,7 @@ select{background-color:#fff!important;color-scheme:light!important;}
 .bellHead{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
 .bellItem{width:100%;text-align:left;border:1px solid #c9d9ee;background:#f2f7ff;color:#294b73;border-radius:8px;padding:10px;margin:4px 0;cursor:pointer;font-size:12px;line-height:1.5}
 .bellItem strong{display:block}
+.bellRow{display:flex;align-items:stretch;gap:6px}.bellRow .bellItem{flex:1;min-width:0}.bellDelete{align-self:center;border:1px solid #e4c9c9;background:#fff7f7;color:#9c3434;border-radius:7px;padding:9px;cursor:pointer}.bellDelete:hover{background:#fee2e2}.bellClear{font-size:12px;border:1px solid #d3dce8;border-radius:6px;background:white;padding:5px 7px;cursor:pointer}
 .bellEmpty{font-size:12px;color:#64748b;padding:12px}
 .toast{position:relative;overflow:hidden}
 .toast-progress{position:absolute;bottom:0;left:0;height:3px;background:currentColor;opacity:.5;width:100%;transform-origin:left;animation:toastDrain var(--toast-duration,10s) linear forwards}
@@ -77,7 +78,7 @@ select{background-color:#fff!important;color-scheme:light!important;}
 .issue-row small{color:#667085;display:block;margin-bottom:5px}
 .issue-row strong{display:block;margin-bottom:4px}
 </style>
-</head><body><div id="notificationHub"><button id="bellButton" type="button" aria-label="Centre d’information" title="Nouveaux FE">🔔<span id="bellCount" hidden>0</span></button><div id="notificationPanel" hidden><div class="bellHead"><strong>Nouveaux FE</strong><button type="button" id="bellClose">Fermer</button></div><div id="bellItems"></div></div></div><div id="toastStack" aria-live="polite" aria-atomic="false"></div><main class="page">
+</head><body><div id="notificationHub"><button id="bellButton" type="button" aria-label="Centre d’information" title="Nouveaux FE">🔔<span id="bellCount" hidden>0</span></button><div id="notificationPanel" hidden><div class="bellHead"><strong>Nouveaux FE</strong><span><button type="button" class="bellClear" id="bellClear">Tout supprimer</button> <button type="button" id="bellClose">Fermer</button></span></div><div id="bellItems"></div></div></div><div id="toastStack" aria-live="polite" aria-atomic="false"></div><main class="page">
 <section id="listView" class="card">
  <div class="top"><div><h1>Bureau des légendes</h1><div class="muted">Car vous êtes des légendes — Consultation et suivi des faits d’établissement — 34 et 48</div></div></div>
  <div class="periodbar">
@@ -773,15 +774,37 @@ async function loadSuiviFor(facts){
 const FE_NOTIFY_POLL_MS=15000,feNoticeHistory=[],feSeenIds=new Set();
 let feNoticeBusy=false,feNoticeTimer=null,feNoticeUnread=0,feNoticeReady=false,feNoticeState=null,feNoticeEmail="",feNoticeLastId=0;
 function feNoticeTime(ts){return new Intl.DateTimeFormat("fr-FR",{hour:"2-digit",minute:"2-digit",day:"2-digit",month:"2-digit"}).format(new Date(ts))}
+function feNoticeVisible(){return feNoticeHistory.filter(x=>!x.deleted&&feNoticeAllowedDepartment(x))}
 function renderFeBell(){
+  feNoticeHistory.splice(0,feNoticeHistory.length,...feNoticeTrim(feNoticeHistory));
+  const visible=feNoticeVisible();
+  feNoticeUnread=visible.filter(x=>Number(x.arrived)>Number(feNoticeState?.Derniere_consultation||0)).length;
   $("bellCount").textContent=String(feNoticeUnread);$("bellCount").hidden=feNoticeUnread===0;
+  $("bellClear").disabled=!visible.length;
   $("bellItems").replaceChildren();
-  if(!feNoticeHistory.length){const p=document.createElement("div");p.className="bellEmpty";p.textContent="Aucun nouveau FE enregistré."; $("bellItems").appendChild(p);return}
-  for(const item of feNoticeHistory){
+  if(!visible.length){const p=document.createElement("div");p.className="bellEmpty";p.textContent="Aucun nouveau FE enregistré.";$("bellItems").appendChild(p);return}
+  for(const item of visible){
+    const row=document.createElement("div");row.className="bellRow";
     const btn=document.createElement("button");btn.type="button";btn.className="bellItem";
     const h=document.createElement("strong");h.textContent=`Nouveau FE · Niveau ${item.niveau}`;
     const d=document.createElement("span");d.textContent=`${item.etab} — ${item.ville} · ${item.numero} · Arrivé le ${feNoticeTime(item.arrived)}`;
-    btn.append(h,d);btn.onclick=()=>openNotifiedFE(item);$("bellItems").appendChild(btn);
+    btn.append(h,d);btn.onclick=()=>openNotifiedFE(item);
+    const del=document.createElement("button");del.type="button";del.className="bellDelete";del.textContent="✕";del.title="Supprimer cette notification";del.setAttribute("aria-label",`Supprimer la notification ${item.numero}`);
+    del.onclick=()=>void feNoticeDelete([item.id]);
+    row.append(btn,del);$("bellItems").appendChild(row);
+  }
+}
+async function feNoticeDelete(ids){
+  if(!feNoticeReady||!feNoticeState)return;
+  const wanted=new Set(ids.map(Number));
+  const previous=feNoticeHistory.map(x=>({...x}));
+  for(const item of feNoticeHistory)if(wanted.has(Number(item.id)))item.deleted=true;
+  renderFeBell();
+  try{await feNoticePersist()}
+  catch(e){
+    // En cas d'échec, ne pas prétendre que la suppression a été enregistrée.
+    feNoticeHistory.splice(0,feNoticeHistory.length,...previous);renderFeBell();
+    toast(e.message,"error","Suppression non enregistrée");
   }
 }
 async function openNotifiedFE(item){
@@ -793,6 +816,7 @@ async function openNotifiedFE(item){
   }catch(e){toast(e.message,"error","Ouverture impossible")}
 }
 function feNoticeIdentity(){
+  if(!identityVerified||!currentEquipier)throw new Error("Identité Grist non vérifiée : notifications suspendues jusqu'à l'identification automatique.");
   const profileEmail=normalizedEmail(currentUserProfile?.email||currentUserProfile?.loginEmail);
   const equipierEmail=normalizedEmail(currentEquipier?.Email||currentEquipier?.email);
   // L'e-mail du profil prévaut ; le repli EQUIPIERS n'est autorisé qu'après
@@ -804,12 +828,25 @@ function feNoticeIdentity(){
   if(!email)throw new Error("Adresse e-mail indisponible : compte Grist non rapproché d'un équipier unique.");
   return email;
 }
+function feNoticeWindowStart(){
+  const now=new Date(),start=new Date(now.getFullYear(),now.getMonth(),now.getDate()-1);
+  return start.getTime()+1000;
+}
+function feNoticeAllowedDepartment(item){
+  // Les notifications historiques sans département vérifié ne sont pas affichées.
+  // Les nouveaux FE sont filtrés à la source et portent leur département explicite.
+  return ["34","48"].includes(depCode(item?.departement));
+}
+function feNoticeTrim(items){
+  const min=feNoticeWindowStart();
+  return items.filter(x=>Number(x.arrived)>=min&&feNoticeAllowedDepartment(x));
+}
 function feNoticeRestore(row){
   feNoticeState=row;feNoticeLastId=Number(row.Dernier_FE_ID)||0;
   let history=[];try{history=JSON.parse(String(row.Historique_JSON||"[]"))}catch(e){console.warn("Historique de notifications illisible",e)}
-  feNoticeHistory.splice(0,feNoticeHistory.length,...(Array.isArray(history)?history:[]).filter(x=>x&&Number.isFinite(Number(x.id))).slice(0,100));
+  feNoticeHistory.splice(0,feNoticeHistory.length,...(Array.isArray(history)?history:[]).filter(x=>x&&Number.isFinite(Number(x.id))).filter(x=>Number(x.arrived)>=feNoticeWindowStart()&&feNoticeAllowedDepartment(x)));
   const viewed=Number(row.Derniere_consultation)||0;
-  feNoticeUnread=feNoticeHistory.filter(x=>Number(x.arrived)>viewed).length;
+  feNoticeUnread=feNoticeHistory.filter(x=>!x.deleted&&Number(x.arrived)>viewed).length;
   renderFeBell();
 }
 // Les écritures de cet onglet sont sérialisées et fusionnées avec la dernière lecture.
@@ -818,9 +855,11 @@ function feNoticeMergeHistory(local,remote){
   const byId=new Map();
   for(const item of [...remote,...local])if(item&&Number.isFinite(Number(item.id))){
     const key=Number(item.id),prev=byId.get(key);
-    if(!prev||Number(item.arrived)<Number(prev.arrived))byId.set(key,item);
+    if(!prev)byId.set(key,item);
+    else if(item.deleted&&!prev.deleted)byId.set(key,item);
+    else if(Boolean(item.deleted)===Boolean(prev.deleted)&&Number(item.arrived)<Number(prev.arrived))byId.set(key,item);
   }
-  return [...byId.values()].sort((a,b)=>Number(b.id)-Number(a.id)).slice(0,100);
+  return feNoticeTrim([...byId.values()].sort((a,b)=>Number(b.id)-Number(a.id)));
 }
 function feNoticePersist(viewedAt=null){
   const pending=feNoticeWriteQueue.catch(()=>{}).then(async()=>{
@@ -840,12 +879,12 @@ function feNoticePersist(viewedAt=null){
     const saved=confirmed[0];
     let savedHistory=[];
     try{savedHistory=JSON.parse(String(saved.Historique_JSON||"[]"))}catch(e){throw new Error("Historique des notifications illisible après sauvegarde.")}
-    if(!Array.isArray(savedHistory)||merged.some(item=>!savedHistory.some(x=>Number(x.id)===Number(item.id)))||Number(saved.Dernier_FE_ID||0)<cursor||Number(saved.Derniere_consultation||0)<viewed){
+    if(!Array.isArray(savedHistory)||merged.some(item=>!savedHistory.some(x=>Number(x.id)===Number(item.id)&&(!item.deleted||x.deleted)))||Number(saved.Dernier_FE_ID||0)<cursor||Number(saved.Derniere_consultation||0)<viewed){
       throw new Error("Une autre session a modifié les notifications pendant la sauvegarde. Actualisez la cloche.");
     }
     feNoticeState=saved;feNoticeLastId=Math.max(cursor,Number(saved.Dernier_FE_ID)||0);
     feNoticeHistory.splice(0,feNoticeHistory.length,...savedHistory);
-    feNoticeUnread=savedHistory.filter(x=>Number(x.arrived)>Number(saved.Derniere_consultation||0)).length;
+    feNoticeUnread=savedHistory.filter(x=>!x.deleted&&Number(x.arrived)>Number(saved.Derniere_consultation||0)).length;
     renderFeBell();
   });
   feNoticeWriteQueue=pending;return pending;
@@ -867,17 +906,36 @@ async function feNoticeInitialize(){
   if(found.length!==1)throw new Error("Initialisation ambiguë des notifications : vérifiez les lignes en doublon dans Grist.");
   feNoticeRestore(found[0]);feNoticeReady=true;
 }
+// Lecture mutualisée entre cloche et tableau : une seule requête récente par cycle.
+let recentFECache={at:0,rows:[],promise:null};
+async function recentFE(){
+  if(Date.now()-recentFECache.at<12000&&recentFECache.rows.length)return recentFECache.rows;
+  if(recentFECache.promise)return recentFECache.promise;
+  recentFECache.promise=(async()=>{
+    const list=await api(T.CUR,{sort:"-id",limit:100});
+    recentFECache.rows=list;recentFECache.at=Date.now();return list;
+  })();
+  try{return await recentFECache.promise}finally{recentFECache.promise=null}
+}
 async function pollNewFE(){
   if(feNoticeBusy||document.hidden||!feNoticeReady)return;
   feNoticeBusy=true;
   try{
     // Pagination jusqu'au curseur : aucun plafond fixe à 100/1000 nouveaux FE.
+    const recent=await recentFE();
+    if(!recent.length||Number(recent[0].id)<=feNoticeLastId)return;
     const newer=[];let offset=0,stop=false;
-    while(!stop&&offset<50000){
-      const batch=await api(T.CUR,{sort:"-id",limit:500,offset});
-      if(!batch.length)break;
-      for(const f of batch){if(Number(f.id)<=feNoticeLastId){stop=true;break}newer.push(f)}
-      if(batch.length<500)break;offset+=500;
+    // Le cas courant ne demande qu'une lecture mutualisée de 100 FE.
+    if(recent.some(f=>Number(f.id)<=feNoticeLastId)){
+      newer.push(...recent.filter(f=>Number(f.id)>feNoticeLastId));
+    }else{
+      // Rattrapage paginé uniquement si plus de 100 FE ont été ajoutés.
+      while(!stop&&offset<50000){
+        const batch=offset===0?recent:await api(T.CUR,{sort:"-id",limit:100,offset});
+        if(!batch.length)break;
+        for(const f of batch){if(Number(f.id)<=feNoticeLastId){stop=true;break}newer.push(f)}
+        if(batch.length<100)break;offset+=100;
+      }
     }
     if(!newer.length)return;
     const maxId=newer.reduce((max,f)=>Math.max(max,Number(f.id)||0),feNoticeLastId);
@@ -885,13 +943,13 @@ async function pollNewFE(){
     const added=[];
     for(const f of newcomers){
       if(feNoticeHistory.some(x=>Number(x.id)===Number(f.id)))continue;
-      const item={id:Number(f.id),numero:String(f.Numero_FE||""),niveau:String(f.Niveau||"—"),etab:String(f.Etablissement||"Établissement non renseigné"),ville:String(f.Ville||""),arrived:Date.now()};
+      const item={id:Number(f.id),numero:String(f.Numero_FE||""),niveau:String(f.Niveau||"—"),etab:String(f.Etablissement||"Établissement non renseigné"),ville:String(f.Ville||""),departement:factDept(f),arrived:Date.now()};
       feNoticeHistory.unshift(item);added.push(item);
     }
-    feNoticeHistory.length=Math.min(feNoticeHistory.length,100);
+    feNoticeHistory.splice(0,feNoticeHistory.length,...feNoticeTrim(feNoticeHistory));
     feNoticeLastId=maxId;
     await feNoticePersist(); // Fusion avec l'historique distant avant d'afficher les notifications.
-    feNoticeUnread=feNoticeHistory.filter(x=>Number(x.arrived)>Number(feNoticeState.Derniere_consultation||0)).length;
+    feNoticeUnread=feNoticeHistory.filter(x=>!x.deleted&&Number(x.arrived)>Number(feNoticeState.Derniere_consultation||0)).length;
     renderFeBell();
     for(const item of added)toast(`${item.etab} — ${item.ville} · ${item.numero}`,"info",`Nouveau FE · Niveau ${item.niveau}`,10000,()=>openNotifiedFE(item));
   }catch(e){toast(e.message,"error","Notifications indisponibles",6000);console.warn(e)}
@@ -906,10 +964,11 @@ async function feNoticeMarkViewed(){
 async function initFeBell(){
   $("bellButton").onclick=async()=>{const panel=$("notificationPanel");panel.hidden=!panel.hidden;if(!panel.hidden){if(!feNoticeState){try{if(!currentEquipier)await detectCurrentEquipier();await feNoticeInitialize();if(!feNoticeTimer)feNoticeTimer=setInterval(pollNewFE,FE_NOTIFY_POLL_MS)}catch(e){console.warn("Notifications : identité Grist toujours indisponible",e);return}}await feNoticeMarkViewed()}};
   $("bellClose").onclick=()=>$("notificationPanel").hidden=true;
+  $("bellClear").onclick=()=>void feNoticeDelete(feNoticeVisible().map(x=>x.id));
   renderFeBell();
   try{
     if(!currentEquipier)await detectCurrentEquipier();
-    await feNoticeInitialize();await pollNewFE();feNoticeTimer=setInterval(pollNewFE,FE_NOTIFY_POLL_MS);
+    await feNoticeInitialize();await pollNewFE();if(!feNoticeTimer)feNoticeTimer=setInterval(pollNewFE,FE_NOTIFY_POLL_MS);
   }catch(e){console.warn("Centre d’information indisponible ; nouvelle tentative à la prochaine ouverture",e)}
 }
 const LIVE_REFRESH_MS=10000; const CLAIM_TTL_SECONDS=180,CLAIM_HEARTBEAT_MS=30000;
@@ -942,10 +1001,76 @@ async function refreshLiveSuivi(){
   }catch(e){console.warn("Actualisation automatique SUIVI impossible",e)}
   finally{lastLiveRefreshAt=Date.now();liveRefreshBusy=false}
 }
-function startLiveRefresh(){if(liveRefreshTimer)clearInterval(liveRefreshTimer);liveRefreshTimer=setInterval(refreshLiveSuivi,LIVE_REFRESH_MS)}
+let feListLiveTimer=null,feListLiveBusy=false,feListLiveLastMax=0;
+let livePeriodKey="",livePeriodFingerprint="",liveEtabFingerprint="",liveEtabPending=false;
+let liveRecentMax=0,liveLastFullCheck=0,liveLastEtabCheck=0;
+function feListSignature(facts){
+  return facts.map(f=>[f.id,f.Numero_FE,f.Date_de_saisie,f.Actif_FE,f.Niveau,f.Resume_du_fait,f.Expose_des_faits,f.Etablissement,f.UAI].join("~")).sort().join("|");
+}
+async function refreshLiveFEList(){
+  if(feListLiveBusy||document.hidden)return;
+  feListLiveBusy=true;
+  try{
+    const spec=periodSpec();if(!spec)return;
+    const key=spec.dates.join(",");
+    const latest=await recentFE();
+    const latestId=Math.max(0,...latest.map(f=>Number(f.id)||0));
+    const changed=latestId>liveRecentMax;
+    liveRecentMax=Math.max(liveRecentMax,latestId);
+    const force=key!==livePeriodKey||Date.now()-liveLastFullCheck>=15000;
+    // Contrôle intégral de la période affichée toutes les 15 secondes,
+    // même sans ajout, pour détecter les modifications des FE existants.
+    if(!changed&&!force)return;
+    liveLastFullCheck=Date.now();
+    // Le filtre Grist ne charge QUE la période sélectionnée, quelle que soit la vue ouverte.
+    const fetched=await apiAllPaged(T.CUR,{filter:{Date_de_saisie:spec.dates},sort:"-id",pageSize:500,maxRows:5000});
+    const fresh=fetched.filter(isCurrentOperationalFact).sort((a,b)=>(Number(b.id)||0)-(Number(a.id)||0));
+    const fingerprint=feListSignature(fresh);
+    if(key!==livePeriodKey){livePeriodKey=key;livePeriodFingerprint=feListSignature(currentRows)}
+    if(fingerprint!==livePeriodFingerprint){
+      const previous=new Set(currentRows.map(f=>Number(f.id)));
+      livePeriodFingerprint=fingerprint;
+      currentRows=fresh;
+      // Conserver les FE historiques et les résultats de recherche déjà ouverts.
+      const inPeriod=new Set(fresh.map(f=>`${T.CUR}:${f.id}`));
+      rows=[...fresh,...rows.filter(f=>f._source!==T.CUR||!previous.has(Number(f.id))&&!inPeriod.has(`${T.CUR}:${f.id}`))];
+      await Promise.all([loadSuiviFor(fresh),loadClaimsFor(fresh)]);
+      // render() ne ferme pas la fiche ou l'établissement consulté.
+      render();
+      if(selected&&selected._source===T.CUR){
+        const replacement=fresh.find(f=>Number(f.id)===Number(selected.id));
+        if(replacement)selected=replacement;
+      }
+    }
+    // L'historique d'un établissement doit également suivre les ajouts hors de la semaine affichée.
+    if(selectedEtab&&!$("etabView").classList.contains("hidden")){
+      const uai=Number(selectedEtab.UAI);
+      if(Number.isFinite(uai)){
+        const facts=await apiAllPaged(T.CUR,{filter:{UAI:[uai]},sort:"-id",pageSize:500,maxRows:5000});
+        const active=facts.filter(isActiveFact);
+        const sig=feListSignature(active);
+        if(!liveEtabFingerprint){liveEtabFingerprint=sig}
+        else if(sig!==liveEtabFingerprint){
+          liveEtabFingerprint=sig;
+          if(!$("ambianceEditor").classList.contains("hidden")){liveEtabPending=true}
+          else{liveEtabPending=false;await openEstablishment(selectedEtab,uai)}
+        }
+      }
+    }else{liveEtabFingerprint="";liveEtabPending=false}
+  }catch(e){console.warn("Actualisation FE en arrière-plan indisponible",e)}
+  finally{feListLiveBusy=false}
+}
+function startLiveRefresh(){
+  if(liveRefreshTimer)clearInterval(liveRefreshTimer);
+  liveRefreshTimer=setInterval(refreshLiveSuivi,LIVE_REFRESH_MS);
+  if(feListLiveTimer)clearInterval(feListLiveTimer);
+  feListLiveTimer=setInterval(refreshLiveFEList,15000);
+  // Premier passage après chargement initial, puis toutes les 15 secondes.
+  void refreshLiveFEList();
+}
 document.addEventListener("visibilitychange",async()=>{
   if(document.hidden)return;
-  await refreshLiveSuivi();
+  await Promise.allSettled([refreshLiveSuivi(),refreshLiveFEList(),pollNewFE()]);
   // Au retour d'un onglet en veille, ne jamais considérer un ancien verrou local comme encore acquis.
   if(selectedEtab&&currentEtabLock){
     const key=String(selectedEtab.UAI||"").trim();
@@ -2060,7 +2185,7 @@ async function saveAmbiance(){
 }
 
 let establishmentLoadGeneration=0;
-async function openEstablishment(e,ref){const generation=++establishmentLoadGeneration;selectedEtab=e||etabMap.get(Number(ref))||null;$("etabBack").textContent=etabReturnTarget==="detail"?"← Retour à la fiche":"← Retour";$("detailView").classList.add("hidden");$("etabView").classList.remove("hidden");$("etabTitle").textContent=e?.Etablissement||selected?.Etablissement||"Établissement";$("etabSub").textContent=[e?.UAI,e?.Ville,e?.Departement].filter(Boolean).join(" — ");$("etabGrid").innerHTML=[info("UAI",e?.UAI),info("Degré",e?.Degre),info("Ville",e?.Ville),info("Département",e?.Departement),info("Bassin",e?.Bassin),info("Type",e?.Type_etablissement),info("Secteur",e?.Secteur),info("Code postal",e?.Code_postal)].join("");$("history").innerHTML='<div class="loading">Chargement de l’historique par UAI…</div>';$("etabCounts").textContent="Chargement du nombre de faits…";$("ambianceDisplay").classList.remove("hidden");$("ambianceEditor").classList.add("hidden");$("ambianceDisplay").innerHTML='<div class="loading">Chargement…</div>';loadAmbiance(e);try{let [cur,old,old2]=await Promise.all([apiAllPaged(T.CUR,{filter:{UAI:[ref]},sort:"-Date_de_saisie"}),apiAllPaged(T.OLD,{filter:{UAI:[ref]},sort:"-Date_de_saisie"}),apiAllPaged(T.OLD2,{filter:{UAI:[ref]},sort:"-Date_de_saisie"})]);if(generation!==establishmentLoadGeneration)return;cur=cur.filter(isActiveFact);$("etabCounts").innerHTML=`<strong>Nombre de faits établissement :</strong> 2026-2027 : <strong>${cur.length}</strong> &nbsp;•&nbsp; 2025-2026 : <strong>${old.length}</strong> &nbsp;•&nbsp; 2024-2025 : <strong>${old2.length}</strong>`;let all=[...cur,...old,...old2].sort((a,b)=>(date(b.Date_de_saisie)?.getTime()||0)-(date(a.Date_de_saisie)?.getTime()||0));await loadSuiviFor(cur);if(generation!==establishmentLoadGeneration)return;let lastSchoolYear=null;$("history").innerHTML=all.length?all.map(f=>{const level=displayLevel(f.Niveau);const warning=level==="3"?'<span class="level-warning" title="Fait de niveau 3" aria-label="Fait de niveau 3">⚠</span>':"";const schoolYear=String(f.Annee_scolaire|| (f._source===T.CUR?"2026-2027":f._source===T.OLD?"2025-2026":"2024-2025"));const separator=schoolYear!==lastSchoolYear?`<div class="school-year-separator"><span>Année scolaire ${esc(schoolYear)}</span></div>`:"";lastSchoolYear=schoolYear;const oldYear=isArchivedFact(f);return `${separator}<div class="event ${oldYear?"old-school-year":""}"><div class="event-title">FE n°${esc(f.Numero_FE)} — <span class="${level==="3"?"event-level3":""}">Niveau ${esc(level)}</span> ${warning}</div><div class="event-meta">${dateFR(f.Date_de_saisie)} — ${esc(schoolYear)} — Équipier : ${esc(isArchivedFact(f)?(String(f.Equipier||"N/A").trim()||"N/A"):eqName(suiviMap.get(feNumericKey(f.Numero_FE)) ? suiviMap.get(feNumericKey(f.Numero_FE)).Equipier : f.Equipier))}</div>${historyTypeBadges(f,level)}<div>${esc(cleanDisplayText((isArchivedFact(f) && (!String(f.Resume_du_fait||"").trim() || norm(f.Resume_du_fait).includes("resume non renseigne"))) ? (f.Expose_des_faits||"Résumé non renseigné") : (f.Resume_du_fait||"Résumé non renseigné")))}</div><button class="btn" style="margin-top:7px" data-hist="${f._source}:${f.id}">Ouvrir la fiche</button></div>`}).join(""):'<div class="muted">Aucun fait trouvé pour cet UAI.</div>';if(generation!==establishmentLoadGeneration)return;const existing=new Set(rows.map(r=>`${r._source}:${r.id}`));all.forEach(f=>{const key=`${f._source}:${f.id}`;if(!existing.has(key)){rows.push(f);existing.add(key)}});document.querySelectorAll("[data-hist]").forEach(b=>b.onclick=()=>openFact(b.dataset.hist))}catch(e){if(generation===establishmentLoadGeneration)$("history").innerHTML='<div class="notice error">Impossible de charger l’historique : '+esc(e.message)+'</div>'}}
+async function openEstablishment(e,ref){if(Number(selectedEtab?.UAI)!==Number(ref))liveEtabFingerprint="";const generation=++establishmentLoadGeneration;selectedEtab=e||etabMap.get(Number(ref))||null;$("etabBack").textContent=etabReturnTarget==="detail"?"← Retour à la fiche":"← Retour";$("detailView").classList.add("hidden");$("etabView").classList.remove("hidden");$("etabTitle").textContent=e?.Etablissement||selected?.Etablissement||"Établissement";$("etabSub").textContent=[e?.UAI,e?.Ville,e?.Departement].filter(Boolean).join(" — ");$("etabGrid").innerHTML=[info("UAI",e?.UAI),info("Degré",e?.Degre),info("Ville",e?.Ville),info("Département",e?.Departement),info("Bassin",e?.Bassin),info("Type",e?.Type_etablissement),info("Secteur",e?.Secteur),info("Code postal",e?.Code_postal)].join("");$("history").innerHTML='<div class="loading">Chargement de l’historique par UAI…</div>';$("etabCounts").textContent="Chargement du nombre de faits…";$("ambianceDisplay").classList.remove("hidden");$("ambianceEditor").classList.add("hidden");$("ambianceDisplay").innerHTML='<div class="loading">Chargement…</div>';loadAmbiance(e);try{let [cur,old,old2]=await Promise.all([apiAllPaged(T.CUR,{filter:{UAI:[ref]},sort:"-Date_de_saisie"}),apiAllPaged(T.OLD,{filter:{UAI:[ref]},sort:"-Date_de_saisie"}),apiAllPaged(T.OLD2,{filter:{UAI:[ref]},sort:"-Date_de_saisie"})]);if(generation!==establishmentLoadGeneration)return;cur=cur.filter(isActiveFact);$("etabCounts").innerHTML=`<strong>Nombre de faits établissement :</strong> 2026-2027 : <strong>${cur.length}</strong> &nbsp;•&nbsp; 2025-2026 : <strong>${old.length}</strong> &nbsp;•&nbsp; 2024-2025 : <strong>${old2.length}</strong>`;let all=[...cur,...old,...old2].sort((a,b)=>(date(b.Date_de_saisie)?.getTime()||0)-(date(a.Date_de_saisie)?.getTime()||0));await loadSuiviFor(cur);if(generation!==establishmentLoadGeneration)return;let lastSchoolYear=null;$("history").innerHTML=all.length?all.map(f=>{const level=displayLevel(f.Niveau);const warning=level==="3"?'<span class="level-warning" title="Fait de niveau 3" aria-label="Fait de niveau 3">⚠</span>':"";const schoolYear=String(f.Annee_scolaire|| (f._source===T.CUR?"2026-2027":f._source===T.OLD?"2025-2026":"2024-2025"));const separator=schoolYear!==lastSchoolYear?`<div class="school-year-separator"><span>Année scolaire ${esc(schoolYear)}</span></div>`:"";lastSchoolYear=schoolYear;const oldYear=isArchivedFact(f);return `${separator}<div class="event ${oldYear?"old-school-year":""}"><div class="event-title">FE n°${esc(f.Numero_FE)} — <span class="${level==="3"?"event-level3":""}">Niveau ${esc(level)}</span> ${warning}</div><div class="event-meta">${dateFR(f.Date_de_saisie)} — ${esc(schoolYear)} — Équipier : ${esc(isArchivedFact(f)?(String(f.Equipier||"N/A").trim()||"N/A"):eqName(suiviMap.get(feNumericKey(f.Numero_FE)) ? suiviMap.get(feNumericKey(f.Numero_FE)).Equipier : f.Equipier))}</div>${historyTypeBadges(f,level)}<div>${esc(cleanDisplayText((isArchivedFact(f) && (!String(f.Resume_du_fait||"").trim() || norm(f.Resume_du_fait).includes("resume non renseigne"))) ? (f.Expose_des_faits||"Résumé non renseigné") : (f.Resume_du_fait||"Résumé non renseigné")))}</div><button class="btn" style="margin-top:7px" data-hist="${f._source}:${f.id}">Ouvrir la fiche</button></div>`}).join(""):'<div class="muted">Aucun fait trouvé pour cet UAI.</div>';if(generation!==establishmentLoadGeneration)return;const existing=new Set(rows.map(r=>`${r._source}:${r.id}`));all.forEach(f=>{const key=`${f._source}:${f.id}`;if(!existing.has(key)){rows.push(f);existing.add(key)}});document.querySelectorAll("[data-hist]").forEach(b=>b.onclick=()=>openFact(b.dataset.hist))}catch(e){if(generation===establishmentLoadGeneration)$("history").innerHTML='<div class="notice error">Impossible de charger l’historique : '+esc(e.message)+'</div>'}}
 document.querySelectorAll("[data-inline-edit]").forEach(b=>b.onclick=()=>editInlineField(b.dataset.inlineEdit));
 document.querySelectorAll("[data-inline-cancel]").forEach(b=>b.onclick=()=>cancelInlineField(b.dataset.inlineCancel));
 document.querySelectorAll("[data-inline-save]").forEach(b=>b.onclick=()=>saveInlineField(b.dataset.inlineSave));
@@ -2083,6 +2208,6 @@ await loadCurrent();
 // Les tâches volumineuses sont lancées après l'affichage initial et ne bloquent plus les FE.
 void loadOperationalIds().catch(e=>console.warn("Index ID_FE indisponible",e));
 // Aucun balayage annuel des FE : les périodes sont un calendrier local.
-void detectCurrentEquipier().then(()=>issueSync(true)).catch(e=>console.warn(e));
-setInterval(()=>{if(!document.hidden)void issueSync()},60000);wireTemporaryClaimTriggers();startLiveRefresh();initFeBell();startClaimHeartbeat();startEditLockHeartbeat();setInterval(retryDeferredActivity,30000);repairLegacyChoiceLists()}catch(e){console.error(e);notice("Erreur Grist : "+e.message,"error");$("body").innerHTML='<tr><td colspan="9" class="loading">Impossible de charger les données.</td></tr>'}})();
+void detectCurrentEquipier().then(async()=>{await issueSync(true);if(!feNoticeReady){try{await feNoticeInitialize();await pollNewFE();if(!feNoticeTimer)feNoticeTimer=setInterval(pollNewFE,FE_NOTIFY_POLL_MS)}catch(e){console.warn("Notifications en attente d'identification :",e)}}}).catch(e=>console.warn(e));
+setInterval(()=>{if(!document.hidden)void issueSync()},60000);wireTemporaryClaimTriggers();startLiveRefresh();void initFeBell();startClaimHeartbeat();startEditLockHeartbeat();setInterval(retryDeferredActivity,30000);repairLegacyChoiceLists()}catch(e){console.error(e);notice("Erreur Grist : "+e.message,"error");$("body").innerHTML='<tr><td colspan="9" class="loading">Impossible de charger les données.</td></tr>'}})();
 </script></body></html>
