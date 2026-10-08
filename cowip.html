@@ -269,6 +269,7 @@ function toast(message,type="info",title="",duration=10000,onOpen=null){
 }
 function esc(v){return String(v??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;")}
 function norm(v){return String(v??"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/\s+/g," ").trim()}
+function normalizedEmail(v){return String(v??"").normalize("NFKC").replace(/[\u200B-\u200D\uFEFF]/g,"").trim().toLowerCase()}
 function date(v){if(!v)return null;if(typeof v==="number")return new Date(v*1000);let d=new Date(v);return isNaN(d)?null:d}
 function dateFR(v){let d=date(v);return d?new Intl.DateTimeFormat("fr-FR").format(d):"—"}
 function notice(s,type=""){
@@ -397,10 +398,10 @@ async function detectCurrentEquipier(){
         if(identityRow?.Email_Grist)break;
         await new Promise(resolve=>setTimeout(resolve,200+attempt*250));
       }
-      const email=String(identityRow?.Email_Grist||"").trim().toLowerCase();
+      const email=normalizedEmail(identityRow?.Email_Grist);
       const name=String(identityRow?.Nom_Grist||"").trim();
       if(!email)throw new Error("La colonne Email_Grist n'a pas été renseignée. Vérifiez la formule de déclenchement user.Email (nouveaux enregistrements).");
-      const matches=[...eqMap.values()].filter(e=>String(e.Email||e.email||"").trim().toLowerCase()===email);
+      const matches=[...eqMap.values()].filter(e=>normalizedEmail(e.Email||e.email)===email);
       if(matches.length!==1)throw new Error(matches.length?"Plusieurs équipiers portent l'adresse "+email:"Aucun équipier ne correspond à l'adresse Grist "+email);
       currentEquipier=matches[0];
       currentUserProfile={email,name};
@@ -792,8 +793,8 @@ async function openNotifiedFE(item){
   }catch(e){toast(e.message,"error","Ouverture impossible")}
 }
 function feNoticeIdentity(){
-  const profileEmail=String(currentUserProfile?.email||currentUserProfile?.loginEmail||"").trim().toLowerCase();
-  const equipierEmail=String(currentEquipier?.Email||currentEquipier?.email||"").trim().toLowerCase();
+  const profileEmail=normalizedEmail(currentUserProfile?.email||currentUserProfile?.loginEmail);
+  const equipierEmail=normalizedEmail(currentEquipier?.Email||currentEquipier?.email);
   // L'e-mail du profil prévaut ; le repli EQUIPIERS n'est autorisé qu'après
   // identification unique de l'équipier (jamais par prénom approximatif).
   if(profileEmail&&equipierEmail&&profileEmail!==equipierEmail){
