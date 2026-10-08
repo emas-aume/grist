@@ -2,6 +2,7 @@
 
 
 
+
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -966,6 +967,69 @@ async function recentFE(force=false){
   })();
   try{return await recentFECache.promise}finally{recentFECache.promise=null}
 }
+// V85 : distribution collective. Une session ouverte alimente aussi les boîtes
+// des autres équipiers, sans modifier leur état de lecture ni leurs suppressions.
+let feFanoutBusy=false;
+async function feNoticeFanout(recent){
+  if(feFanoutBusy||!feNoticeReady||!recent?.length)return;
+  feFanoutBusy=true;
+  try{
+    const [members,boxes]=await Promise.all([apiAllPaged(T.EQ,{pageSize:500,maxRows:5000}),apiAllPaged(T.NOTIF,{pageSize:500,maxRows:5000})]);
+    const emails=[...new Set(members.map(m=>normalizedEmail(m.Email||m.email)).filter(Boolean))];
+    const rowsByEmail=new Map();
+    for(const row of boxes){const email=normalizedEmail(row.Email);if(!email)continue;
+      if(!rowsByEmail.has(email))rowsByEmail.set(email,[]);rowsByEmail.get(email).push(row);
+    }
+    // Préparer également les boîtes des équipiers absents. Relire avant insertion
+    // pour réduire les créations concurrentes (Grist n'impose pas d'unicité).
+    const baseline=Math.max(0,...recent.map(f=>Number(f.id)||0));
+    for(const email of emails){
+      if((rowsByEmail.get(email)||[]).length)continue;
+      const check=await api(T.NOTIF,{filter:{Email:[email]},limit:10});
+      if(check.length){rowsByEmail.set(email,check);continue}
+      await grist.docApi.applyUserActions([["AddRecord",T.NOTIF,null,{
+        Email:email,Dernier_FE_ID:baseline,Derniere_consultation:Date.now(),Historique_JSON:"[]"
+      }]]);
+      const created=await api(T.NOTIF,{filter:{Email:[email]},limit:10});
+      rowsByEmail.set(email,created);
+    }
+    for(const email of emails){
+      if(email===feNoticeEmail)continue;
+      const candidates=rowsByEmail.get(email)||[];
+      if(candidates.length!==1)continue; // Doublon : ne rien écraser.
+      const row=candidates[0];
+      let history;
+      try{history=JSON.parse(String(row.Historique_JSON||"[]"));if(!Array.isArray(history))continue}catch(e){continue}
+      const cursor=Number(row.Dernier_FE_ID)||0;
+      const newRows=recent.filter(f=>Number(f.id)>cursor);
+      const newest=Math.max(cursor,...recent.map(f=>Number(f.id)||0));
+      if(!newRows.length||newest===cursor)continue;
+      const fresh=newRows.filter(isCurrentOperationalFact).map(f=>({
+        id:Number(f.id),occurrence:`${Number(f.id)}:${String(f.Numero_FE||'')}`,
+        numero:String(f.Numero_FE||''),niveau:String(f.Niveau||'—'),
+        etab:String(f.Etablissement||'Établissement non renseigné'),ville:String(f.Ville||''),
+        departement:factDept(f),arrived:Date.now(),read:false,deleted:false
+      }));
+      const merged=feNoticeMergeHistory(fresh,history);
+      await grist.docApi.applyUserActions([["UpdateRecord",T.NOTIF,row.id,{
+        Dernier_FE_ID:newest,Historique_JSON:JSON.stringify(merged)
+      }]]);
+    }
+    // Relire notre propre boîte : les ajouts réalisés par d'autres sessions sont visibles.
+    const mine=await api(T.NOTIF,{filter:{Email:[feNoticeEmail]},limit:10});
+    if(mine.length===1){
+      const remote=mine[0];let parsed=[];
+      try{parsed=JSON.parse(String(remote.Historique_JSON||'[]'))}catch(e){}
+      if(Array.isArray(parsed)){
+        const merged=feNoticeMergeHistory(feNoticeHistory,parsed);
+        feNoticeHistory.splice(0,feNoticeHistory.length,...merged);
+        feNoticeState=remote;feNoticeLastId=Math.max(feNoticeLastId,Number(remote.Dernier_FE_ID)||0);
+        renderFeBell();
+      }
+    }
+  }catch(e){console.warn('Distribution collective des notifications indisponible',e)}
+  finally{feFanoutBusy=false}
+}
 function feNoticeRowSignature(f){return isCurrentOperationalFact(f)?String(f.Numero_FE||"").trim():""}
 async function pollNewFE(){
   if(feNoticeBusy||document.hidden)return;
@@ -976,7 +1040,7 @@ async function pollNewFE(){
   feNoticeBusy=true;
   try{
     // Pagination jusqu'au curseur : aucun plafond fixe à 100/1000 nouveaux FE.
-    const recent=await recentFE(true);
+    const recent=await recentFE();
     if(!recent.length)return;
     // Une ligne Grist déjà existante peut passer de vide à remplie : son id ne change pas.
     const reused=[];
@@ -995,7 +1059,7 @@ async function pollNewFE(){
     // Éviter que le cache de suivi augmente sans limite.
     if(feNoticeRowSnapshot.size>500){const ids=new Set(recent.map(f=>Number(f.id)));for(const id of feNoticeRowSnapshot.keys())if(!ids.has(id))feNoticeRowSnapshot.delete(id)}
     saveFeNoticeRowSnapshot();
-    if(Number(recent[0].id)<=feNoticeLastId&&!reused.length)return;
+    if(Number(recent[0].id)<=feNoticeLastId&&!reused.length){await feNoticeFanout(recent);return;}
     const newer=[];let offset=0,stop=false;
     // Le cas courant ne demande qu'une lecture mutualisée de 100 FE.
     if(recent.some(f=>Number(f.id)<=feNoticeLastId)){
@@ -1010,7 +1074,7 @@ async function pollNewFE(){
       }
     }
     newer.push(...reused);
-    if(!newer.length)return;
+    if(!newer.length){await feNoticeFanout(recent);return;}
     const maxId=newer.reduce((max,f)=>Math.max(max,Number(f.id)||0),feNoticeLastId);
     const newcomers=newer.filter(isCurrentOperationalFact).sort((a,b)=>Number(a.id)-Number(b.id));
     const added=[];
@@ -1029,6 +1093,7 @@ async function pollNewFE(){
     await feNoticePersist(); // Fusion avec l'historique distant avant d'afficher les notifications.
     feNoticeUnread=feNoticeHistory.filter(x=>!x.deleted&&!x.read&&Number(x.arrived)>Number(feNoticeState.Derniere_consultation||0)).length;
     renderFeBell();
+    await feNoticeFanout(recent);
     for(const item of added)toast(`${item.etab} — ${item.ville} · ${item.numero}`,"info",`Nouveau FE · Niveau ${item.niveau}`,10000,()=>openNotifiedFE(item));
   }catch(e){toast(e.message,"error","Notifications indisponibles",6000);console.warn(e)}
   finally{feNoticeBusy=false}
@@ -1040,13 +1105,13 @@ async function feNoticeMarkViewed(){
   }catch(e){toast(e.message,"error","Notifications non enregistrées")}
 }
 async function initFeBell(){
-  $("bellButton").onclick=async()=>{const panel=$("notificationPanel");panel.hidden=!panel.hidden;if(!panel.hidden){if(!feNoticeState){try{if(!currentEquipier)await detectCurrentEquipier();await feNoticeInitialize();if(!feNoticeTimer)feNoticeTimer=setInterval(pollNewFE,FE_NOTIFY_POLL_MS)}catch(e){console.warn("Notifications : identité Grist toujours indisponible",e);return}}await feNoticeMarkViewed()}};
+  $("bellButton").onclick=async()=>{const panel=$("notificationPanel");panel.hidden=!panel.hidden;if(!panel.hidden){if(!feNoticeState){try{if(!currentEquipier)await detectCurrentEquipier();await feNoticeInitialize();}catch(e){console.warn("Notifications : identité Grist toujours indisponible",e);return}}await feNoticeMarkViewed()}};
   $("bellClear").onclick=()=>void feNoticeDelete(feNoticeVisible().map(x=>x.id));
   renderFeBell();
-  if(!feNoticeTimer)feNoticeTimer=setInterval(()=>void pollNewFE(),FE_NOTIFY_POLL_MS);
+  
   try{
     if(!currentEquipier)await detectCurrentEquipier();
-    await feNoticeInitialize();await pollNewFE();if(!feNoticeTimer)feNoticeTimer=setInterval(pollNewFE,FE_NOTIFY_POLL_MS);
+    await feNoticeInitialize();;
   }catch(e){console.warn("Centre d’information indisponible ; nouvelle tentative à la prochaine ouverture",e)}
 }
 const LIVE_REFRESH_MS=10000; const CLAIM_TTL_SECONDS=180,CLAIM_HEARTBEAT_MS=30000;
@@ -1138,17 +1203,28 @@ async function refreshLiveFEList(){
   }catch(e){console.warn("Actualisation FE en arrière-plan indisponible",e)}
   finally{feListLiveBusy=false}
 }
+// Une seule cadence : le tableau est rafraîchi en premier, puis les notifications.
+// Le second passage utilise les mêmes données Grist récentes, sans temporisation séparée.
+let feAndNoticeBusy=false;
+async function refreshFEAndNotifications(){
+  if(feAndNoticeBusy||document.hidden)return;
+  feAndNoticeBusy=true;
+  try{
+    await refreshLiveFEList();
+    await pollNewFE();
+  }finally{feAndNoticeBusy=false}
+}
 function startLiveRefresh(){
   if(liveRefreshTimer)clearInterval(liveRefreshTimer);
   liveRefreshTimer=setInterval(refreshLiveSuivi,LIVE_REFRESH_MS);
   if(feListLiveTimer)clearInterval(feListLiveTimer);
-  feListLiveTimer=setInterval(refreshLiveFEList,15000);
+  feListLiveTimer=setInterval(()=>void refreshFEAndNotifications(),15000);
   // Premier passage après chargement initial, puis toutes les 15 secondes.
-  void refreshLiveFEList();
+  void refreshFEAndNotifications();
 }
 document.addEventListener("visibilitychange",async()=>{
   if(document.hidden)return;
-  await Promise.allSettled([refreshLiveSuivi(),refreshLiveFEList(),pollNewFE()]);
+  await Promise.allSettled([refreshLiveSuivi(),refreshFEAndNotifications()]);
   // Au retour d'un onglet en veille, ne jamais considérer un ancien verrou local comme encore acquis.
   if(selectedEtab&&currentEtabLock){
     const key=String(selectedEtab.UAI||"").trim();
@@ -1996,6 +2072,22 @@ async function resetFollowup(){
   const ok=await showModal({title:"Réinitialiser entièrement ce suivi ?",message:`Le suivi EMAS, l’attribution, les qualifications d’activité et les données de traitement enregistrées pour le FE ${numeroAffiche} seront supprimés. Cette action est irréversible.`,type:"error",confirmText:"Réinitialiser",cancelText:"Annuler"});
   if(!ok)return;
   try{assertFeContext(context)}catch(e){toast(e.message,"error","Réinitialisation annulée");return}
+  // La poubelle doit pouvoir renouveler une réservation expirée, mais ne doit
+  // jamais contourner une réservation active appartenant à un autre équipier.
+  // Reprendre la réservation AVANT de désactiver les boutons / supprimer l'activité.
+  try{
+    const activeClaims=(await api(T.CLAIM,{filter:{Numero_FE:[numero]},limit:30})).filter(claimIsActive);
+    if(activeClaims.some(c=>!claimOwnedByMe(c))){
+      await showModal({title:"Réinitialisation impossible",message:"Ce FE est actuellement pris en charge dans une autre session. Réinitialisation bloquée pour éviter un conflit.",type:"error"});
+      return;
+    }
+    if(!activeClaims.length){
+      const resumed=await ensureTemporaryClaim();
+      if(!resumed)return;
+      assertFeContext(context);
+    }
+    await requireOwnedActiveClaim(numero);
+  }catch(e){await showModal({title:"Réinitialisation impossible",message:e.message,type:"error"});return}
   const btn=$("resetFollowup");btn.disabled=true;$("save").disabled=true;$("toggleDone").disabled=true;
   try{
     const suivis=await api(T.SUIVI,{filter:{Numero_FE:[numero]},limit:50});
@@ -2300,6 +2392,6 @@ await loadCurrent();
 // Les tâches volumineuses sont lancées après l'affichage initial et ne bloquent plus les FE.
 void loadOperationalIds().catch(e=>console.warn("Index ID_FE indisponible",e));
 // Aucun balayage annuel des FE : les périodes sont un calendrier local.
-void detectCurrentEquipier().then(async()=>{await issueSync(true);if(!feNoticeReady){try{await feNoticeInitialize();await pollNewFE();if(!feNoticeTimer)feNoticeTimer=setInterval(pollNewFE,FE_NOTIFY_POLL_MS)}catch(e){console.warn("Notifications en attente d'identification :",e)}}}).catch(e=>console.warn(e));
+void detectCurrentEquipier().then(async()=>{await issueSync(true);if(!feNoticeReady){try{await feNoticeInitialize();}catch(e){console.warn("Notifications en attente d'identification :",e)}}}).catch(e=>console.warn(e));
 setInterval(()=>{if(!document.hidden)void issueSync()},60000);wireTemporaryClaimTriggers();startLiveRefresh();void initFeBell();startClaimHeartbeat();startEditLockHeartbeat();setInterval(retryDeferredActivity,30000);repairLegacyChoiceLists()}catch(e){console.error(e);notice("Erreur Grist : "+e.message,"error");$("body").innerHTML='<tr><td colspan="9" class="loading">Impossible de charger les données.</td></tr>'}})();
 </script></body></html>
