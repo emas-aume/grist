@@ -104,10 +104,10 @@ select{background-color:#fff!important;color-scheme:light!important;}
  </div>
  <div id="opsCard" class="card"><div class="sectiontitle"><h2>Suivi opérationnel</h2><span id="saveMeta" class="muted"></span></div>
   <div class="editgrid">
-   <div class="field"><label>Équipier</label><select id="equipier"></select><div id="currentEquipierInfo" class="muted" style="margin-top:7px;font-size:12px"></div></div>
+   <div class="field span2"><label>Équipier</label><select id="equipier"></select><div id="currentEquipierInfo" class="muted" style="margin-top:7px;font-size:12px"></div></div>
    <select id="editStatus" class="hidden" aria-hidden="true" tabindex="-1"><option>Non attribué</option><option>En cours</option></select>
-   <div class="inline-edit-field" data-inline-field="suivi"><div class="inline-edit-head"><span class="inline-edit-label">Suivi établissement</span><button class="inline-edit-pencil" type="button" data-inline-edit="suivi" title="Modifier" aria-label="Modifier le suivi établissement">✎</button></div><div id="suiviDisplay" class="inline-edit-display"></div><div id="suiviEditor" class="inline-edit-editor hidden"><textarea id="suivi"></textarea><div class="inline-edit-actions"><button class="btn" type="button" data-inline-cancel="suivi">Annuler</button><button class="btn primary" type="button" data-inline-save="suivi">Valider</button></div></div></div>
    <div class="inline-edit-field" data-inline-field="emas"><div class="inline-edit-head"><span class="inline-edit-label">Traitement / accompagnement EMAS</span><button class="inline-edit-pencil" type="button" data-inline-edit="emas" title="Modifier" aria-label="Modifier le traitement EMAS">✎</button></div><div id="emasDisplay" class="inline-edit-display"></div><div id="emasEditor" class="inline-edit-editor hidden"><textarea id="emas"></textarea><div class="inline-edit-actions"><button class="btn" type="button" data-inline-cancel="emas">Annuler</button><button class="btn primary" type="button" data-inline-save="emas">Valider</button></div></div></div>
+   <div class="inline-edit-field" data-inline-field="suivi"><div class="inline-edit-head"><span class="inline-edit-label">Suivi établissement</span><button class="inline-edit-pencil" type="button" data-inline-edit="suivi" title="Modifier" aria-label="Modifier le suivi établissement">✎</button></div><div id="suiviDisplay" class="inline-edit-display"></div><div id="suiviEditor" class="inline-edit-editor hidden"><textarea id="suivi"></textarea><div class="inline-edit-actions"><button class="btn" type="button" data-inline-cancel="suivi">Annuler</button><button class="btn primary" type="button" data-inline-save="suivi">Valider</button></div></div></div>
    <div class="inline-edit-field span2" data-inline-field="notes"><div class="inline-edit-head"><span class="inline-edit-label">Notes et informations internes</span><button class="inline-edit-pencil" type="button" data-inline-edit="notes" title="Modifier" aria-label="Modifier les notes internes">✎</button></div><div id="notesDisplay" class="inline-edit-display"></div><div id="notesEditor" class="inline-edit-editor hidden"><textarea id="notes"></textarea><div class="inline-edit-actions"><button class="btn" type="button" data-inline-cancel="notes">Annuler</button><button class="btn primary" type="button" data-inline-save="notes">Valider</button></div></div></div>
    <div class="inline-edit-field span2" data-inline-field="eleveSuivi"><div class="inline-edit-head"><span class="inline-edit-label">Élève suivi</span><button class="inline-edit-pencil" type="button" data-inline-edit="eleveSuivi" title="Modifier" aria-label="Modifier l’élève suivi">✎</button></div><div id="eleveSuiviDisplay" class="inline-edit-display"></div><div id="eleveSuiviEditor" class="inline-edit-editor hidden"><input id="eleveSuivi" type="text" placeholder="Saisie libre"><div class="inline-edit-actions"><button class="btn" type="button" data-inline-cancel="eleveSuivi">Annuler</button><button class="btn primary" type="button" data-inline-save="eleveSuivi">Valider</button></div></div></div>
   </div>
@@ -133,7 +133,7 @@ select{background-color:#fff!important;color-scheme:light!important;}
 <!-- CO-EMAS V49 — correction libellé après remise à zéro -->
 <script>
 "use strict";
-const T={CUR:"FE26_27_2",OLD:"FE25_26",OLD2:"FE24_25",SUIVI:"SUIVI_FE26_27",EQ:"EQUIPIERS",ETAB:"ETABLISSEMENTS",ACT_D1:"ACTIVITE_D1_EMS34_48",ACT_D2:"ACTIVITE_D2_EMS34_48",SUIVI_ETAB:"SUIVI_ETABLISSEMENTS",ID_FE:"ID_FE",CLAIM:"PRISE_EN_CHARGE_FE",LOCK:"VERROUS_EDITION",NOTIF:"NOTIFICATIONS_UTILISATEURS",JOURNAL:"JOURNAL_ANOMALIES"};
+const T={CUR:"FE26_27_2",OLD:"FE25_26",OLD2:"FE24_25",SUIVI:"SUIVI_FE26_27",EQ:"EQUIPIERS",ETAB:"ETABLISSEMENTS",ACT_D1:"ACTIVITE_D1_EMS34_48",ACT_D2:"ACTIVITE_D2_EMS34_48",SUIVI_ETAB:"SUIVI_ETABLISSEMENTS",ID_FE:"ID_FE",CLAIM:"PRISE_EN_CHARGE_FE",LOCK:"VERROUS_EDITION",NOTIF:"NOTIFICATIONS_UTILISATEURS",JOURNAL:"JOURNAL_ANOMALIES",IDENT:"IDENTIFICATION_SESSIONS"};
 const ALLOWED_EQUIPIER_NAMES=["Guillaume","Gilles","Patrick","Mathilde","Jean-Marc","Christophe","Bastien","Rachida","François","Frederic","Thierry","Philippe"];
 function isAllowedEquipier(e){return !!e&&ALLOWED_EQUIPIER_NAMES.some(n=>norm(n)===norm(e.Nom));}
 const PAGE=25; let tokenInfo=null,currentRows=[],rows=[],suiviMap=new Map(),eqMap=new Map(),etabMap=new Map(),page=1,selected=null,selectedSuivi=null,selectedEtab=null,selectedEtabSuivi=null,etabReturnTarget="list",equipierSelectionTouched=false,opsCleanSnapshot=null,ambianceCleanSnapshot=null,idFeRows=[],idByNumero=new Map(),numeroById=new Map(),idConflictingFe=new Set(),idConflictingIds=new Set(),idOccupied=new Set();
@@ -377,46 +377,47 @@ function claimIsActive(c){return !!c&&Number(c.Derniere_activite||0)>=(Math.floo
 function activeClaimFor(f){const c=claimMap.get(claimKey(f));return claimIsActive(c)?c:null}
 function claimOwnerName(c){return c?(eqName(c.Equipier)||String(c.Email||"").trim()||"un autre équipier"):"N/A"}
 function claimOwnedByMe(c){return !!c&&!!currentEquipier&&Number(c.Equipier)===Number(currentEquipier.id)&&String(c.Session||"")===currentClaimSession}
+let identityPromise=null,identityVerified=false;
 async function detectCurrentEquipier(){
-  try{
-    const ti=await grist.docApi.getAccessToken({readOnly:true});
-    const origin=new URL(ti.baseUrl).origin;
-    const r=await fetch(origin+"/api/profile/user",{headers:{Authorization:"Bearer "+ti.token}});
-    if(!r.ok)throw new Error("profil HTTP "+r.status);
-    currentUserProfile=await r.json();
-
-    const profileEmail=String(currentUserProfile?.email||currentUserProfile?.loginEmail||"").trim().toLowerCase();
-    const profileName=norm(currentUserProfile?.name||"");
-    const equipiers=[...eqMap.values()];
-
-    // Priorité à l'e-mail Grist : c'est l'identifiant le moins ambigu entre équipiers.
-    let matches=[];
-    if(profileEmail){
-      matches=equipiers.filter(e=>String(e.Email||e.email||"").trim().toLowerCase()===profileEmail);
-      if(matches.length>1)throw new Error(`plusieurs équipiers utilisent l’adresse ${profileEmail}`);
+  if(identityVerified&&currentEquipier)return currentEquipier;
+  if(identityPromise)return identityPromise;
+  identityPromise=(async()=>{
+    const session=currentClaimSession;
+    let identityRow=null,addedId=null;
+    try{
+      // La formule de déclenchement user.Email est exécutée côté Grist au moment de l'ajout.
+      // Ne jamais fournir Email_Grist ou Nom_Grist dans AddRecord.
+      const response=await grist.docApi.applyUserActions([["AddRecord",T.IDENT,null,{
+        Session_ID:session,Date_creation:Math.floor(Date.now()/1000)
+      }]]);
+      addedId=Number(response?.[0])||null;
+      for(let attempt=0;attempt<4;attempt++){
+        const found=await api(T.IDENT,{filter:{Session_ID:[session]},limit:20});
+        identityRow=found.find(r=>addedId&&Number(r.id)===addedId)||found.sort((x,y)=>Number(y.id)-Number(x.id))[0]||null;
+        if(identityRow?.Email_Grist)break;
+        await new Promise(resolve=>setTimeout(resolve,200+attempt*250));
+      }
+      const email=String(identityRow?.Email_Grist||"").trim().toLowerCase();
+      const name=String(identityRow?.Nom_Grist||"").trim();
+      if(!email)throw new Error("La colonne Email_Grist n'a pas été renseignée. Vérifiez la formule de déclenchement user.Email (nouveaux enregistrements).");
+      const matches=[...eqMap.values()].filter(e=>String(e.Email||e.email||"").trim().toLowerCase()===email);
+      if(matches.length!==1)throw new Error(matches.length?"Plusieurs équipiers portent l'adresse "+email:"Aucun équipier ne correspond à l'adresse Grist "+email);
+      currentEquipier=matches[0];
+      currentUserProfile={email,name};
+      identityVerified=true;
+      return currentEquipier;
+    }catch(e){
+      console.warn("Identification par formule Grist impossible :",e);
+      return null;
+    }finally{
+      // Nettoyage immédiat : une session ne doit pas laisser de lignes permanentes.
+      if(identityRow?.id||addedId){
+        try{await grist.docApi.applyUserActions([["RemoveRecord",T.IDENT,Number(identityRow?.id||addedId)]])}
+        catch(e){console.warn("Nettoyage IDENTIFICATION_SESSIONS à effectuer :",e)}
+      }
     }
-
-    // Repli sur le nom uniquement si l'e-mail n'a donné aucun résultat,
-    // et seulement si le nom correspond à un unique équipier.
-    if(!matches.length&&profileName){
-      matches=equipiers.filter(e=>{
-        const full=norm(e["Prénom nom complet"]||e["Prenom nom complet"]||"");
-        const nom=norm(e.Nom||"");
-        return (full&&full===profileName)||(nom&&nom===profileName);
-      });
-      if(matches.length>1)throw new Error(`nom Grist ambigu : ${currentUserProfile?.name||""}`);
-    }
-
-    currentEquipier=matches.length===1?matches[0]:null;
-    if(!currentEquipier){
-      const who=profileEmail||currentUserProfile?.name||"compte inconnu";
-      throw new Error(`aucun équipier unique ne correspond au compte Grist ${who}`);
-    }
-  }catch(e){
-    console.warn("Identification automatique Grist impossible",e);
-    // Ne jamais inventer une identité si l'API du profil est indisponible.
-    currentEquipier=null;
-  }
+  })();
+  try{return await identityPromise}finally{identityPromise=null}
 }
 async function loadClaimsFor(facts){
   const ids=[...new Set((facts||[]).filter(f=>!isArchivedFact(f)&&isActiveFact(f)).map(claimKey).filter(Boolean))];
