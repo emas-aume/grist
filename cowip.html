@@ -865,13 +865,18 @@ function feNoticeMergeHistory(local,remote){
   const byId=new Map();
   for(const item of [...remote,...local])if(item&&Number.isFinite(Number(item.id))){
     const key=Number(item.id),prev=byId.get(key);
-    if(!prev)byId.set(key,item);
-    else if(Number(item.arrived)>Number(prev.arrived)&&item.reentered)byId.set(key,item);
-    else if(item.deleted&&!prev.deleted)byId.set(key,item);
+    if(!prev){byId.set(key,item);continue}
+    // A genuinely new FE in a reused Grist row supersedes the previous
+    // notification (including one that had been deleted or marked read).
+    if(String(item.numero||"")!==String(prev.numero||"")&&Number(item.arrived)>Number(prev.arrived)){
+      byId.set(key,item);continue;
+    }
+    if(String(item.numero||"")!==String(prev.numero||"")&&Number(prev.arrived)>Number(item.arrived))continue;
+    if(item.deleted&&!prev.deleted)byId.set(key,item);
     else if(item.read&&!prev.read)byId.set(key,{...prev,read:true});
-    else if(Boolean(item.deleted)===Boolean(prev.deleted)&&Number(item.arrived)<Number(prev.arrived))byId.set(key,item);
+    else if(Number(item.arrived)<Number(prev.arrived))byId.set(key,item);
   }
-  return feNoticeTrim([...byId.values()].sort((a,b)=>Number(b.id)-Number(a.id)));
+  return feNoticeTrim([...byId.values()].sort((a,b)=>Number(b.arrived)-Number(a.arrived)));
 }
 function feNoticePersist(viewedAt=null){
   const pending=feNoticeWriteQueue.catch(()=>{}).then(async()=>{
@@ -931,7 +936,11 @@ async function recentFE(){
 }
 function feNoticeRowSignature(f){return isCurrentOperationalFact(f)?String(f.Numero_FE||"").trim():""}
 async function pollNewFE(){
-  if(feNoticeBusy||document.hidden||!feNoticeReady)return;
+  if(feNoticeBusy||document.hidden)return;
+  if(!feNoticeReady){
+    try{if(!currentEquipier||!identityVerified)await detectCurrentEquipier();await feNoticeInitialize()}
+    catch(e){console.warn("Notifications : nouvelle tentative d’identification",e);return}
+  }
   feNoticeBusy=true;
   try{
     // Pagination jusqu'au curseur : aucun plafond fixe à 100/1000 nouveaux FE.
@@ -944,6 +953,10 @@ async function pollNewFE(){
       if(feNoticeRowSnapshot.has(id)){
         const previous=feNoticeRowSnapshot.get(id);
         if(signature&&signature!==previous&&id<=feNoticeLastId)reused.push(f);
+      }
+      if(signature&&id<=feNoticeLastId&&!reused.some(x=>Number(x.id)===id)){
+        const old=feNoticeHistory.find(x=>Number(x.id)===id);
+        if(old&&String(old.numero||"").trim()!==signature)reused.push(f);
       }
       feNoticeRowSnapshot.set(id,signature);
     }
@@ -997,6 +1010,7 @@ async function initFeBell(){
   $("bellButton").onclick=async()=>{const panel=$("notificationPanel");panel.hidden=!panel.hidden;if(!panel.hidden){if(!feNoticeState){try{if(!currentEquipier)await detectCurrentEquipier();await feNoticeInitialize();if(!feNoticeTimer)feNoticeTimer=setInterval(pollNewFE,FE_NOTIFY_POLL_MS)}catch(e){console.warn("Notifications : identité Grist toujours indisponible",e);return}}await feNoticeMarkViewed()}};
   $("bellClear").onclick=()=>void feNoticeDelete(feNoticeVisible().map(x=>x.id));
   renderFeBell();
+  if(!feNoticeTimer)feNoticeTimer=setInterval(()=>void pollNewFE(),FE_NOTIFY_POLL_MS);
   try{
     if(!currentEquipier)await detectCurrentEquipier();
     await feNoticeInitialize();await pollNewFE();if(!feNoticeTimer)feNoticeTimer=setInterval(pollNewFE,FE_NOTIFY_POLL_MS);
@@ -1953,7 +1967,7 @@ async function resetFollowup(){
   try{
     const suivis=await api(T.SUIVI,{filter:{Numero_FE:[numero]},limit:50});
     if(suivis.length>1)throw new Error(`Doublon SUIVI détecté pour le FE ${numeroAffiche}. Réinitialisation bloquée.`);
-    const resetFields={Equipier:null,Statut:"Non attribué",Suivi_etablissement:"",Accompagnement_EMAS:"",Notes_informations:"",Eleve_suivi:"",Securisation:gristChoiceList([]),Prevention:gristChoiceList([]),Accompagnement:gristChoiceList([]),Formation:gristChoiceList([]),Representation_Partenariat:gristChoiceList([]),Date_traitement_EMS:null,Derniere_modification:null};
+    const resetFields={Equipier:null,Statut:"Non attribué",Suivi_etablissement:"",Accompagnement_EMAS:"",Notes_informations:"",Eleve_suivi:"",Securisation:gristChoiceList([]),Prevention:gristChoiceList([]),Accompagnement:gristChoiceList([]),Formation:gristChoiceList([]),Representation_Partenariat:gristChoiceList([]),Date_traitement_EMS:null,Derniere_modification:null,Modifie_par:null};
     // Ne jamais supprimer un suivi qui a changé depuis l'ouverture de la fiche.
     await requireOwnedActiveClaim(numero);
     if(suivis.length){
@@ -1974,13 +1988,32 @@ async function resetFollowup(){
       assertFeContext(context);
       const beforeDelete=await api(T.SUIVI,{filter:{Numero_FE:[numero]},limit:3});
       if(beforeDelete.length!==suivis.length||beforeDelete.some((r,i)=>Number(r.id)!==Number(suivis[i].id)||Number(r.Derniere_modification||0)!==Number(suivis[i].Derniere_modification||0)))throw new Error("Le suivi a changé pendant la réinitialisation : suppression interrompue.");
+      // Le suivi peut aussi être présent dans la table FE source : sans vider
+      // ces champs, sourceSuivi() le réaffiche après suppression de SUIVI.
+      const clearSource={Equipier:null,Statut:"Non attribué",Suivi_etablissement:"",Accompagnement_EMAS:"",Notes_informations:"",Date_traitement_EMS:null};
+      await grist.docApi.applyUserActions([["UpdateRecord",T.CUR,Number(target.id),clearSource]]);
+      const verifiedSource=await api(T.CUR,{filter:{id:[Number(target.id)]},limit:1});
+      if(verifiedSource.length!==1||String(verifiedSource[0].Equipier??"").trim()||
+         String(verifiedSource[0].Suivi_etablissement??"").trim()||
+         String(verifiedSource[0].Accompagnement_EMAS??"").trim()||
+         String(verifiedSource[0].Notes_informations??"").trim()||
+         sourceStatus(verifiedSource[0])!=="Non attribué")
+        throw new Error("Remise à zéro des champs de la base FE non confirmée : suppression du suivi interrompue.");
       if(suivis.length)await grist.docApi.applyUserActions([["RemoveRecord",T.SUIVI,suivis[0].id]]);
       const afterDelete=await api(T.SUIVI,{filter:{Numero_FE:[numero]},limit:3});
       if(afterDelete.length)throw new Error("Suppression du suivi non confirmée dans Grist.");
       assertFeContext(context);
+      Object.assign(target,verifiedSource[0]);
+      const localFact=currentRows.find(f=>f._source===T.CUR&&Number(f.id)===Number(target.id));
+      if(localFact&&localFact!==target)Object.assign(localFact,verifiedSource[0]);
       selectedSuivi=null;suiviMap.delete(numero);
-      renderOps();render();
+      // La suppression du suivi efface aussi son auteur et sa date de modification.
+      // Nettoyer les éventuelles copies locales pour ne pas afficher un ancien « modifié par ».
+      for(const fact of [target,localFact])if(fact){fact.Modifie_par=null;fact.Derniere_modification=null;}
+      // La réservation temporaire affiche artificiellement En cours / Equipier.
+      // Il faut la libérer AVANT de redessiner la fiche.
       await releaseMyTemporaryClaim();
+      renderOps();$("saveMeta").textContent="Aucun suivi enregistré";render();
       toast(`Le FE ${numeroAffiche} est de nouveau non attribué.`,"success","Suivi remis à zéro",5000);
     }catch(e){
       if(activityRemoved){
