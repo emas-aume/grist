@@ -149,6 +149,8 @@ function issueSave(){try{sessionStorage.setItem(ISSUE_STORE,JSON.stringify(issue
 function issueAdd(kind,message,fe=""){
   const msg=String(message||"Erreur non détaillée").slice(0,700);
   if(!msg.trim())return;
+  // Une anomalie persistante ID_FE est un état, pas un nouvel événement à chaque rechargement.
+  if(kind==="Conflit ID_FE"&&issueEntries.some(x=>x.kind===kind&&x.fe===fe))return;
   const last=issueEntries[issueEntries.length-1];
   if(last&&last.kind===kind&&last.message===msg&&last.fe===fe&&Date.now()-last.time<15000)return;
   const eventId="e"+Date.now().toString(36)+"-"+Math.random().toString(36).slice(2,12);
@@ -161,9 +163,23 @@ function issueAdd(kind,message,fe=""){
   issueSavePending();
   // Les événements en attente seront envoyés après l'identification de la session.
 }
+function issueDateMillis(raw){
+  if(raw instanceof Date)return raw.getTime();
+  const n=Number(raw);
+  if(raw!==null&&raw!==undefined&&String(raw).trim()!==""&&Number.isFinite(n))return n>1e11?n:n*1000;
+  const parsed=Date.parse(String(raw||""));
+  return Number.isFinite(parsed)?parsed:0;
+}
 function issueRender(){
-  const shared=sharedIssueEntries.map(r=>({time:(Number(r.Date_heure)||0)*1000,kind:String(r.Operation||r.Niveau||"Erreur"),message:String(r.Message||""),fe:String(r.Numero_FE||""),source:String(r.Equipier||r.Utilisateur||"Autre session"),id:r.id}));
-  const combined=[...shared,...issueEntries.filter(local=>!shared.some(remote=>remote.time===local.time&&remote.message===local.message&&remote.fe===local.fe))].sort((a,b)=>b.time-a.time);
+  const shared=sharedIssueEntries.map(r=>({time:issueDateMillis(r.Date_heure),kind:String(r.Operation||r.Niveau||"Erreur"),message:String(r.Message||""),fe:String(r.Numero_FE||""),source:String(r.Equipier||r.Utilisateur||"Autre session"),id:r.id,eventId:String(r.Details||"")}));
+  const remoteIds=new Set(shared.map(x=>x.eventId).filter(Boolean));
+  const merged=[...shared,...issueEntries.filter(x=>!remoteIds.has(x.eventId))];
+  const seen=new Set();
+  const combined=merged.sort((a,b)=>b.time-a.time).filter(x=>{
+    // Pour ID_FE, une seule entrée par FE, même si plusieurs sessions ont remonté le même état.
+    const key=x.kind==="Conflit ID_FE"?`ID_FE:${x.fe}`:(x.eventId||`${x.kind}:${x.fe}:${x.message}:${Math.floor(x.time/15000)}`);
+    if(seen.has(key))return false;seen.add(key);return true;
+  });
   const badge=$("issueCount");if(badge){badge.textContent=String(combined.length);badge.hidden=!combined.length}
   const scope=$("issueScope");if(scope)scope.textContent=issueSharedEnabled?"Anomalies partagées entre équipiers (actualisation périodique). Le bouton Effacer ne supprime que le journal local.":"Journal local uniquement : table JOURNAL_ANOMALIES indisponible ou droits insuffisants.";
   const box=$("issueItems");if(!box)return;
@@ -171,7 +187,7 @@ function issueRender(){
   if(!combined.length){const p=document.createElement("p");p.className="muted";p.textContent="Aucune anomalie enregistrée.";box.appendChild(p);return}
   for(const item of combined.slice(0,250)){
     const div=document.createElement("div");div.className="issue-row";
-    const meta=document.createElement("small");meta.textContent=new Date(item.time).toLocaleString("fr-FR")+(item.source?" — "+item.source:"")+(item.fe?" — FE "+item.fe:"");
+    const meta=document.createElement("small");meta.textContent=(Number.isFinite(item.time)&&item.time>0?new Date(item.time).toLocaleString("fr-FR",{dateStyle:"short",timeStyle:"medium"}):"Date non renseignée")+(item.source?" — "+item.source:"")+(item.fe?" — FE "+item.fe:"");
     const title=document.createElement("strong");title.textContent=item.kind;
     const msg=document.createElement("div");msg.textContent=item.message;
     div.append(meta,title,msg);box.appendChild(div);
@@ -187,14 +203,21 @@ async function issueSync(force=false){
   try{
     // Relire avant écriture : une réponse réseau perdue peut masquer un AddRecord réussi.
     // Details porte uniquement un identifiant aléatoire d'événement, jamais une pile d'erreur.
+    // Les conflits ID_FE sont des états persistants : ne pas les retransmettre en boucle.
+    const sentStates=new Set();
     for(const item of issuePending.slice(0,20)){
+      if(item.kind==="Conflit ID_FE"){
+        const stateKey=item.kind+":"+item.fe;
+        if(sentStates.has(stateKey)){issuePending=issuePending.filter(x=>x.eventId!==item.eventId);issueSavePending();continue}
+        sentStates.add(stateKey);
+      }
       const already=await api(T.JOURNAL,{filter:{Details:[item.eventId]},limit:2});
       if(already.length>0){
         issuePending=issuePending.filter(x=>x.eventId!==item.eventId);issueSavePending();
         continue;
       }
       const equipier=String(currentEquipier?.Nom||"");
-      const utilisateur=String(currentUserProfile?.email||currentUserProfile?.loginEmail||"");
+      const utilisateur=String(currentUserProfile?.email||currentUserProfile?.loginEmail||currentEquipier?.Email||"");
       const record={Date_heure:Math.floor(item.time/1000),Equipier:equipier,Utilisateur:utilisateur,Session_ID:currentClaimSession,Numero_FE:item.fe,Operation:item.kind,Niveau:"Erreur",Message:item.message,Details:item.eventId,Statut:"Nouvelle",Date_resolution:null};
       await grist.docApi.applyUserActions([["AddRecord",T.JOURNAL,null,record]]);
       // Confirmer l'écriture avant de retirer l'événement de la file d'attente.
@@ -389,6 +412,7 @@ async function detectCurrentEquipier(){
     }
   }catch(e){
     console.warn("Identification automatique Grist impossible",e);
+    // Ne jamais inventer une identité si l'API du profil est indisponible.
     currentEquipier=null;
   }
 }
@@ -782,8 +806,15 @@ async function openNotifiedFE(item){
   }catch(e){toast(e.message,"error","Ouverture impossible")}
 }
 function feNoticeIdentity(){
-  const email=String(currentUserProfile?.email||currentUserProfile?.loginEmail||"").trim().toLowerCase();
-  if(!email)throw new Error("Adresse e-mail du compte Grist indisponible : impossible de conserver les notifications.");
+  const profileEmail=String(currentUserProfile?.email||currentUserProfile?.loginEmail||"").trim().toLowerCase();
+  const equipierEmail=String(currentEquipier?.Email||currentEquipier?.email||"").trim().toLowerCase();
+  // L'e-mail du profil prévaut ; le repli EQUIPIERS n'est autorisé qu'après
+  // identification unique de l'équipier (jamais par prénom approximatif).
+  if(profileEmail&&equipierEmail&&profileEmail!==equipierEmail){
+    throw new Error("L'adresse du profil Grist diffère de celle de l'équipier identifié : notifications non initialisées.");
+  }
+  const email=profileEmail||equipierEmail;
+  if(!email)throw new Error("Adresse e-mail indisponible : compte Grist non rapproché d'un équipier unique.");
   return email;
 }
 function feNoticeRestore(row){
@@ -880,16 +911,19 @@ async function pollNewFE(){
   finally{feNoticeBusy=false}
 }
 async function feNoticeMarkViewed(){
+  if(!feNoticeState){console.warn("Notifications non initialisées : aucune écriture tentée.");return}
   try{
     const at=Date.now();await feNoticePersist(at);feNoticeUnread=0;renderFeBell();
   }catch(e){toast(e.message,"error","Notifications non enregistrées")}
 }
 async function initFeBell(){
-  $("bellButton").onclick=()=>{const panel=$("notificationPanel");panel.hidden=!panel.hidden;if(!panel.hidden)feNoticeMarkViewed()};
+  $("bellButton").onclick=async()=>{const panel=$("notificationPanel");panel.hidden=!panel.hidden;if(!panel.hidden){if(!feNoticeState){try{if(!currentEquipier)await detectCurrentEquipier();await feNoticeInitialize();if(!feNoticeTimer)feNoticeTimer=setInterval(pollNewFE,FE_NOTIFY_POLL_MS)}catch(e){console.warn("Notifications : identité Grist toujours indisponible",e);return}}await feNoticeMarkViewed()}};
   $("bellClose").onclick=()=>$("notificationPanel").hidden=true;
   renderFeBell();
-  try{await feNoticeInitialize();await pollNewFE();feNoticeTimer=setInterval(pollNewFE,FE_NOTIFY_POLL_MS)}
-  catch(e){toast(e.message,"error","Centre d’information indisponible",10000);console.warn(e)}
+  try{
+    if(!currentEquipier)await detectCurrentEquipier();
+    await feNoticeInitialize();await pollNewFE();feNoticeTimer=setInterval(pollNewFE,FE_NOTIFY_POLL_MS);
+  }catch(e){console.warn("Centre d’information indisponible ; nouvelle tentative à la prochaine ouverture",e)}
 }
 const LIVE_REFRESH_MS=10000; const CLAIM_TTL_SECONDS=180,CLAIM_HEARTBEAT_MS=30000;
 let claimMap=new Map(),currentEquipier=null,currentUserProfile=null,currentClaimSession=(crypto.randomUUID?crypto.randomUUID():String(Date.now())+"-"+Math.random().toString(36).slice(2)),claimHeartbeatTimer=null,claimBusy=false,editLockHeartbeatTimer=null,currentEtabLock=null;
