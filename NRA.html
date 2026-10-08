@@ -1,6 +1,7 @@
 
 
 
+
 <!DOCTYPE html>
 <html lang="fr">
 
@@ -1018,6 +1019,42 @@
 .nra-table-scroll{overflow-x:auto;margin:8px 0 14px}.nra-table{min-width:540px;width:100%;border-collapse:collapse}.nra-table th,.nra-table td{padding:8px 12px;border-bottom:1px solid var(--line);text-align:right;font-size:12px}.nra-table th:first-child,.nra-table td:first-child{text-align:left}.nra-quality{font-size:12px}
 .nra-chart{border:1px solid var(--line);border-radius:10px;padding:14px;margin:12px 0;background:#fff}.nra-chart h5{margin:0 0 8px;font-size:14px}.nra-chart-legend{font-size:11px;color:var(--muted);display:flex;align-items:center;gap:7px;margin-bottom:12px}.nra-dot{display:inline-block;width:12px;height:12px;border-radius:3px}.nra-dot-current{background:#2f6fed}.nra-dot-previous{background:#98a2b3}.nra-chart-row{display:grid;grid-template-columns:minmax(120px,1fr) minmax(150px,2fr) 75px;gap:9px;align-items:center;margin:7px 0;font-size:11px}.nra-chart-label{overflow-wrap:anywhere}.nra-chart-bars{display:flex;flex-direction:column;gap:3px}.nra-chart-bar{height:9px;min-width:0;border-radius:3px}.nra-chart-current{background:#2f6fed}.nra-chart-previous{background:#98a2b3}.nra-chart-numbers{text-align:right;font-variant-numeric:tabular-nums}.nra-chart-caption{font-size:12px;color:var(--muted)}@media(max-width:700px){.nra-chart-row{grid-template-columns:105px minmax(80px,1fr) 60px}}
 .nra-reference-table{min-width:880px}.nra-reference-table th,.nra-reference-table td{border:1px solid #cbd5e1;padding:6px 7px}.nra-reference-table thead th{background:#e8eef5;text-align:center}.nra-reference-table .nra-year-current{background:#e2f0df}.nra-reference-table .nra-year-diff{background:#fff2ce;color:#9c2424;font-weight:600}.nra-reference-table tbody th{font-weight:600}.nra-cartables-table{min-width:780px}.nra-cartables-table tbody tr:last-child{font-weight:800;background:#f4f7fb}.nra-cartables-table th{white-space:nowrap}
+
+/* NRA : typographie et alignement homogènes des tableaux de la page 2 */
+#nra-cumulative-tables .nra-table,#nra-op-cartables .nra-table{table-layout:fixed}
+#nra-cumulative-tables .nra-table th,#nra-cumulative-tables .nra-table td,#nra-op-cartables .nra-table th,#nra-op-cartables .nra-table td{font-size:12px!important;font-weight:500;text-align:center!important;vertical-align:middle;padding:7px 5px;line-height:1.3}
+#nra-cumulative-tables .nra-table thead th,#nra-op-cartables .nra-table thead th{font-weight:700}
+#nra-cumulative-tables .nra-table .nra-year-diff{color:#e46d16!important;font-weight:700}
+#nra-cumulative-tables h5,#nra-op-cartables h5{margin:12px 0 3px!important}
+#nra-cumulative-tables .nra-table-scroll,#nra-op-cartables .nra-table-scroll{margin:0 0 9px!important}
+
+/* NRA : mise en page pleine largeur et champs clairs, indépendants du thème global. */
+#nra-section .nra-document{max-width:none!important;width:100%!important;margin:0!important;box-sizing:border-box}
+#nra-section .nra-document textarea,
+#nra-section .nra-controls select{
+  background:#fff!important;color:#203045!important;-webkit-text-fill-color:#203045!important;
+  border:1px solid #cbd5e1!important;opacity:1!important;box-shadow:none!important;
+  color-scheme:light!important;
+}
+#nra-section .nra-document textarea::placeholder{color:#77869b!important;-webkit-text-fill-color:#77869b!important}
+#nra-section .nra-controls select option{background:#fff!important;color:#203045!important}
+#nra-section .nra-document textarea:focus,#nra-section .nra-controls select:focus{outline:2px solid #9cbbf8!important;outline-offset:1px}
+#nra-section .nra-departments{gap:8px;border:0}
+#nra-section .nra-department{border:1px solid #d0d5dd;border-radius:6px}
+#nra-section .nra-chart-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin-top:14px}
+#nra-section .nra-chart{margin:0;min-width:0}
+#nra-section .nra-chart-row[hidden]{display:none!important}
+#nra-section .nra-chart h5{text-align:center;color:#123366;font-size:13px;min-height:32px}
+#nra-section .nra-chart-legend{justify-content:center;gap:8px;flex-wrap:wrap;margin:8px 0}
+#nra-section .nra-vertical-plot{display:flex;align-items:stretch;justify-content:space-around;gap:5px;height:205px;border-bottom:1px solid #ccd5e1;padding:6px 4px 0}
+#nra-section .nra-vertical-group{display:flex;flex-direction:column;justify-content:flex-end;align-items:center;min-width:0;flex:1;gap:3px}
+#nra-section .nra-vertical-bars{height:158px;width:100%;display:flex;align-items:flex-end;justify-content:center;gap:3px}
+#nra-section .nra-vertical-bar{width:min(22px,42%);min-height:0;position:relative;border-radius:2px 2px 0 0}
+#nra-section .nra-vertical-bar b{position:absolute;bottom:100%;left:50%;transform:translateX(-50%);font-size:10px;white-space:nowrap}
+#nra-section .nra-vertical-label{height:37px;text-align:center;font-size:10px;line-height:1.1;overflow-wrap:anywhere}
+#nra-section .nra-vertical-bar.now{background:#cf2525;color:#cf2525}
+#nra-section .nra-vertical-bar.prior{background:#102f69;color:#102f69}
+@media(max-width:850px){#nra-section .nra-chart-grid{grid-template-columns:1fr}}
 </style>
 
 </head>
@@ -1302,7 +1339,7 @@
   <!-- NRA : année 2026-2027 uniquement -->
   <section class="section bureau-panel hidden-panel" id="nra-section">
     <h2>Note de renseignement académique — NRA</h2>
-    <p class="muted">Synthèses hebdomadaires 2026-2027. Les textes de la page 1 sont conservés séparément dans Grist.</p>
+    <p class="muted">Synthèses hebdomadaires 2026-2027.</p>
     <div class="nra-controls">
       <label>NRA à consulter<select id="nra-week" onchange="nraChangeWeek(this.value)"></select></label>
       <button id="nra-save" type="button" onclick="nraSaveDraft()">Enregistrer le brouillon</button>
@@ -1327,7 +1364,7 @@
       <div id="nra-cumulative-tables"></div><div id="nra-op-cartables" aria-live="polite"></div>
       <h4>Page 3 — Comparaisons hebdomadaires</h4>
       <div id="nra-week-count" class="nra-stat-placeholder">Chargement des totaux hebdomadaires…</div>
-      <div id="nra-weekly-charts" aria-live="polite"></div><details><summary>Voir les tableaux chiffrés de la semaine</summary><div id="nra-weekly-tables"></div></details>
+      <div id="nra-weekly-charts" aria-live="polite"></div>
     </div>
   </section>
 
@@ -1520,10 +1557,9 @@
       if(token!==nraComparisonToken||week!==nraWeek)return;
       const delta=(a,b)=>b===0?"variation non calculable (base N−1 nulle)":((a-b)/b*100).toLocaleString("fr-FR",{maximumFractionDigits:1})+" %";
       cum.textContent="Total des FE depuis la rentrée jusqu'à la fin de la semaine "+week+" : 2026-2027 : "+counts[0].cumulative+" ; 2025-2026 : "+counts[1].cumulative+" ; évolution : "+delta(counts[0].cumulative,counts[1].cumulative)+". Périodes comparées à rang de semaine équivalent, sur la date du fait.";
-      weekly.textContent="Total des FE sur la semaine "+week+" depuis la rentrée : 2026-2027 : "+counts[0].selected+" ; 2025-2026 : "+counts[1].selected+" ; évolution : "+delta(counts[0].selected,counts[1].selected)+". Les FE désactivés sont exclus.";
+      weekly.textContent="Total des FE sur la semaine "+week+" depuis la rentrée : 2026-2027 : "+counts[0].selected+" ; 2025-2026 : "+counts[1].selected+" ; évolution : "+delta(counts[0].selected,counts[1].selected)+".";
       document.getElementById("nra-cumulative-tables").innerHTML=nraBuildTables(counts[0].cumulativeRows,counts[1].cumulativeRows);
       void nraLoadCartables(week,token);
-      document.getElementById("nra-weekly-tables").innerHTML=nraBuildTables(counts[0].selectedRows,counts[1].selectedRows);
       document.getElementById("nra-weekly-charts").innerHTML=nraBuildCharts(counts[0].selectedRows,counts[1].selectedRows);
     }catch(e){
       if(token!==nraComparisonToken)return;
@@ -1531,7 +1567,6 @@
       cum.textContent="Totaux cumulés indisponibles : "+e.message;
       weekly.textContent="Totaux hebdomadaires indisponibles : "+e.message;
       document.getElementById("nra-cumulative-tables").textContent="Ventilations indisponibles.";
-      document.getElementById("nra-weekly-tables").textContent="Ventilations indisponibles.";
       document.getElementById("nra-weekly-charts").textContent="Graphiques indisponibles.";
     }
   }
@@ -1753,7 +1788,7 @@ function nraSplitStructuredFactPaths(value){
     ])).join('');
     const table1='<h5>RÉCAPITULATIF ANNUEL :</h5><div class="nra-table-scroll"><table class="nra-table nra-reference-table"><thead>'+head1+'</thead><tbody>'+rows1+'</tbody></table></div>';
     const departments=[['Total',null],['Aude','11'],['Gard','30'],['Hérault','34'],['Lozère','48'],['Pyrénées-Orientales','66']];
-    const headers2=['FE',years[0],years[1],'DIF.','1er D '+years[0],'1er D '+years[1],'DIF.','2nd D '+years[0],'2nd D '+years[1],'DIF.'];
+    const headers2=['FE',years[0],years[1],'DIFFERENTIEL','1er D '+years[0],'1er D '+years[1],'DIFFERENTIEL','2nd D '+years[0],'2nd D '+years[1],'DIFFERENTIEL'];
     const head2=tr(headers2.map((v,i)=>h(v,[2,5,8].includes(i)?'nra-year-current':[3,6,9].includes(i)?'nra-year-diff':'')));
     const rows2=departments.map(([name,dep])=>{
       const pred=(p,d)=>((!dep||p.department===dep)&&(!d||degree(p,d)));
@@ -1767,22 +1802,25 @@ function nraSplitStructuredFactPaths(value){
     const missingDegree=datasets.map(rows=>rows.filter(p=>!['1er','2nd'].includes(p.degree)).length);
     const missingDep=datasets.map(rows=>rows.filter(p=>!['11','30','34','48','66'].includes(p.department)).length);
     const note='<p class="muted nra-quality">Période : cumul depuis la rentrée, à rang de semaine équivalent. Différences = 2026-2027 moins 2025-2026. FE sans degré reconnu : '+missingDegree.join(' / ')+' ; sans département reconnu : '+missingDep.join(' / ')+' (N−1 / N). Un FE peut relever de plusieurs familles.</p>';
-    return table1+table2+note;
+    return table1+table2;
   }
 
   /* Les barres sont calculées à partir des FE de la semaine, jamais par l'IA.
      Pour les sous-types, seules les étiquettes structurées sont prises en compte :
      on évite de compter une simple mention dans le récit d'un FE. */
   function nraBuildCharts(current, previous){
-    const years=[current,previous];
-    const profiles=years.map(rows=>rows.map(nraFactProfile));
-    const total=()=>true;
+    const profiles=[current,previous].map(rows=>rows.map(nraFactProfile));
     const dept=["11","30","34","48","66"];
-    const broad=Object.keys(NRA_FACT_TAXONOMY).map(root=>[root,p=>p.roots.has(nraNorm(root))]);
+    const broad=[
+      ["ValRep",p=>p.roots.has(nraNorm("Atteintes aux valeurs de la République"))],
+      ["Atteintes aux personnes",p=>p.roots.has(nraNorm("Atteintes aux personnes"))],
+      ["Sécurité / Climat",p=>p.roots.has(nraNorm("Atteintes à la sécurité, au climat de l'établissement"))],
+      ["Biens",p=>p.roots.has(nraNorm("Atteintes aux biens"))]
+    ];
     const violence=[
-      ["Violences verbales",p=>nraHasBranch(p,"Violences verbales")],
-      ["Violences physiques",p=>nraHasBranch(p,"Violences physiques")],
-      ["Violences sexuelles",p=>nraHasBranch(p,"Violences sexuelles")],
+      ["Verbales",p=>nraHasBranch(p,"Violences verbales")],
+      ["Physiques",p=>nraHasBranch(p,"Violences physiques")],
+      ["Sexuelles",p=>nraHasBranch(p,"Violences sexuelles")],
       ["Cyberviolences",p=>nraHasBranch(p,"Cyber-violences")],
       ["Harcèlement",p=>nraHasBranch(p,"Harcèlement ou suspicion de harcèlement")],
       ["Cyberharcèlement",p=>nraHasBranch(p,"Cyber-harcèlement")]
@@ -1790,143 +1828,172 @@ function nraSplitStructuredFactPaths(value){
     const make=(title,items)=>{
       const values=items.map(([label,pred])=>({label,now:profiles[0].filter(pred).length,prior:profiles[1].filter(pred).length}));
       const max=Math.max(1,...values.flatMap(v=>[v.now,v.prior]));
-      return '<section class="nra-chart"><h5>'+escapeHtml(title)+'</h5>'+
-        '<div class="nra-chart-legend"><span class="nra-dot nra-dot-current"></span>2026-2027 <span class="nra-dot nra-dot-previous"></span>2025-2026</div>'+
-        values.map(v=>'<div class="nra-chart-row"><div class="nra-chart-label">'+escapeHtml(v.label)+'</div>'+
-          '<div class="nra-chart-bars"><div class="nra-chart-bar nra-chart-current" style="width:'+100*v.now/max+'%"></div><div class="nra-chart-bar nra-chart-previous" style="width:'+100*v.prior/max+'%"></div></div>'+
-          '<div class="nra-chart-numbers">'+v.now+' / '+v.prior+'</div></div>').join("")+'</section>';
+      const groups=values.map(v=>{
+        const bar=(num,cls)=>'<div class="nra-vertical-bar '+cls+'" style="height:'+(100*num/max)+'%">'+(num?'<b>'+num+'</b>':'')+'</div>';
+        return '<div class="nra-vertical-group"><div class="nra-vertical-bars">'+bar(v.prior,'prior')+bar(v.now,'now')+
+          '</div><div class="nra-vertical-label">'+escapeHtml(v.label)+'</div></div>';
+      }).join("");
+      // Preserve the chart-row data contract used by the jsPDF exporter.
+      const data=values.map(v=>'<div class="nra-chart-row" hidden><div class="nra-chart-label">'+escapeHtml(v.label)+
+        '</div><div class="nra-chart-numbers">'+v.now+' / '+v.prior+'</div></div>').join("");
+      return '<section class="nra-chart"><h5>'+escapeHtml(title)+'</h5><div class="nra-vertical-plot">'+groups+
+        '</div><div class="nra-chart-legend"><span class="nra-dot nra-dot-previous"></span>2025-2026 '+
+        '<span class="nra-dot nra-dot-current" style="background:#cf2525"></span>2026-2027</div>'+data+'</section>';
     };
-    return '<p class="nra-chart-caption">Comparaison des semaines de même rang depuis la rentrée. Valeurs : 2026-2027 / 2025-2026. Les catégories peuvent se recouper.</p>'+
-      make("Total des faits d’établissement",[["Académie",total]])+
-      make("Départements et degrés",dept.flatMap(d=>[
-        [d+" — 1er degré",p=>p.department===d&&p.degree==="1er"],
-        [d+" — 2nd degré",p=>p.department===d&&p.degree==="2nd"]
+    return '<div class="nra-chart-grid">'+
+      make("SUIVI TENDANCIEL HEBDOMADAIRE FE — 2025-2026 ET N-1",[["Académie",()=>true]])+
+      make("FE HEBDOMADAIRE / DSDEN",dept.flatMap(d=>[
+        [d+" — 1er D",p=>p.department===d&&p.degree==="1er"],
+        [d+" — 2nd D",p=>p.department===d&&p.degree==="2nd"]
       ]))+
-      make("Grandes familles d’atteintes",broad)+
-      make("Violences et harcèlement",violence)+
-      '<p class="nra-chart-caption">Sous-catégories : seules les mentions présentes dans les champs de typologie sont comptées. Les valeurs absentes ne sont pas déduites des résumés.</p>';
+      make("DONNÉES HEBDOMADAIRES – ATTEINTES",broad)+
+      make("DONNÉES HEBDOMADAIRES – VIOLENCES",violence)+
+      '</div>';
   }
 
-  /* Export NRA : trois pages A4 en paysage pour conserver les 17 colonnes OP_CA.
-     Les tableaux sont lus dans le DOM déjà calculé, sans recalcul ni données fictives. */
+  /* Export A4 paysage en trois pages, graphique vertical en colonnes. */
   function nraExportPdf(){
     const C=window.jspdf&&window.jspdf.jsPDF?window.jspdf.jsPDF:(window.jsPDF||null);
     if(!C){alert("Bibliothèque jsPDF indisponible.");return;}
-    const cumulative=document.getElementById("nra-cumulative-tables");
-    const ops=document.getElementById("nra-op-cartables");
-    const charts=document.getElementById("nra-weekly-charts");
-    if(!cumulative.querySelector("table")||!ops.querySelector("table")||!charts.querySelector(".nra-chart")){
-      alert("Les données de la NRA ne sont pas encore chargées. Attendez la fin du calcul.");return;
+    const cumulative=document.getElementById("nra-cumulative-tables"),ops=document.getElementById("nra-op-cartables"),charts=document.getElementById("nra-weekly-charts");
+    if(!cumulative?.querySelector("table")||!ops?.querySelector("table")||!charts?.querySelector(".nra-chart")){
+      alert("Les données NRA ne sont pas encore chargées.");return;
     }
     const doc=new C({orientation:"landscape",unit:"mm",format:"a4"});
-    const W=doc.internal.pageSize.getWidth(),H=doc.internal.pageSize.getHeight();
-    const margin=12,usable=W-2*margin;
-    const black=[36,49,63],green=[225,240,228],yellow=[255,246,209];
-    const txt=(v,x,y,size=8,bold=false,max=usable)=>{
-      doc.setFont("helvetica",bold?"bold":"normal");doc.setFontSize(size);doc.setTextColor(...black);
-      const lines=doc.splitTextToSize(String(v||""),max);
-      doc.text(lines,x,y);return y+lines.length*size*0.39+2;
+    const W=doc.internal.pageSize.getWidth(),H=doc.internal.pageSize.getHeight(),margin=12,usable=W-24;
+    const ink=[32,48,69],green=[225,240,228],yellow=[255,246,209],orange=[230,111,22],blue=[12,40,103],red=[202,13,13];
+    const write=(v,x,y,size=9,bold=false,w=usable)=>{
+      doc.setFont("helvetica",bold?"bold":"normal");doc.setFontSize(size);doc.setTextColor(...ink);
+      const lines=doc.splitTextToSize(String(v??""),w);doc.text(lines,x,y);
+      return y+lines.length*size*.42;
     };
-    const title=(v,y)=>txt(v,margin,y,11,true);
-    const para=(v,x,y,w,size=8,maxY=H-17)=>{
-      doc.setFont("helvetica","normal");doc.setFontSize(size);doc.setTextColor(...black);
-      const lines=doc.splitTextToSize(String(v||""),w),lineH=size*0.42;
-      const fit=Math.max(0,Math.floor((maxY-y)/lineH));
-      doc.text(lines.slice(0,fit),x,y);
-      if(lines.length>fit)doc.text("[…]",x,Math.min(maxY,y+fit*lineH));
-      return y+Math.min(lines.length,fit)*lineH;
+    const title=(v,y,size=11)=>write(v,margin,y,size,true);
+    const paragraph=(v,x,y,w,size=8,maxY=H-17)=>{
+      doc.setFont("helvetica","normal");doc.setFontSize(size);doc.setTextColor(...ink);
+      const lines=doc.splitTextToSize(String(v??""),w),lh=size*.44;
+      const fit=Math.max(0,Math.floor((maxY-y)/lh));doc.text(lines.slice(0,fit),x,y);
+      if(lines.length>fit)doc.text("[…]",x,Math.min(maxY,y+fit*lh));
+      return y+Math.min(fit,lines.length)*lh;
     };
-    const table=(element,y,space)=>{
+    const drawTable=(element,y,height)=>{
       if(!element)return y;
-      const rows=Array.from(element.querySelectorAll("tr"));
-      // Reconstituer les colonnes avec rowspan / colspan pour le tableau OP_CA.
-      const grid=[],occupied=[];
-      rows.forEach((tr,ri)=>{
-        const line=[];let ci=0;
-        Array.from(tr.children).forEach(cell=>{
+      const trs=[...element.querySelectorAll("tr")],grid=[],occupied=[];
+      trs.forEach((tr,ri)=>{
+        let ci=0;const cells=[];
+        [...tr.children].forEach(cell=>{
           while(occupied[ci]>ri)ci++;
-          const span=Number(cell.getAttribute("colspan")||1),rowspan=Number(cell.getAttribute("rowspan")||1);
-          line.push({start:ci,span,text:cell.textContent.trim(),head:cell.tagName==="TH",cls:cell.className});
-          for(let k=0;k<span;k++)occupied[ci+k]=ri+rowspan;
+          const span=Number(cell.getAttribute("colspan")||1),rs=Number(cell.getAttribute("rowspan")||1);
+          cells.push({start:ci,span,rs,text:cell.textContent.trim(),head:cell.tagName==="TH",cls:cell.className});
+          for(let k=0;k<span;k++)occupied[ci+k]=ri+rs;
           ci+=span;
-        });grid.push(line);
+        });grid.push(cells);
       });
-      const n=Math.max(...grid.flatMap(r=>r.map(c=>c.start+c.span)),1);
-      const rh=Math.min(7,Math.max(4.4,space/Math.max(rows.length,1))),cw=usable/n;
-      grid.forEach((line,ri)=>{
-        const yy=y+ri*rh;
-        line.forEach(cell=>{
-          const x=margin+cell.start*cw,w=cell.span*cw;
-          const isNow=cell.cls.includes("nra-now"),isDiff=cell.cls.includes("nra-diff");
-          if(cell.head||isNow||isDiff){doc.setFillColor(...(isDiff?yellow:isNow?green:[232,238,243]));doc.rect(x,yy,w,rh,"F");}
-          doc.setDrawColor(192,201,209);doc.setLineWidth(.15);doc.rect(x,yy,w,rh);
-          doc.setFont("helvetica",cell.head?"bold":"normal");doc.setFontSize(n>13?5.1:n>9?6:7);
-          doc.setTextColor(...black);
-          const maxChars=Math.max(1,Math.floor(w/(n>13?1.35:1.7)));
-          let label=cell.text;
-          if(label.length>maxChars)label=label.slice(0,Math.max(1,maxChars-1))+"…";
-          doc.text(label,x+1,yy+rh/2+1,{baseline:"middle"});
-        });
-      });
-      return y+rows.length*rh+4;
+      const n=Math.max(1,...grid.flatMap(r=>r.map(c=>c.start+c.span)));
+      const rh=Math.min(8.1,Math.max(5.1,height/trs.length)),cw=usable/n;
+      grid.forEach((line,ri)=>line.forEach(cell=>{
+        const x=margin+cell.start*cw,yy=y+ri*rh,w=cell.span*cw,h=rh*cell.rs;
+        const now=cell.cls.includes("nra-year-current"),diff=cell.cls.includes("nra-year-diff");
+        if(cell.head||now||diff){doc.setFillColor(...(diff?yellow:now?green:[232,238,243]));doc.rect(x,yy,w,h,"F");}
+        doc.setDrawColor(192,201,209);doc.setLineWidth(.15);doc.rect(x,yy,w,h);
+        const size=n>13?5.1:n>9?6.2:7.2;
+        doc.setFont("helvetica",cell.head?"bold":"normal");doc.setFontSize(size);
+        doc.setTextColor(...(diff&&!cell.head?orange:ink));
+        const width=w-1.4;
+        let label=cell.text;
+        while(label.length>1&&doc.getTextWidth(label)>width)label=label.slice(0,-2)+"…";
+        doc.text(label,x+w/2,yy+h/2+size*.16,{align:"center",baseline:"middle"});
+      }));
+      return y+trs.length*rh;
     };
     const period=document.getElementById("nra-period").textContent;
-    // Page 1 : rédaction sauvegardable, reproduite telle qu'elle apparaît dans les champs.
-    let y=title("Synthèse – Rentrée scolaire 2026 – État des signalements et mobilisation des EMAS",19);
-    y=txt("Semaine "+String(getISOWeekInfo(nraMonday(nraWeek)).week).padStart(2,"0")+" — "+period,margin,y,9);
-    y=title("Contexte général",y+4);
-    y=para(document.getElementById("nra-Contexte_general").value,margin,y+2,usable,9,91);
-    y=title("Points saillants par départements",Math.max(y+8,103));
-    const deps=["34","30","66","11"],gap=3,cw=(usable-3*gap)/4,top=y+4;
+    const iso=String(getISOWeekInfo(nraMonday(nraWeek)).week).padStart(2,"0");
+    // Page 1 — contenu éditorial. Le texte d'exemple n'est ni sauvegardé ni transmis à Grist.
+    let y=title("Synthèse – État des signalements et mobilisation des EMAS",19,12);
+    y=write("Semaine "+iso+" — "+period,margin,y+2,9);
+    y=title("Contexte général :",y+6);
+    const example="Exemple de mise en page (à remplacer) : La semaine considérée fait apparaître des situations contrastées dans les établissements de l'académie. Les signalements nécessitent une lecture différenciée selon les territoires, les degrés d'enseignement et la nature des atteintes. Les EMAS assurent quotidiennement le renseignement et l'appui sur le terrain, en lien avec les services compétents.";
+    const context=document.getElementById("nra-Contexte_general").value.trim()||example;
+    y=paragraph(context,margin,y+4,usable,9,H-72);
+    y=title("Points saillants par départements :",y+9);
+    const deps=["34","30","66","11"],gap=3,cw=(usable-3*gap)/4,top=y+3;
     deps.forEach((d,i)=>{
       const x=margin+i*(cw+gap);
       doc.setFillColor(235,240,245);doc.rect(x,top,cw,9,"F");doc.setDrawColor(175,188,200);
-      doc.rect(x,top,cw,H-top-17);
-      txt("EMAS "+d,x+3,top+6,9,true,cw-6);
-      para(document.getElementById("nra-EMAS_"+d).value,x+3,top+14,cw-6,7.5,H-22);
+      doc.rect(x,top,cw,Math.max(12,H-top-17));
+      write("EMAS "+d,x+3,top+6,9,true,cw-6);
+      paragraph(document.getElementById("nra-EMAS_"+d).value,x+3,top+14,cw-6,7.5,H-22);
     });
-    // Page 2 : tableaux calculés, dont opérations cartables.
+    // Page 2 — trois tableaux compacts, titres directement au-dessus.
     doc.addPage();y=title("RECAPITULATIF ANNUEL :",16);
     const tables=cumulative.querySelectorAll("table");
-    if(tables[0])y=table(tables[0],y+2,42);
-    y=title("Comparatif par département années scolaires 2025-2026 et 2026-2027",y+2);
-    if(tables[1])y=table(tables[1],y+2,44);
-    y=title("Total des opérations cartables par département depuis le 31/08/2026",y+2);
-    y=table(ops.querySelector("table"),y+2,42);
-    const note=ops.querySelector(".nra-quality");
-    if(note)y=para(note.textContent,margin,y+1,usable,7,H-15);
-    // Page 3 : quatre graphiques (2 x 2), dessinés à partir des valeurs affichées.
-    doc.addPage();title("Comparaisons hebdomadaires — "+period,16);
-    const boxes=Array.from(charts.querySelectorAll(".nra-chart")).slice(0,4);
-    const chartW=(usable-7)/2,chartH=82;
+    y=drawTable(tables[0],y+1,43)+5;
+    y=title("Comparatif par département années scolaires 2025-2026 et 2026-2027",y);
+    y=drawTable(tables[1],y+1,51)+5;
+    y=title("Total des opérations cartables par département depuis le 31/08/2026",y);
+    y=drawTable(ops.querySelector("table"),y+1,43);
+    // Page 3 — quatre graphiques à barres VERTICALES, disposition 2 x 2.
+    doc.addPage();
+    const boxes=[...charts.querySelectorAll(".nra-chart")].slice(0,4);
+    const titles=["SUIVI TENDANCIEL HEBDOMADAIRE FE – 2025-2026 ET N-1","FE HEBDOMADAIRE / DSDEN","DONNÉES HEBDOMADAIRES – ATTEINTES","DONNÉES HEBDOMADAIRES – VIOLENCES"];
+    const bw=(usable-9)/2,bh=81;
     boxes.forEach((el,i)=>{
-      const x=margin+(i%2)*(chartW+7),top=24+Math.floor(i/2)*89;
-      doc.setDrawColor(189,199,207);doc.rect(x,top,chartW,chartH);
-      const name=el.querySelector("h5")?.textContent||"Graphique";
-      txt(name,x+3,top+7,8,true,chartW-6);
-      const lines=Array.from(el.querySelectorAll(".nra-chart-row"));
-      const maxRows=Math.min(lines.length,11),rowH=Math.min(6.1,64/Math.max(maxRows,1));
-      lines.slice(0,maxRows).forEach((r,j)=>{
-        const label=r.querySelector(".nra-chart-label")?.textContent||"";
-        const numbers=(r.querySelector(".nra-chart-numbers")?.textContent||"").match(/(\d+)\s*\/\s*(\d+)/);
-        if(!numbers)return;
-        const a=Number(numbers[1]),b=Number(numbers[2]);
-        const max=Math.max(1,...lines.map(z=>{
-          const m=(z.querySelector(".nra-chart-numbers")?.textContent||"").match(/(\d+)\s*\/\s*(\d+)/);
-          return m?Math.max(Number(m[1]),Number(m[2])):0;
-        }));
-        const yy=top+13+j*rowH;
-        doc.setFont("helvetica","normal");doc.setFontSize(5.8);doc.setTextColor(...black);
-        doc.text(label.slice(0,30),x+2,yy+2);
-        const bx=x+chartW*.48,bw=chartW*.39;
-        doc.setFillColor(72,135,185);doc.rect(bx,yy,bw*a/max,1.5,"F");
-        doc.setFillColor(174,185,195);doc.rect(bx,yy+1.9,bw*b/max,1.5,"F");
-        doc.text(a+" / "+b,x+chartW-2,yy+2,{align:"right"});
+      const x=margin+(i%2)*(bw+9),top=16+Math.floor(i/2)*91;
+      doc.setFont("helvetica","bold");doc.setFontSize(9);doc.setTextColor(...blue);
+      const heading=doc.splitTextToSize(titles[i],bw-5);
+      doc.text(heading,x+bw/2,top,{align:"center"});
+      const rows=[...el.querySelectorAll(".nra-chart-row")];
+      const values=rows.map(r=>{
+        const m=(r.querySelector(".nra-chart-numbers")?.textContent||"").match(/(\d+)\s*\/\s*(\d+)/);
+        return {label:r.querySelector(".nra-chart-label")?.textContent||"",now:m?Number(m[1]):0,prior:m?Number(m[2]):0};
       });
+      // Départements : agréger les 10 catégories en 2 groupes de degrés, 5 départements par groupe.
+      let groups=values;
+      if(i===1){
+        groups=["1er degré","2nd degré"].map((label,j)=>({label,parts:values.filter((_,k)=>k%2===j)}));
+      } else if(i===0 && values.length===1){
+        groups=[{label:"2025/2026",prior:values[0].prior,now:0},
+                {label:"2026/2027",prior:0,now:values[0].now}];
+      }
+      const base=top+64,chartTop=top+16,chartHeight=base-chartTop;
+      const max=Math.max(1,...values.flatMap(v=>[v.now,v.prior]));
+      doc.setDrawColor(200,207,215);doc.line(x+4,base,x+bw-4,base);
+      if(i===1){
+        const deptColors=[[246,219,0],[9,40,99],[235,122,46],[80,110,183],[0,166,91]];
+        groups.forEach((g,j)=>{
+          const groupX=x+13+j*(bw-26)/2,barW=5.5;
+          g.parts.forEach((v,k)=>{
+            const hh=chartHeight*v.now/max;
+            doc.setFillColor(...deptColors[k]);doc.rect(groupX+(k-2)*barW,base-hh,barW-0.6,hh,"F");
+            if(v.now){doc.setFontSize(6);doc.setTextColor(...blue);doc.text(String(v.now),groupX+(k-1.5)*barW,base-hh-1,{align:"center"});}
+          });
+          doc.setFontSize(6.8);doc.setTextColor(...blue);doc.text(g.label,x+18+j*(bw-26)/2,base+5);
+        });
+        ["Aude","Gard","Hérault","Lozère","Pyrénées-Orientales"].forEach((label,k)=>{
+          const xx=x+3+k*(bw-6)/5;
+          doc.setFillColor(...deptColors[k]);doc.rect(xx,top+74,2.5,2.5,"F");
+          doc.setFontSize(5.6);doc.setTextColor(...blue);doc.text(label,xx+3.3,top+76);
+        });
+      }else{
+        const step=(bw-9)/Math.max(1,groups.length);
+        groups.forEach((v,j)=>{
+          const cx=x+4+step*(j+.5),barW=Math.min(7,step*.35);
+          [[v.prior,blue,-1],[v.now,red,1]].forEach(([value,color,side])=>{
+            const hh=chartHeight*value/max,bx=cx+(side<0?-barW:0);
+            doc.setFillColor(...color);doc.rect(bx,base-hh,barW-.5,hh,"F");
+            if(value){doc.setFont("helvetica","bold");doc.setFontSize(6.2);doc.setTextColor(...color);doc.text(String(value),bx+barW/2,base-hh-1,{align:"center"});}
+          });
+          doc.setFont("helvetica","normal");doc.setFontSize(groups.length>5?5.2:6.3);doc.setTextColor(...blue);
+          const short=i===0?(j===0?"2025/26":"2026/27"):v.label.replace("Atteintes aux ","").replace("Violences ","");
+          const label=short.length>19?short.slice(0,18)+"…":short;
+          doc.text(label,cx,base+5,{align:"center",maxWidth:step*.95});
+        });
+        doc.setFillColor(...blue);doc.rect(x+8,top+74,3,3,"F");
+        doc.setFontSize(6.5);doc.setTextColor(...ink);doc.text("2025-2026",x+12,top+76.5);
+        doc.setFillColor(...red);doc.rect(x+43,top+74,3,3,"F");doc.text("2026-2027",x+47,top+76.5);
+      }
     });
-    txt("Bleu : 2026-2027   |   Gris : 2025-2026   |   Valeurs : N / N−1",margin,H-12,7);
     addEmasPdfBranding(doc);
-    doc.save("NRA_2026-2027_semaine_"+nraWeek+".pdf");
+    doc.save("NRA_S"+iso+"_26_27.pdf");
   }
 
   let nraOriginalValues={};
@@ -2937,7 +3004,9 @@ function nraSplitStructuredFactPaths(value){
         .replace(/\s+/g, " ")
         .trim();
 
-      const numberMatch = normalized.match(/(?:^|\D)(11|30|34|48|66)(?:\D|$)/);
+      // La base FE25_26 utilise des codes département à trois chiffres
+      // (ex. 030, 034, 011, 048, 066), contrairement au format attendu à deux chiffres.
+      const numberMatch = normalized.match(/(?:^|\D)0?(11|30|34|48|66)(?:\D|$)/);
       if (numberMatch) return numberMatch[1];
 
       if (normalized.includes("pyrenees orientales")) return "66";
