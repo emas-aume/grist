@@ -58,7 +58,7 @@ select{background-color:#fff!important;color-scheme:light!important;}
 #notificationPanel[hidden],#bellCount[hidden]{display:none}
 .bellHead{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
 .bellItem{width:100%;text-align:left;border:1px solid #c9d9ee;background:#f2f7ff;color:#294b73;border-radius:8px;padding:10px;margin:4px 0;cursor:pointer;font-size:12px;line-height:1.5}
-.bellItem strong{display:block}
+.bellItem strong{display:block}.bellDate{display:block;margin-top:5px;color:#596b82}
 .bellRow{display:flex;align-items:stretch;gap:6px}.bellRow .bellItem{flex:1;min-width:0}.bellDelete{align-self:center;border:1px solid #e4c9c9;background:#fff7f7;color:#9c3434;border-radius:7px;padding:9px;cursor:pointer}.bellDelete:hover{background:#fee2e2}.bellClear{font-size:12px;border:1px solid #d3dce8;border-radius:6px;background:#fff;color:#344054!important;padding:5px 7px;cursor:pointer;white-space:nowrap;min-width:max-content}.bellClear:disabled{color:#667085!important;opacity:.65;cursor:not-allowed}.bellHead>span{display:flex;align-items:center;gap:5px}
 .bellEmpty{font-size:12px;color:#64748b;padding:12px}
 .toast{position:relative;overflow:hidden}
@@ -777,13 +777,15 @@ async function loadSuiviFor(facts){
 }
 // V28 : état des notifications sauvegardé par compte Grist dans NOTIFICATIONS_UTILISATEURS.
 const FE_NOTIFY_POLL_MS=15000,feNoticeHistory=[],feSeenIds=new Set();
+// Suivi des changements de contenu sur les lignes Grist déjà utilisées.
+const feNoticeRowSnapshot=new Map();
 let feNoticeBusy=false,feNoticeTimer=null,feNoticeUnread=0,feNoticeReady=false,feNoticeState=null,feNoticeEmail="",feNoticeLastId=0;
 function feNoticeTime(ts){return new Intl.DateTimeFormat("fr-FR",{hour:"2-digit",minute:"2-digit",day:"2-digit",month:"2-digit"}).format(new Date(ts))}
 function feNoticeVisible(){return feNoticeHistory.filter(x=>!x.deleted&&feNoticeAllowedDepartment(x))}
 function renderFeBell(){
   feNoticeHistory.splice(0,feNoticeHistory.length,...feNoticeTrim(feNoticeHistory));
   const visible=feNoticeVisible();
-  feNoticeUnread=visible.filter(x=>Number(x.arrived)>Number(feNoticeState?.Derniere_consultation||0)).length;
+  feNoticeUnread=visible.filter(x=>!x.read&&Number(x.arrived)>Number(feNoticeState?.Derniere_consultation||0)).length;
   $("bellCount").textContent=String(feNoticeUnread);$("bellCount").hidden=feNoticeUnread===0;
   $("bellClear").disabled=!visible.length;
   $("bellItems").replaceChildren();
@@ -792,8 +794,8 @@ function renderFeBell(){
     const row=document.createElement("div");row.className="bellRow";
     const btn=document.createElement("button");btn.type="button";btn.className="bellItem";
     const h=document.createElement("strong");h.textContent=`Nouveau FE · Niveau ${item.niveau}`;
-    const d=document.createElement("span");d.textContent=`${item.etab} — ${item.ville} · ${item.numero} · Arrivé le ${feNoticeTime(item.arrived)}`;
-    btn.append(h,d);btn.onclick=()=>openNotifiedFE(item);
+    const d=document.createElement("span");d.textContent=`${item.etab} — ${item.ville} · ${item.numero}`;const date=document.createElement("span");date.className="bellDate";date.textContent=`Arrivé le ${feNoticeTime(item.arrived)}`;
+    btn.append(h,d,date);btn.onclick=()=>openNotifiedFE(item);
     const del=document.createElement("button");del.type="button";del.className="bellDelete";del.textContent="✕";del.title="Supprimer cette notification";del.setAttribute("aria-label",`Supprimer la notification ${item.numero}`);
     del.onclick=()=>void feNoticeDelete([item.id]);
     row.append(btn,del);$("bellItems").appendChild(row);
@@ -818,6 +820,9 @@ async function openNotifiedFE(item){
     const f=found[0];
     if(!f||!isCurrentOperationalFact(f)){toast("Ce FE n’est plus disponible.","error","Ouverture impossible");return}
     $("notificationPanel").hidden=true;await openFact(`${T.CUR}:${item.id}`);
+    // La consultation du FE marque cette notification comme lue, sans la supprimer.
+    const local=feNoticeHistory.find(x=>Number(x.id)===Number(item.id));
+    if(local){local.read=true;renderFeBell();try{await feNoticePersist()}catch(e){console.warn("Lecture de notification non enregistrée",e);toast(e.message,"error","Lecture non enregistrée")}}
   }catch(e){toast(e.message,"error","Ouverture impossible")}
 }
 function feNoticeIdentity(){
@@ -851,7 +856,7 @@ function feNoticeRestore(row){
   let history=[];try{history=JSON.parse(String(row.Historique_JSON||"[]"))}catch(e){console.warn("Historique de notifications illisible",e)}
   feNoticeHistory.splice(0,feNoticeHistory.length,...(Array.isArray(history)?history:[]).filter(x=>x&&Number.isFinite(Number(x.id))).filter(x=>Number(x.arrived)>=feNoticeWindowStart()&&feNoticeAllowedDepartment(x)));
   const viewed=Number(row.Derniere_consultation)||0;
-  feNoticeUnread=feNoticeHistory.filter(x=>!x.deleted&&Number(x.arrived)>viewed).length;
+  feNoticeUnread=feNoticeHistory.filter(x=>!x.deleted&&!x.read&&Number(x.arrived)>viewed).length;
   renderFeBell();
 }
 // Les écritures de cet onglet sont sérialisées et fusionnées avec la dernière lecture.
@@ -861,7 +866,9 @@ function feNoticeMergeHistory(local,remote){
   for(const item of [...remote,...local])if(item&&Number.isFinite(Number(item.id))){
     const key=Number(item.id),prev=byId.get(key);
     if(!prev)byId.set(key,item);
+    else if(Number(item.arrived)>Number(prev.arrived)&&item.reentered)byId.set(key,item);
     else if(item.deleted&&!prev.deleted)byId.set(key,item);
+    else if(item.read&&!prev.read)byId.set(key,{...prev,read:true});
     else if(Boolean(item.deleted)===Boolean(prev.deleted)&&Number(item.arrived)<Number(prev.arrived))byId.set(key,item);
   }
   return feNoticeTrim([...byId.values()].sort((a,b)=>Number(b.id)-Number(a.id)));
@@ -889,7 +896,7 @@ function feNoticePersist(viewedAt=null){
     }
     feNoticeState=saved;feNoticeLastId=Math.max(cursor,Number(saved.Dernier_FE_ID)||0);
     feNoticeHistory.splice(0,feNoticeHistory.length,...savedHistory);
-    feNoticeUnread=savedHistory.filter(x=>!x.deleted&&Number(x.arrived)>Number(saved.Derniere_consultation||0)).length;
+    feNoticeUnread=savedHistory.filter(x=>!x.deleted&&!x.read&&Number(x.arrived)>Number(saved.Derniere_consultation||0)).length;
     renderFeBell();
   });
   feNoticeWriteQueue=pending;return pending;
@@ -922,13 +929,27 @@ async function recentFE(){
   })();
   try{return await recentFECache.promise}finally{recentFECache.promise=null}
 }
+function feNoticeRowSignature(f){return isCurrentOperationalFact(f)?String(f.Numero_FE||"").trim():""}
 async function pollNewFE(){
   if(feNoticeBusy||document.hidden||!feNoticeReady)return;
   feNoticeBusy=true;
   try{
     // Pagination jusqu'au curseur : aucun plafond fixe à 100/1000 nouveaux FE.
     const recent=await recentFE();
-    if(!recent.length||Number(recent[0].id)<=feNoticeLastId)return;
+    if(!recent.length)return;
+    // Une ligne Grist déjà existante peut passer de vide à remplie : son id ne change pas.
+    const reused=[];
+    for(const f of recent){
+      const id=Number(f.id),signature=feNoticeRowSignature(f);
+      if(feNoticeRowSnapshot.has(id)){
+        const previous=feNoticeRowSnapshot.get(id);
+        if(signature&&signature!==previous&&id<=feNoticeLastId)reused.push(f);
+      }
+      feNoticeRowSnapshot.set(id,signature);
+    }
+    // Éviter que le cache de suivi augmente sans limite.
+    if(feNoticeRowSnapshot.size>500){const ids=new Set(recent.map(f=>Number(f.id)));for(const id of feNoticeRowSnapshot.keys())if(!ids.has(id))feNoticeRowSnapshot.delete(id)}
+    if(Number(recent[0].id)<=feNoticeLastId&&!reused.length)return;
     const newer=[];let offset=0,stop=false;
     // Le cas courant ne demande qu'une lecture mutualisée de 100 FE.
     if(recent.some(f=>Number(f.id)<=feNoticeLastId)){
@@ -942,19 +963,25 @@ async function pollNewFE(){
         if(batch.length<100)break;offset+=100;
       }
     }
+    newer.push(...reused);
     if(!newer.length)return;
     const maxId=newer.reduce((max,f)=>Math.max(max,Number(f.id)||0),feNoticeLastId);
     const newcomers=newer.filter(isCurrentOperationalFact).sort((a,b)=>Number(a.id)-Number(b.id));
     const added=[];
     for(const f of newcomers){
-      if(feNoticeHistory.some(x=>Number(x.id)===Number(f.id)))continue;
-      const item={id:Number(f.id),numero:String(f.Numero_FE||""),niveau:String(f.Niveau||"—"),etab:String(f.Etablissement||"Établissement non renseigné"),ville:String(f.Ville||""),departement:factDept(f),arrived:Date.now()};
+      const existing=feNoticeHistory.find(x=>Number(x.id)===Number(f.id));
+      // Nouvelle saisie sur une ligne précédemment vidée : remplacer l'ancienne occurrence.
+      if(existing){
+        if(!reused.some(x=>Number(x.id)===Number(f.id)))continue;
+        feNoticeHistory.splice(feNoticeHistory.indexOf(existing),1);
+      }
+      const item={id:Number(f.id),numero:String(f.Numero_FE||""),niveau:String(f.Niveau||"—"),etab:String(f.Etablissement||"Établissement non renseigné"),ville:String(f.Ville||""),departement:factDept(f),arrived:Date.now(),reentered:reused.some(x=>Number(x.id)===Number(f.id))};
       feNoticeHistory.unshift(item);added.push(item);
     }
     feNoticeHistory.splice(0,feNoticeHistory.length,...feNoticeTrim(feNoticeHistory));
     feNoticeLastId=maxId;
     await feNoticePersist(); // Fusion avec l'historique distant avant d'afficher les notifications.
-    feNoticeUnread=feNoticeHistory.filter(x=>!x.deleted&&Number(x.arrived)>Number(feNoticeState.Derniere_consultation||0)).length;
+    feNoticeUnread=feNoticeHistory.filter(x=>!x.deleted&&!x.read&&Number(x.arrived)>Number(feNoticeState.Derniere_consultation||0)).length;
     renderFeBell();
     for(const item of added)toast(`${item.etab} — ${item.ville} · ${item.numero}`,"info",`Nouveau FE · Niveau ${item.niveau}`,10000,()=>openNotifiedFE(item));
   }catch(e){toast(e.message,"error","Notifications indisponibles",6000);console.warn(e)}
