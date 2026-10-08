@@ -201,31 +201,33 @@ async function issueSync(force=false){
   if(!force&&!issuePending.length&&Date.now()-issueLastPoll<30000)return;
   issueSyncBusy=true;
   try{
-    // Relire avant écriture : une réponse réseau perdue peut masquer un AddRecord réussi.
-    // Details porte uniquement un identifiant aléatoire d'événement, jamais une pile d'erreur.
-    // Les conflits ID_FE sont des états persistants : ne pas les retransmettre en boucle.
-    const sentStates=new Set();
-    for(const item of issuePending.slice(0,20)){
-      if(item.kind==="Conflit ID_FE"){
-        const stateKey=item.kind+":"+item.fe;
-        if(sentStates.has(stateKey)){issuePending=issuePending.filter(x=>x.eventId!==item.eventId);issueSavePending();continue}
-        sentStates.add(stateKey);
-      }
-      const already=await api(T.JOURNAL,{filter:{Details:[item.eventId]},limit:2});
-      if(already.length>0){
-        issuePending=issuePending.filter(x=>x.eventId!==item.eventId);issueSavePending();
-        continue;
-      }
+    // Une seule lecture du journal partagé par cycle : évite 2 requêtes par anomalie.
+    const existing=await api(T.JOURNAL,{sort:"-Date_heure",limit:1000});
+    const eventIds=new Set(existing.map(r=>String(r.Details||"")).filter(Boolean));
+    const signatures=new Set(existing.map(r=>`${String(r.Operation||"")}|${String(r.Numero_FE||"")}|${String(r.Message||"")}`));
+    const now=Date.now();
+    const pending=issuePending.slice(0,20);
+    const toWrite=[];
+    const seenBatch=new Set();
+    for(const item of pending){
+      const signature=`${item.kind}|${item.fe}|${item.message}`;
+      const known=eventIds.has(item.eventId)||signatures.has(signature)||seenBatch.has(signature);
+      if(known){issuePending=issuePending.filter(x=>x.eventId!==item.eventId);continue}
+      seenBatch.add(signature);
+      toWrite.push(item);
+    }
+    issueSavePending();
+    for(const item of toWrite){
       const equipier=String(currentEquipier?.Nom||"");
       const utilisateur=String(currentUserProfile?.email||currentUserProfile?.loginEmail||currentEquipier?.Email||"");
       const record={Date_heure:Math.floor(item.time/1000),Equipier:equipier,Utilisateur:utilisateur,Session_ID:currentClaimSession,Numero_FE:item.fe,Operation:item.kind,Niveau:"Erreur",Message:item.message,Details:item.eventId,Statut:"Nouvelle",Date_resolution:null};
       await grist.docApi.applyUserActions([["AddRecord",T.JOURNAL,null,record]]);
-      // Confirmer l'écriture avant de retirer l'événement de la file d'attente.
-      const verified=await api(T.JOURNAL,{filter:{Details:[item.eventId]},limit:2});
-      if(verified.length!==1)throw new Error("Écriture du journal non confirmée");
-      issuePending=issuePending.filter(x=>x.eventId!==item.eventId);issueSavePending();
+      // En cas de coupure, l'événement reste en attente et sera retrouvé par Details au prochain cycle.
+      issuePending=issuePending.filter(x=>x.eventId!==item.eventId);
+      issueSavePending();
+      existing.unshift({...record,id:"local-"+item.eventId});
     }
-    const remote=await api(T.JOURNAL,{sort:"-Date_heure",limit:250});
+    const remote=existing.slice(0,1000);
     sharedIssueEntries=remote;
     issueLastPoll=Date.now();
     issueRender();
@@ -719,6 +721,7 @@ async function findFactBySuffix(table,query,suffix,limit=10){
   return out;
 }
 async function loadPeriodOptions(){
+  const selectedDayBefore=$("daySelect").value,selectedWeekBefore=$("weekSelect").value;
   // Grist ne fournit pas de DISTINCT sur les dates via cet endpoint : on construit
   // une fois l'index des périodes à partir de FE26_27_2, puis les FE affichés sont
   // toujours rechargés à la demande pour la période choisie.
@@ -757,8 +760,9 @@ async function loadPeriodOptions(){
   $("weekSelect").innerHTML='<option value="">Choisir une semaine</option>'+weeks.map(([key,w])=>{let st=isoWeekStart(w.year,w.week),en=new Date(st.getTime()+6*86400000);return `<option value="${key}">S${String(w.week).padStart(2,"0")} — ${frShortUTC(st)} à ${frShortUTC(en)}</option>`}).join("");
   // Par défaut : semaine courante si elle contient des FE, sinon dernière semaine disponible.
   let now=isoWeekInfo(new Date()),cur=`${now.year}-W${String(now.week).padStart(2,"0")}`;
-  $("weekSelect").value=availableWeeks.has(cur)?cur:(weeks[0]?.[0]||"");
-  $("daySelect").value="";
+  $("weekSelect").value=selectedDayBefore?"":(availableWeeks.has(selectedWeekBefore)?selectedWeekBefore:(availableWeeks.has(cur)?cur:(weeks[0]?.[0]||"")));
+  $("daySelect").value=availableDays.has(selectedDayBefore)?selectedDayBefore:"";
+  if(selectedDayBefore&&!availableDays.has(selectedDayBefore))$("weekSelect").value=availableWeeks.has(cur)?cur:(weeks[0]?.[0]||"");
 }
 function periodSpec(){
   let day=$("daySelect").value,week=$("weekSelect").value;
@@ -767,7 +771,7 @@ function periodSpec(){
   return null;
 }
 let loadCurrentGeneration=0;
-async function loadCurrent(){const generation=++loadCurrentGeneration;let spec=periodSpec();if(!spec){notice("Choisissez une période valide.","error");return}notice(`Chargement des faits ${spec.label} — départements 34 et 48…`);let loaded=await apiAllPaged(T.CUR,{filter:{Date_de_saisie:spec.dates},sort:"-id",pageSize:1000,maxRows:10000});if(generation!==loadCurrentGeneration)return;const nextRows=loaded.filter(isCurrentOperationalFact).sort((a,b)=>(Number(b.id)||0)-(Number(a.id)||0));await loadSuiviFor(nextRows);if(generation!==loadCurrentGeneration)return;await loadClaimsFor(nextRows);if(generation!==loadCurrentGeneration)return;currentRows=nextRows;rows=[...nextRows];notice(`${currentRows.length} fait(s) des départements 34 et 48 chargé(s) pour ${spec.label}.`,"ok");page=1;render()}
+async function loadCurrent(){const generation=++loadCurrentGeneration;let spec=periodSpec();if(!spec){notice("Choisissez une période valide.","error");return}notice(`Chargement des faits ${spec.label} — départements 34 et 48…`);let loaded=await apiAllPaged(T.CUR,{filter:{Date_de_saisie:spec.dates},sort:"-id",pageSize:1000,maxRows:10000});if(generation!==loadCurrentGeneration)return;const nextRows=loaded.filter(isCurrentOperationalFact).sort((a,b)=>(Number(b.id)||0)-(Number(a.id)||0));await Promise.all([loadSuiviFor(nextRows),loadClaimsFor(nextRows)]);if(generation!==loadCurrentGeneration)return;currentRows=nextRows;rows=[...nextRows];notice(`${currentRows.length} fait(s) des départements 34 et 48 chargé(s) pour ${spec.label}.`,"ok");page=1;render()}
 async function loadSuiviFor(facts){
   // Une requête par groupe de FE distincts évite les filtres REST démesurés.
   const ids=[...new Set(facts.filter(f=>!isArchivedFact(f)).map(f=>feNumericKey(f.Numero_FE)).filter(Boolean))];
@@ -1067,7 +1071,13 @@ async function loadOperationalIds(){
   }
   if(idConflictingFe.size){
     console.warn("ID_FE : correspondances ambiguës ignorées",[...idConflictingFe]);
-    for(const numero of idConflictingFe)issueAdd("Conflit ID_FE","Correspondances d’ID opérationnels ambiguës dans ID_FE. Aucun ID attribué automatiquement.",numero);
+    for(const numero of idConflictingFe){
+      if(issueEntries.some(x=>x.kind==="Conflit ID_FE"&&x.fe===numero))continue;
+      const item={time:Date.now(),kind:"Conflit ID_FE",message:"Correspondances d’ID opérationnels ambiguës dans ID_FE. Aucun ID attribué automatiquement.",fe:numero,eventId:"e"+Date.now().toString(36)+"-"+Math.random().toString(36).slice(2,12)};
+      issueEntries.push(item);issuePending.push(item);
+    }
+    issueEntries=issueEntries.slice(-200);issuePending=issuePending.slice(-200);
+    issueSave();issueSavePending();issueRender();
   }
 }
 
@@ -2080,6 +2090,14 @@ $("equipier").onchange=()=>{equipierSelectionTouched=true};["dep","degree","leve
 $("back").onclick=async()=>{if(!(await confirmLeaveIfDirty()))return;await releaseCurrentEditResources();opsCleanSnapshot=null;ambianceCleanSnapshot=null;const wasOperationalSearch=/^id\s*=\s*\d+$/i.test($("q").value.trim());if(wasOperationalSearch){$("q").value="";rows=[...currentRows];page=1;notice("")}$("detailView").classList.add("hidden");$("listView").classList.remove("hidden");render()};$("openEtab").onclick=showEstablishment;$("etabBack").onclick=async()=>{if(!(await confirmLeaveIfDirty()))return;const lockUai=String(selectedEtab?.UAI||"").trim();await releaseEditLock("ETAB",lockUai);currentEtabLock=null;ambianceCleanSnapshot=null;$("etabView").classList.add("hidden");if(etabReturnTarget==="detail"&&selected){$("detailView").classList.remove("hidden");markOpsClean()}else{$("listView").classList.remove("hidden");render()}};$("save").onclick=saveOps;$("toggleDone").onclick=toggleDone;$("resetFollowup").onclick=resetFollowup;
 (async()=>{try{initIssueJournal();initActivityFields();
 // Chargements indépendants en parallèle : référentiels, identifiants et index des périodes.
-await Promise.all([loadSmallTables(),loadOperationalIds(),loadPeriodOptions()]);
-await detectCurrentEquipier();void issueSync(true);setInterval(()=>{if(!document.hidden)void issueSync(true)},30000);await loadCurrent();wireTemporaryClaimTriggers();startLiveRefresh();initFeBell();startClaimHeartbeat();startEditLockHeartbeat();setInterval(retryDeferredActivity,30000);repairLegacyChoiceLists()}catch(e){console.error(e);notice("Erreur Grist : "+e.message,"error");$("body").innerHTML='<tr><td colspan="9" class="loading">Impossible de charger les données.</td></tr>'}})();
+await loadSmallTables();
+const startupWeek=isoWeekInfo(new Date()),startupKey=`${startupWeek.year}-W${String(startupWeek.week).padStart(2,"0")}`;
+$("weekSelect").innerHTML=`<option value="${startupKey}">S${String(startupWeek.week).padStart(2,"0")} — semaine actuelle</option>`;
+$("weekSelect").value=startupKey;
+await loadCurrent();
+// Les tâches volumineuses sont lancées après l'affichage initial et ne bloquent plus les FE.
+void loadOperationalIds().catch(e=>console.warn("Index ID_FE indisponible",e));
+void loadPeriodOptions().catch(e=>console.warn("Index périodes indisponible",e));
+void detectCurrentEquipier().then(()=>issueSync(true)).catch(e=>console.warn(e));
+setInterval(()=>{if(!document.hidden)void issueSync()},60000);wireTemporaryClaimTriggers();startLiveRefresh();initFeBell();startClaimHeartbeat();startEditLockHeartbeat();setInterval(retryDeferredActivity,30000);repairLegacyChoiceLists()}catch(e){console.error(e);notice("Erreur Grist : "+e.message,"error");$("body").innerHTML='<tr><td colspan="9" class="loading">Impossible de charger les données.</td></tr>'}})();
 </script></body></html>
