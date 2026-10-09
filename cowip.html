@@ -793,7 +793,7 @@ function feNoticeVisible(){return feNoticeHistory.filter(x=>!x.deleted&&feNotice
 function renderFeBell(){
   feNoticeHistory.splice(0,feNoticeHistory.length,...feNoticeTrim(feNoticeHistory));
   const visible=feNoticeVisible();
-  feNoticeUnread=visible.filter(x=>!x.read&&Number(x.arrived)>Number(feNoticeState?.Derniere_consultation||0)).length;
+  feNoticeUnread=visible.filter(x=>!x.read).length;
   $("bellCount").textContent=String(feNoticeUnread);$("bellCount").hidden=feNoticeUnread===0;
   $("bellClear").disabled=!visible.length;
   $("bellItems").replaceChildren();
@@ -805,15 +805,16 @@ function renderFeBell(){
     const d=document.createElement("span");d.textContent=`${item.etab} — ${item.ville} · ${item.numero}`;const date=document.createElement("span");date.className="bellDate";date.textContent=`Arrivé le ${feNoticeTime(item.arrived)}`;
     btn.append(h,d,date);btn.onclick=()=>openNotifiedFE(item);
     const del=document.createElement("button");del.type="button";del.className="bellDelete";del.textContent="✕";del.title="Supprimer cette notification";del.setAttribute("aria-label",`Supprimer la notification ${item.numero}`);
-    del.onclick=()=>void feNoticeDelete([item.id]);
+    del.onclick=()=>void feNoticeDelete([String(item.occurrence||`${item.id}:${item.numero}`)]);
     row.append(btn,del);$("bellItems").appendChild(row);
   }
 }
 async function feNoticeDelete(ids){
   if(!feNoticeReady||!feNoticeState)return;
-  const wanted=new Set(ids.map(Number));
+  const wanted=new Set(ids.map(String));
   const previous=feNoticeHistory.map(x=>({...x}));
-  for(const item of feNoticeHistory)if(wanted.has(Number(item.id)))item.deleted=true;
+  // Suppression strictement individuelle : seule la boîte de cet équipier est modifiée.
+  for(const item of feNoticeHistory)if(wanted.has(String(item.occurrence||`${item.id}:${item.numero}`)))item.deleted=true;
   renderFeBell();
   try{await feNoticePersist()}
   catch(e){
@@ -829,8 +830,15 @@ async function openNotifiedFE(item){
     if(!f||!isCurrentOperationalFact(f)){toast("Ce FE n’est plus disponible.","error","Ouverture impossible");return}
     $("notificationPanel").hidden=true;await openFact(`${T.CUR}:${item.id}`);
     // La consultation du FE marque cette notification comme lue, sans la supprimer.
-    const local=feNoticeHistory.find(x=>Number(x.id)===Number(item.id));
-    if(local){local.read=true;renderFeBell();try{await feNoticePersist()}catch(e){console.warn("Lecture de notification non enregistrée",e);toast(e.message,"error","Lecture non enregistrée")}}
+    const local=feNoticeHistory.find(x=>String(x.occurrence||`${x.id}:${x.numero}`)===String(item.occurrence||`${item.id}:${item.numero}`));
+    if(local){
+      const wasRead=Boolean(local.read);
+      local.read=true;renderFeBell();
+      try{await feNoticePersist()}catch(e){
+        local.read=wasRead;renderFeBell();
+        console.warn("Lecture de notification non enregistrée",e);toast(e.message,"error","Lecture non enregistrée");
+      }
+    }
   }catch(e){toast(e.message,"error","Ouverture impossible")}
 }
 function feNoticeIdentity(){
@@ -861,7 +869,7 @@ function feNoticeRestore(row){
   let history=[];try{history=JSON.parse(String(row.Historique_JSON||"[]"))}catch(e){console.warn("Historique de notifications illisible",e)}
   feNoticeHistory.splice(0,feNoticeHistory.length,...(Array.isArray(history)?history:[]).filter(x=>x&&Number.isFinite(Number(x.id))).filter(x=>Number(x.arrived)>=feNoticeWindowStart()&&Number(x.arrived)<=Date.now()&&feNoticeAllowedDepartment(x)));
   const viewed=Number(row.Derniere_consultation)||0;
-  feNoticeUnread=feNoticeHistory.filter(x=>!x.deleted&&!x.read&&Number(x.arrived)>viewed).length;
+  feNoticeUnread=feNoticeHistory.filter(x=>!x.deleted&&!x.read).length;
   renderFeBell();
 }
 // Les écritures de cet onglet sont sérialisées et fusionnées avec la dernière lecture.
@@ -906,7 +914,7 @@ function feNoticePersist(viewedAt=null){
     }
     feNoticeState=saved;feNoticeLastId=Math.max(cursor,Number(saved.Dernier_FE_ID)||0);
     feNoticeHistory.splice(0,feNoticeHistory.length,...savedHistory);
-    feNoticeUnread=savedHistory.filter(x=>!x.deleted&&!x.read&&Number(x.arrived)>Number(saved.Derniere_consultation||0)).length;
+    feNoticeUnread=savedHistory.filter(x=>!x.deleted&&!x.read).length;
     renderFeBell();
   });
   feNoticeWriteQueue=pending;return pending;
@@ -1069,12 +1077,23 @@ async function pollNewFE(){
 async function feNoticeMarkViewed(){
   if(!feNoticeState){console.warn("Notifications non initialisées : aucune écriture tentée.");return}
   try{
-    const at=Date.now();await feNoticePersist(at);feNoticeUnread=0;renderFeBell();
+    const at=Date.now();
+    // Une ouverture de la cloche acquitte uniquement les notifications visibles.
+    // Ne pas utiliser Derniere_consultation pour masquer celles importées avant
+    // la toute première connexion de cet équipier.
+    const previous=feNoticeHistory.map(x=>({...x}));
+    for(const item of feNoticeVisible())item.read=true;
+    renderFeBell();
+    try{await feNoticePersist(at)}catch(e){
+      feNoticeHistory.splice(0,feNoticeHistory.length,...previous);renderFeBell();throw e;
+    }
   }catch(e){toast(e.message,"error","Notifications non enregistrées")}
 }
 async function initFeBell(){
-  $("bellButton").onclick=async()=>{const panel=$("notificationPanel");panel.hidden=!panel.hidden;if(!panel.hidden){if(!feNoticeState){try{if(!currentEquipier)await detectCurrentEquipier();await feNoticeInitialize();}catch(e){console.warn("Notifications : identité Grist toujours indisponible",e);return}}await feNoticeMarkViewed()}};
-  $("bellClear").onclick=()=>void feNoticeDelete(feNoticeVisible().map(x=>x.id));
+  // Ouvrir la cloche ne signifie pas lire toutes les notifications :
+  // le badge ne baisse que lors de la consultation d'un FE ou de sa suppression.
+  $("bellButton").onclick=async()=>{const panel=$("notificationPanel");panel.hidden=!panel.hidden;if(!panel.hidden){if(!feNoticeState){try{if(!currentEquipier)await detectCurrentEquipier();await feNoticeInitialize();}catch(e){console.warn("Notifications : identité Grist toujours indisponible",e);return}}renderFeBell()}};
+  $("bellClear").onclick=()=>void feNoticeDelete(feNoticeVisible().map(x=>String(x.occurrence||`${x.id}:${x.numero}`)));
   renderFeBell();
   
   try{
