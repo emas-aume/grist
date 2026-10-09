@@ -1459,9 +1459,9 @@
   function nraWeekCount(){
     const today=new Date(), localToday=new Date(Date.UTC(today.getFullYear(),today.getMonth(),today.getDate()));
     const elapsed=Math.floor((localToday-NRA_START)/604800000);
-    // La semaine en cours et la suivante restent accessibles pour préparer un brouillon.
-    // Les statistiques continuent à utiliser les seuls FE déjà disponibles.
-    return Math.max(0,Math.min(53,elapsed+2));
+    // Débloquer uniquement la semaine scolaire en cours, dès son lundi.
+    // La suivante devient accessible à partir du lundi suivant.
+    return Math.max(0,Math.min(53,elapsed+1));
   }
   async function nraInit(){
     const selector=document.getElementById("nra-week"), max=nraWeekCount();
@@ -1470,7 +1470,7 @@
       return '<option value="'+week+'">S'+String(getISOWeekInfo(monday).week).padStart(2,'0')+' (semaine '+week+' depuis la rentrée) — '+nraDateText(monday)+' au '+nraDateText(sunday)+'</option>';
     }).reverse().join("");
     if(!max){nraSetStatus("La rentrée scolaire n’a pas encore commencé.");return;}
-    if(!nraWeek||nraWeek>max)nraWeek=Math.max(1,max-1);
+    if(!nraWeek||nraWeek>max)nraWeek=max;
     selector.value=String(nraWeek);
     await Promise.all([nraLoadDraft(),nraLoadComparison()]);
   }
