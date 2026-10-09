@@ -2,7 +2,6 @@
 
 
 
-
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -135,7 +134,7 @@ select{background-color:#fff!important;color-scheme:light!important;}
 <!-- CO-EMAS V49 — correction libellé après remise à zéro -->
 <script>
 "use strict";
-const T={CUR:"FE26_27_2",OLD:"FE25_26",OLD2:"FE24_25",SUIVI:"SUIVI_FE26_27",EQ:"EQUIPIERS",ETAB:"ETABLISSEMENTS",ACT_D1:"ACTIVITE_D1_EMS34_48",ACT_D2:"ACTIVITE_D2_EMS34_48",SUIVI_ETAB:"SUIVI_ETABLISSEMENTS",ID_FE:"ID_FE",CLAIM:"PRISE_EN_CHARGE_FE",LOCK:"VERROUS_EDITION",NOTIF:"NOTIFICATIONS_UTILISATEURS",JOURNAL:"JOURNAL_ANOMALIES",IDENT:"IDENTIFICATION_SESSIONS"};
+const T={CUR:"FE26_27_2",OLD:"FE25_26",OLD2:"FE24_25",SUIVI:"SUIVI_FE26_27",EQ:"EQUIPIERS",ETAB:"ETABLISSEMENTS",ACT_D1:"ACTIVITE_D1_EMS34_48",ACT_D2:"ACTIVITE_D2_EMS34_48",SUIVI_ETAB:"SUIVI_ETABLISSEMENTS",ID_FE:"ID_FE",CLAIM:"PRISE_EN_CHARGE_FE",LOCK:"VERROUS_EDITION",NOTIF:"NOTIFICATIONS_UTILISATEURS",NOTIF_FE:"NOTIFICATIONS_FE",JOURNAL:"JOURNAL_ANOMALIES",IDENT:"IDENTIFICATION_SESSIONS"};
 const ALLOWED_EQUIPIER_NAMES=["Guillaume","Gilles","Patrick","Mathilde","Jean-Marc","Christophe","Bastien","Rachida","François","Frederic","Thierry","Philippe"];
 function isAllowedEquipier(e){return !!e&&ALLOWED_EQUIPIER_NAMES.some(n=>norm(n)===norm(e.Nom));}
 const PAGE=25; let tokenInfo=null,currentRows=[],rows=[],suiviMap=new Map(),eqMap=new Map(),etabMap=new Map(),page=1,selected=null,selectedSuivi=null,selectedEtab=null,selectedEtabSuivi=null,etabReturnTarget="list",equipierSelectionTouched=false,opsCleanSnapshot=null,ambianceCleanSnapshot=null,idFeRows=[],idByNumero=new Map(),numeroById=new Map(),idConflictingFe=new Set(),idConflictingIds=new Set(),idOccupied=new Set();
@@ -761,7 +760,8 @@ function periodSpec(){
   return null;
 }
 let loadCurrentGeneration=0;
-async function loadCurrent(){const generation=++loadCurrentGeneration;let spec=periodSpec();if(!spec){notice("Choisissez une période valide.","error");return}notice(`Chargement des faits ${spec.label} — départements 34 et 48…`);let loaded=await apiAllPaged(T.CUR,{filter:{Date_de_saisie:spec.dates},sort:"-id",pageSize:1000,maxRows:10000});if(generation!==loadCurrentGeneration)return;const nextRows=loaded.filter(isCurrentOperationalFact).sort((a,b)=>(Number(b.id)||0)-(Number(a.id)||0));await Promise.all([loadSuiviFor(nextRows),loadClaimsFor(nextRows)]);if(generation!==loadCurrentGeneration)return;currentRows=nextRows;rows=[...nextRows];notice(`${currentRows.length} fait(s) des départements 34 et 48 chargé(s) pour ${spec.label}.`,"ok");page=1;render()}
+function feOrderDescending(a,b){const x=Number(a.manualSort),y=Number(b.manualSort);if(Number.isFinite(x)&&Number.isFinite(y)&&x!==y)return y-x;return (Number(b.id)||0)-(Number(a.id)||0)}
+async function loadCurrent(){const generation=++loadCurrentGeneration;let spec=periodSpec();if(!spec){notice("Choisissez une période valide.","error");return}notice(`Chargement des faits ${spec.label} — départements 34 et 48…`);let loaded=await apiAllPaged(T.CUR,{filter:{Date_de_saisie:spec.dates},sort:"-id",pageSize:1000,maxRows:10000});if(generation!==loadCurrentGeneration)return;const nextRows=loaded.filter(isCurrentOperationalFact).sort(feOrderDescending);await Promise.all([loadSuiviFor(nextRows),loadClaimsFor(nextRows)]);if(generation!==loadCurrentGeneration)return;currentRows=nextRows;rows=[...nextRows];notice(`${currentRows.length} fait(s) des départements 34 et 48 chargé(s) pour ${spec.label}.`,"ok");page=1;render()}
 async function loadSuiviFor(facts){
   // Une requête par groupe de FE distincts évite les filtres REST démesurés.
   const ids=[...new Set(facts.filter(f=>!isArchivedFact(f)).map(f=>feNumericKey(f.Numero_FE)).filter(Boolean))];
@@ -846,10 +846,7 @@ function feNoticeIdentity(){
   if(!email)throw new Error("Adresse e-mail indisponible : compte Grist non rapproché d'un équipier unique.");
   return email;
 }
-function feNoticeWindowStart(){
-  const now=new Date(),start=new Date(now.getFullYear(),now.getMonth(),now.getDate()-1);
-  return start.getTime()+1000;
-}
+function feNoticeWindowStart(){return Date.now()-72*60*60*1000;}
 function feNoticeAllowedDepartment(item){
   // Les notifications historiques sans département vérifié ne sont pas affichées.
   // Les nouveaux FE sont filtrés à la source et portent leur département explicite.
@@ -857,12 +854,12 @@ function feNoticeAllowedDepartment(item){
 }
 function feNoticeTrim(items){
   const min=feNoticeWindowStart();
-  return items.filter(x=>Number(x.arrived)>=min&&feNoticeAllowedDepartment(x));
+  return items.filter(x=>Number(x.arrived)>=min&&Number(x.arrived)<=Date.now()&&feNoticeAllowedDepartment(x));
 }
 function feNoticeRestore(row){
   feNoticeState=row;feNoticeLastId=Number(row.Dernier_FE_ID)||0;
   let history=[];try{history=JSON.parse(String(row.Historique_JSON||"[]"))}catch(e){console.warn("Historique de notifications illisible",e)}
-  feNoticeHistory.splice(0,feNoticeHistory.length,...(Array.isArray(history)?history:[]).filter(x=>x&&Number.isFinite(Number(x.id))).filter(x=>Number(x.arrived)>=feNoticeWindowStart()&&feNoticeAllowedDepartment(x)));
+  feNoticeHistory.splice(0,feNoticeHistory.length,...(Array.isArray(history)?history:[]).filter(x=>x&&Number.isFinite(Number(x.id))).filter(x=>Number(x.arrived)>=feNoticeWindowStart()&&Number(x.arrived)<=Date.now()&&feNoticeAllowedDepartment(x)));
   const viewed=Number(row.Derniere_consultation)||0;
   feNoticeUnread=feNoticeHistory.filter(x=>!x.deleted&&!x.read&&Number(x.arrived)>viewed).length;
   renderFeBell();
@@ -1031,71 +1028,42 @@ async function feNoticeFanout(recent){
   finally{feFanoutBusy=false}
 }
 function feNoticeRowSignature(f){return isCurrentOperationalFact(f)?String(f.Numero_FE||"").trim():""}
+// V87: central events created by Python, never by an open browser session.
+let centralNotificationWarningShown=false;
 async function pollNewFE(){
   if(feNoticeBusy||document.hidden)return;
   if(!feNoticeReady){
     try{if(!currentEquipier||!identityVerified)await detectCurrentEquipier();await feNoticeInitialize()}
-    catch(e){console.warn("Notifications : nouvelle tentative d’identification",e);return}
+    catch(e){console.warn('Notifications : identification en attente',e);return}
   }
   feNoticeBusy=true;
   try{
-    // Pagination jusqu'au curseur : aucun plafond fixe à 100/1000 nouveaux FE.
-    const recent=await recentFE();
-    if(!recent.length)return;
-    // Une ligne Grist déjà existante peut passer de vide à remplie : son id ne change pas.
-    const reused=[];
-    for(const f of recent){
-      const id=Number(f.id),signature=feNoticeRowSignature(f);
-      if(feNoticeRowSnapshot.has(id)){
-        const previous=feNoticeRowSnapshot.get(id);
-        if(signature&&signature!==previous&&id<=feNoticeLastId)reused.push(f);
-      }
-      if(signature&&id<=feNoticeLastId&&!reused.some(x=>Number(x.id)===id)){
-        const old=feNoticeHistory.find(x=>Number(x.id)===id);
-        if(old&&String(old.numero||"").trim()!==signature)reused.push(f);
-      }
-      feNoticeRowSnapshot.set(id,signature);
-    }
-    // Éviter que le cache de suivi augmente sans limite.
-    if(feNoticeRowSnapshot.size>500){const ids=new Set(recent.map(f=>Number(f.id)));for(const id of feNoticeRowSnapshot.keys())if(!ids.has(id))feNoticeRowSnapshot.delete(id)}
-    saveFeNoticeRowSnapshot();
-    if(Number(recent[0].id)<=feNoticeLastId&&!reused.length){await feNoticeFanout(recent);return;}
-    const newer=[];let offset=0,stop=false;
-    // Le cas courant ne demande qu'une lecture mutualisée de 100 FE.
-    if(recent.some(f=>Number(f.id)<=feNoticeLastId)){
-      newer.push(...recent.filter(f=>Number(f.id)>feNoticeLastId));
-    }else{
-      // Rattrapage paginé uniquement si plus de 100 FE ont été ajoutés.
-      while(!stop&&offset<50000){
-        const batch=offset===0?recent:await api(T.CUR,{sort:"-id",limit:100,offset});
-        if(!batch.length)break;
-        for(const f of batch){if(Number(f.id)<=feNoticeLastId){stop=true;break}newer.push(f)}
-        if(batch.length<100)break;offset+=100;
-      }
-    }
-    newer.push(...reused);
-    if(!newer.length){await feNoticeFanout(recent);return;}
-    const maxId=newer.reduce((max,f)=>Math.max(max,Number(f.id)||0),feNoticeLastId);
-    const newcomers=newer.filter(isCurrentOperationalFact).sort((a,b)=>Number(a.id)-Number(b.id));
+    const central=await apiAllPaged(T.NOTIF_FE,{sort:'-Arrivee',pageSize:500,maxRows:10000});
+    const start=feNoticeWindowStart();
+    const eligible=central.filter(x=>Number(x.Arrivee)>=start&&Number(x.Arrivee)<=Date.now()&&['34','48'].includes(depCode(x.Departement))&&String(x.Numero_FE||'').trim());
+    const activeOccurrences=new Set(eligible.map(x=>String(x.Occurrence||`${x.FE_Row_ID}:${x.Numero_FE}`)));
+    feNoticeHistory.splice(0,feNoticeHistory.length,...feNoticeTrim(feNoticeHistory).filter(x=>activeOccurrences.has(String(x.occurrence||`${x.id}:${x.numero}`))));
+    const known=new Set(feNoticeHistory.map(x=>String(x.occurrence||'')));
     const added=[];
-    for(const f of newcomers){
-      const existing=feNoticeHistory.find(x=>Number(x.id)===Number(f.id));
-      // Nouvelle saisie sur une ligne précédemment vidée : remplacer l'ancienne occurrence.
-      if(existing){
-        if(!reused.some(x=>Number(x.id)===Number(f.id)))continue;
-        feNoticeHistory.splice(feNoticeHistory.indexOf(existing),1);
-      }
-      const item={id:Number(f.id),occurrence:`${Number(f.id)}:${Date.now()}:${Math.random().toString(36).slice(2,8)}`,numero:String(f.Numero_FE||""),niveau:String(f.Niveau||"—"),etab:String(f.Etablissement||"Établissement non renseigné"),ville:String(f.Ville||""),departement:factDept(f),arrived:Date.now(),reentered:reused.some(x=>Number(x.id)===Number(f.id))};
-      feNoticeHistory.unshift(item);added.push(item);
+    for(const row of eligible){
+      const occurrence=String(row.Occurrence||`${row.FE_Row_ID}:${row.Numero_FE}`);
+      if(known.has(occurrence))continue;
+      const item={id:Number(row.FE_Row_ID),occurrence,numero:String(row.Numero_FE||''),niveau:String(row.Niveau||'—'),etab:String(row.Etablissement||'Établissement non renseigné'),ville:String(row.Ville||''),departement:depCode(row.Departement),arrived:Number(row.Arrivee),read:false,deleted:false};
+      if(!Number.isFinite(item.id)||item.id<=0)continue;
+      feNoticeHistory.push(item);known.add(occurrence);added.push(item);
     }
-    feNoticeHistory.splice(0,feNoticeHistory.length,...feNoticeTrim(feNoticeHistory));
-    feNoticeLastId=maxId;
-    await feNoticePersist(); // Fusion avec l'historique distant avant d'afficher les notifications.
-    feNoticeUnread=feNoticeHistory.filter(x=>!x.deleted&&!x.read&&Number(x.arrived)>Number(feNoticeState.Derniere_consultation||0)).length;
+    feNoticeHistory.splice(0,feNoticeHistory.length,...feNoticeTrim(feNoticeHistory).sort((a,b)=>Number(b.arrived)-Number(a.arrived)));
+    if(added.length)await feNoticePersist();
+    else {
+      // Recover per-user state changed from another device.
+      const mine=await api(T.NOTIF,{filter:{Email:[feNoticeEmail]},limit:10});
+      if(mine.length===1){let remote=[];try{remote=JSON.parse(String(mine[0].Historique_JSON||'[]'))}catch(_){}
+        if(Array.isArray(remote)){feNoticeHistory.splice(0,feNoticeHistory.length,...feNoticeMergeHistory(feNoticeHistory,remote).filter(x=>activeOccurrences.has(String(x.occurrence||`${x.id}:${x.numero}`))));feNoticeState=mine[0]}
+      }
+    }
     renderFeBell();
-    await feNoticeFanout(recent);
-    for(const item of added)toast(`${item.etab} — ${item.ville} · ${item.numero}`,"info",`Nouveau FE · Niveau ${item.niveau}`,10000,()=>openNotifiedFE(item));
-  }catch(e){toast(e.message,"error","Notifications indisponibles",6000);console.warn(e)}
+    for(const item of added)toast(`${item.etab} — ${item.ville} · ${item.numero}`,'info',`Nouveau FE · Niveau ${item.niveau}`,10000,()=>openNotifiedFE(item));
+  }catch(e){if(!centralNotificationWarningShown){console.warn('Table NOTIFICATIONS_FE indisponible',e);centralNotificationWarningShown=true;toast('Vérifiez la table NOTIFICATIONS_FE et ses colonnes.','error','Notifications centrales indisponibles',6000)}}
   finally{feNoticeBusy=false}
 }
 async function feNoticeMarkViewed(){
@@ -1167,7 +1135,7 @@ async function refreshLiveFEList(){
     liveLastFullCheck=Date.now();
     // Le filtre Grist ne charge QUE la période sélectionnée, quelle que soit la vue ouverte.
     const fetched=await apiAllPaged(T.CUR,{filter:{Date_de_saisie:spec.dates},sort:"-id",pageSize:500,maxRows:5000});
-    const fresh=fetched.filter(isCurrentOperationalFact).sort((a,b)=>(Number(b.id)||0)-(Number(a.id)||0));
+    const fresh=fetched.filter(isCurrentOperationalFact).sort(feOrderDescending);
     const fingerprint=feListSignature(fresh);
     if(key!==livePeriodKey){livePeriodKey=key;livePeriodFingerprint=feListSignature(currentRows)}
     if(fingerprint!==livePeriodFingerprint){
@@ -1550,6 +1518,12 @@ function filtered(){
       if(!terms.every(term=>hay.includes(term)))return false;
     }
     return true;
+  }).sort((a,b)=>{
+    // L’ordre physique de FE26_27_2 est représenté par son ID Grist :
+    // la dernière ligne ajoutée apparaît toujours en premier, même après recherche.
+    if(a._source===T.CUR&&b._source!==T.CUR)return -1;
+    if(b._source===T.CUR&&a._source!==T.CUR)return 1;
+    return (Number(b.id)||0)-(Number(a.id)||0);
   });
 }
 function render(){let a=filtered(),pages=Math.max(1,Math.ceil(a.length/PAGE));page=Math.min(page,pages);let slice=a.slice((page-1)*PAGE,page*PAGE);$("body").innerHTML=slice.length?slice.map(f=>{let su=suiviMap.get(feNumericKey(f.Numero_FE)),cl=activeClaimFor(f);let eq=isArchivedFact(f)?(f.Equipier||"N/A"):eqName(cl ? cl.Equipier : (su?su.Equipier:f.Equipier));return `<tr><td>${dateFR(f.Date_de_saisie)}</td><td><span class="badge ${String(f.Niveau)==="3"?"b3":""}">${esc(f.Niveau||"—")}</span></td><td>${factTypeBadges(f.Types_de_fait,f.Niveau)}</td><td><button class="etab-link" data-etab-from-fe="${f._source}:${f.id}">${esc(f.Etablissement||"—")}</button></td><td>${esc(f.Ville||"—")}</td><td>${badgeStatus(statusOf(f))}</td><td>${equipierBadge(eq)}</td><td>${esc(f.Numero_FE)}</td><td><button class="btn open-btn" data-open="${f._source}:${f.id}" title="Ouvrir le fait" aria-label="Ouvrir le fait">↗</button></td></tr>`}).join(""):'<tr><td colspan="9" class="loading">Aucun résultat.</td></tr>';document.querySelectorAll("[data-open]").forEach(b=>b.onclick=()=>openFact(b.dataset.open));document.querySelectorAll("[data-etab-from-fe]").forEach(b=>b.onclick=()=>openEstablishmentFromFact(b.dataset.etabFromFe));$("count").textContent=a.length+" résultat(s) dans les données actuellement chargées";$("pageInfo").textContent=`Page ${page} / ${pages}`;$("prev").disabled=page<=1;$("next").disabled=page>=pages}
