@@ -1,7 +1,6 @@
 
 
 
-
 <!DOCTYPE html>
 <html lang="fr">
 
@@ -1460,7 +1459,9 @@
   function nraWeekCount(){
     const today=new Date(), localToday=new Date(Date.UTC(today.getFullYear(),today.getMonth(),today.getDate()));
     const elapsed=Math.floor((localToday-NRA_START)/604800000);
-    return Math.max(0,Math.min(53,elapsed)); // seulement les semaines entièrement terminées
+    // La semaine en cours et la suivante restent accessibles pour préparer un brouillon.
+    // Les statistiques continuent à utiliser les seuls FE déjà disponibles.
+    return Math.max(0,Math.min(53,elapsed+2));
   }
   async function nraInit(){
     const selector=document.getElementById("nra-week"), max=nraWeekCount();
@@ -1468,8 +1469,8 @@
       const week=i+1, monday=nraMonday(week), sunday=addDaysUTC(monday,6);
       return '<option value="'+week+'">S'+String(getISOWeekInfo(monday).week).padStart(2,'0')+' (semaine '+week+' depuis la rentrée) — '+nraDateText(monday)+' au '+nraDateText(sunday)+'</option>';
     }).reverse().join("");
-    if(!max){nraSetStatus("Aucune semaine complète depuis la rentrée.");return;}
-    if(!nraWeek||nraWeek>max)nraWeek=max;
+    if(!max){nraSetStatus("La rentrée scolaire n’a pas encore commencé.");return;}
+    if(!nraWeek||nraWeek>max)nraWeek=Math.max(1,max-1);
     selector.value=String(nraWeek);
     await Promise.all([nraLoadDraft(),nraLoadComparison()]);
   }
@@ -2415,7 +2416,7 @@ function nraSplitStructuredFactPaths(value){
   async function fetchEtabRecordsByUais(uais, retry) {
     const wanted = Array.from(new Set((uais || []).map(extractUai).filter(Boolean)));
     const missing = wanted.filter(function(uai){ return !brqEtabByUai.has(uai); });
-    if (!missing.length) return [];
+    if (!missing.length) return;
 
     const t = await getTokenInfo(false);
     const filter = JSON.stringify({UAI: missing});
@@ -2430,16 +2431,13 @@ function nraSplitStructuredFactPaths(value){
     if (!response.ok) throw new Error("ETABLISSEMENTS/UAI : HTTP " + response.status);
 
     const payload = await response.json();
-    const foundRows = (Array.isArray(payload.records) ? payload.records : []).map(function(r) {
-      return Object.assign({id:r.id}, r.fields || {});
-    });
-    foundRows.forEach(function(row) {
+    (Array.isArray(payload.records) ? payload.records : []).forEach(function(r) {
+      const row = Object.assign({id:r.id}, r.fields || {});
       const id = Number(row.id);
       const uai = getEtabUai(row);
       if (Number.isFinite(id)) brqEtabByRowId.set(id, row);
       if (uai) brqEtabByUai.set(uai, row);
     });
-    return foundRows;
   }
 
   async function ensureBrqEstablishments(records) {
@@ -2478,7 +2476,7 @@ function nraSplitStructuredFactPaths(value){
 
     if (uais.size) {
       const rows = await fetchEtabRecordsByUais(Array.from(uais));
-      (rows || []).forEach(function(row) {
+      rows.forEach(function(row) {
         const id = Number(row.id);
         if (Number.isFinite(id)) brqEtabByRowId.set(id, row);
         const uai = getEtabUai(row);
@@ -3346,7 +3344,7 @@ function nraSplitStructuredFactPaths(value){
   function getBrqCategory(record) {
     const sector = getRecordSector(record);
     if (sector === "private") return "private";
-    // Secteur inconnu : conserver le classement par degré si connu.
+    if (sector === "unknown") return "";
     if (record._degre === "1er") return "first";
     if (record._degre === "2nd") return "second";
     return "";
