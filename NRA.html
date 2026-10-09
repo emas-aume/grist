@@ -1054,6 +1054,9 @@
 #nra-section .nra-vertical-bar.now{background:#cf2525;color:#cf2525}
 #nra-section .nra-vertical-bar.prior{background:#102f69;color:#102f69}
 @media(max-width:850px){#nra-section .nra-chart-grid{grid-template-columns:1fr}}
+#nra-section .nra-gemma-settings{display:flex;gap:14px;flex-wrap:wrap;margin:8px 0 12px}
+#nra-section .nra-gemma-settings label{font-size:12px;color:#475467;display:flex;flex-direction:column;gap:4px}
+#nra-section .nra-gemma-settings input{min-width:190px;padding:7px 9px;background:#fff;color:#203045;border:1px solid #cbd5e1;border-radius:6px}
 </style>
 
 </head>
@@ -1342,9 +1345,10 @@
     <div class="nra-controls">
       <label>NRA à consulter<select id="nra-week" onchange="nraChangeWeek(this.value)"></select></label>
       <button id="nra-save" type="button" onclick="nraSaveDraft()">Enregistrer le brouillon</button>
-      <button type="button" disabled title="Disponible après validation des règles de calcul et de l'export">Générer la NRA avec Gemma</button>
+      <button id="nra-gemma" type="button" onclick="nraGenerateGemma()">Générer la NRA avec Gemma</button>
       <button type="button" onclick="nraExportPdf()" title="Exporter les trois pages de la NRA">Exporter PDF</button>
     </div>
+    <div class="nra-gemma-settings"><label>Adresse du serveur Ollama <input id="nra-ollama-url" type="url" value="http://localhost:11434" spellcheck="false" aria-label="Adresse Ollama"></label><label>Modèle <input id="nra-ollama-model" type="text" value="gemma3:4b" aria-label="Modèle Gemma"></label></div>
     <div class="nra-status" id="nra-status">Sélectionnez une semaine pour consulter son brouillon.</div>
     <div class="nra-document">
       <h3 id="nra-heading">Synthèse — Rentrée scolaire 2026</h3>
@@ -1523,9 +1527,10 @@
     finally{button.disabled=false;nraSaving=false;}
   }
 
-  let nraComparisonToken=0;
+  let nraComparisonToken=0, nraGemmaData=null;
   async function nraLoadComparison(){
     const token=++nraComparisonToken, week=nraWeek;
+    nraGemmaData=null;
     const cum=document.getElementById("nra-cumulative-count"), weekly=document.getElementById("nra-week-count");
     cum.textContent="Calcul des FE cumulés (date du fait)…";
     weekly.textContent="Calcul des FE de la semaine (date du fait)…";
@@ -1556,6 +1561,7 @@
         return {cumulative:cumulativeRows.length,selected:selectedRows.length,cumulativeRows,selectedRows};
       }));
       if(token!==nraComparisonToken||week!==nraWeek)return;
+      nraGemmaData={week,rows:counts[0].selectedRows,priorRows:counts[1].selectedRows};
       const delta=(a,b)=>b===0?"variation non calculable (base N−1 nulle)":((a-b)/b*100).toLocaleString("fr-FR",{maximumFractionDigits:1})+" %";
       cum.textContent="Total des FE depuis la rentrée jusqu'à la fin de la semaine "+week+" : 2026-2027 : "+counts[0].cumulative+" ; 2025-2026 : "+counts[1].cumulative+" ; évolution : "+delta(counts[0].cumulative,counts[1].cumulative)+". Périodes comparées à rang de semaine équivalent, sur la date du fait.";
       weekly.textContent="Total des FE sur la semaine "+week+" depuis la rentrée : 2026-2027 : "+counts[0].selected+" ; 2025-2026 : "+counts[1].selected+" ; évolution : "+delta(counts[0].selected,counts[1].selected)+".";
@@ -1570,6 +1576,85 @@
       document.getElementById("nra-cumulative-tables").textContent="Ventilations indisponibles.";
       document.getElementById("nra-weekly-charts").textContent="Graphiques indisponibles.";
     }
+  }
+
+
+  /* Gemma reçoit uniquement des agrégats, jamais les récits de FE ni les noms d'élèves. */
+  function nraGemmaAggregates(rows){
+    const depNames={"11":"Aude","30":"Gard","34":"Hérault","48":"Lozère","66":"Pyrénées-Orientales"};
+    const depCounts=Object.fromEntries(Object.entries(depNames).map(([k,v])=>[v,0]));
+    const levels={}, degrees={}, families={};
+    for(const r of rows){
+      const dep=getDepartement(r);
+      if(depNames[dep])depCounts[depNames[dep]]++;
+      const a=analyzeRecordFromColumns(r);
+      const level=String(a.level??"Non renseigné");
+      levels[level]=(levels[level]||0)+1;
+      const degree=String(a.degree??"Non renseigné");
+      degrees[degree]=(degrees[degree]||0)+1;
+      const profile=nraFactProfile(r);
+      for(const family of profile.roots){
+        families[family]=(families[family]||0)+1;
+      }
+    }
+    return {total:rows.length,departements:depCounts,niveaux:levels,degres:degrees,familles:families};
+  }
+  function nraParseGemmaJson(raw){
+    let cleaned=String(raw||"").trim().replace(/^```(?:json)?\s*/i,"").replace(/\s*```$/,"");
+    const first=cleaned.indexOf("{"),last=cleaned.lastIndexOf("}");
+    if(first<0||last<first)throw new Error("Gemma n'a pas renvoyé d'objet JSON.");
+    const obj=JSON.parse(cleaned.slice(first,last+1));
+    for(const k of NRA_FIELDS)if(typeof obj[k]!=="string")throw new Error("Champ manquant ou incorrect : "+k);
+    return obj;
+  }
+  async function nraGenerateGemma(){
+    const button=document.getElementById("nra-gemma");
+    if(button.disabled)return;
+    if(!nraGemmaData||nraGemmaData.week!==nraWeek){
+      nraSetStatus("Attendez la fin du chargement des statistiques de cette semaine.");return;
+    }
+    const week=nraWeek;
+    const existing=NRA_FIELDS.filter(k=>document.getElementById("nra-"+k).value.trim());
+    if(existing.length&&!confirm("Des textes existent déjà dans "+existing.length+" champ(s). Gemma va proposer de nouveaux textes qui les remplaceront à l'écran (sans les enregistrer). Continuer ?"))return;
+    const base=document.getElementById("nra-ollama-url").value.trim().replace(/\/+$/,"");
+    const model=document.getElementById("nra-ollama-model").value.trim();
+    if(!/^https?:\/\/[^/]+$/i.test(base)||!model){nraSetStatus("Renseignez une adresse Ollama valide et un modèle.");return;}
+    const today=new Date();
+    const cutoff=nraDateText(new Date(Date.UTC(today.getFullYear(),today.getMonth(),today.getDate())));
+    const monday=nraMonday(week),sunday=addDaysUTC(monday,6);
+    const current=nraGemmaAggregates(nraGemmaData.rows);
+    const previous=nraGemmaAggregates(nraGemmaData.priorRows);
+    const prompt=[
+      "Tu es un assistant de rédaction d'une note de renseignement académique pour l'académie de Montpellier.",
+      "Rédige en français, style institutionnel, factuel, sobre et concis.",
+      "Période étudiée : "+nraDateText(monday)+" au "+nraDateText(sunday)+". Données disponibles au "+cutoff+".",
+      "La semaine peut être en cours : ne présente jamais ces données comme définitives.",
+      "N'invente aucun événement, établissement, intervention EMAS, évolution qualitative, cause ou chiffre.",
+      "Les données sont agrégées et ne permettent PAS de décrire un fait marquant précis.",
+      "Rédige un contexte général (4 à 6 phrases) et un court paragraphe pour chaque département demandé.",
+      "Mentionne les limites des données lorsque nécessaire. Ne compare pas des données partielles comme si elles étaient définitives.",
+      "Ne dis pas que les EMAS ont effectué des interventions spécifiques sans données.",
+      "Réponds UNIQUEMENT en JSON valide avec les clés exactes : Contexte_general, EMAS_34, EMAS_30, EMAS_66, EMAS_11.",
+      "Agrégats de la semaine sélectionnée : "+JSON.stringify(current),
+      "Agrégats N-1 à semaine scolaire équivalente : "+JSON.stringify(previous)
+    ].join("\n");
+    button.disabled=true;nraSetStatus("Génération Gemma en cours… Aucun texte n'est encore enregistré.");
+    try{
+      const response=await fetch(base+"/api/generate",{
+        method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({model,prompt,stream:false,format:"json",options:{temperature:0.2}})
+      });
+      if(!response.ok)throw new Error("Ollama HTTP "+response.status+" : "+(await response.text()).slice(0,200));
+      const payload=await response.json();
+      const generated=nraParseGemmaJson(payload.response);
+      if(week!==nraWeek)throw new Error("La semaine a changé pendant la génération. Aucun texte remplacé.");
+      for(const k of NRA_FIELDS)document.getElementById("nra-"+k).value=generated[k].trim();
+      nraMarkDirty();
+      nraSetStatus("Premier jet Gemma prêt. Relisez et corrigez les cinq champs, puis cliquez sur « Enregistrer le brouillon ».");
+    }catch(e){
+      console.error("Gemma NRA",e);
+      nraSetStatus("Génération impossible : "+e.message+". Vérifiez que Ollama est démarré, que le modèle est installé et que le navigateur autorise l'accès au serveur (CORS/HTTPS).");
+    }finally{button.disabled=false;}
   }
 
   function nraNorm(v){return String(v??"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/\s+/g," ").trim();}
