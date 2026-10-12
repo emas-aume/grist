@@ -1839,7 +1839,7 @@ function nraSplitStructuredFactPaths(value){
       return '<tr'+(mode==="TOTAL"?' class="nra-cartables-total"':'')+
         '><th>'+escapeHtml(mode)+'</th>'+cells+'<td>'+val(rows,m,null,null)+'</td></tr>';
     }).join("");
-    return '<div class="nra-cartables-block" data-scope="'+scope+'"><h5>'+(scope==='week'?'Opérations cartables de la semaine sélectionnée':'Total des opérations cartables depuis le 31/08/2026')+'</h5>'+
+    return '<div class="nra-cartables-block" data-scope="'+scope+'"><h5>'+(scope==='week'?'Opérations cartables de la semaine N°'+String(getISOWeekInfo(nraMonday(nraWeek)).week).padStart(2,'0'):'Total des opérations cartables depuis le 31/08/2026')+'</h5>'+
       '<div class="nra-table-scroll"><table class="nra-table nra-cartables-table"><thead>'+
       head+'</thead><tbody>'+body+'</tbody></table></div>'+
       '<p class="muted nra-quality">'+escapeHtml(message)+'</p></div>';
@@ -2015,7 +2015,7 @@ function nraSplitStructuredFactPaths(value){
       for(const line of lines){if(y+lh>maxY)break;drawJustifiedLine(line,x,y,w,size);y+=lh+(line.breakAfter?lh*.38:0);}
       return y;
     };
-    const drawTable=(element,y,height)=>{
+    const drawTable=(element,y,height,cartables=false)=>{
       if(!element)return y;
       const trs=[...element.querySelectorAll("tr")],grid=[],occupied=[];
       trs.forEach((tr,ri)=>{
@@ -2035,8 +2035,12 @@ function nraSplitStructuredFactPaths(value){
         const now=cell.cls.includes("nra-year-current"),diff=cell.cls.includes("nra-year-diff");
         if(cell.head||now||diff){doc.setFillColor(...(diff?yellow:now?green:[232,238,243]));doc.rect(x,yy,w,h,"F");}
         doc.setDrawColor(192,201,209);doc.setLineWidth(.15);doc.rect(x,yy,w,h);
-        const size=n>13?5.1:n>9?6.2:7.2;
-        doc.setFont("helvetica",cell.head?"bold":"normal");doc.setFontSize(size);
+        const baseSize=n>13?5.1:n>9?6.2:7.2;
+        // Export PDF cartables : chiffres +1 pt, valeurs non nulles en gras.
+        const numericCartable=cartables&&!cell.head&&/^\d+$/.test(cell.text);
+        const size=baseSize+(numericCartable?1:0);
+        const emphasized=numericCartable&&Number(cell.text)!==0;
+        doc.setFont("helvetica",cell.head||emphasized?"bold":"normal");doc.setFontSize(size);
         doc.setTextColor(...(diff&&!cell.head?orange:ink));
         const width=w-1.4;
         let label=cell.text;
@@ -2087,8 +2091,8 @@ function nraSplitStructuredFactPaths(value){
     y=drawTable(tables[0],y+1,43)+9;
     y=title("Comparatif par département années scolaires 2025-2026 et 2026-2027",y);
     y=drawTable(tables[1],y+1,51)+9;
-    y=title("Opérations cartables de la semaine sélectionnée",y);
-    y=drawTable(ops.querySelector('[data-scope="week"] table'),y+1,43);
+    y=title("Opérations cartables de la semaine N°"+String(getISOWeekInfo(nraMonday(nraWeek)).week).padStart(2,"0"),y);
+    y=drawTable(ops.querySelector('[data-scope="week"] table'),y+1,43,true);
     // Page 3 — quatre graphiques à barres VERTICALES, disposition 2 x 2.
     doc.addPage();
     const boxes=[...charts.querySelectorAll(".nra-chart")].slice(0,4);
@@ -2109,8 +2113,9 @@ function nraSplitStructuredFactPaths(value){
       if(i===1){
         groups=["1er degré","2nd degré"].map((label,j)=>({label,parts:values.filter((_,k)=>k%2===j)}));
       } else if(i===0 && values.length===1){
-        groups=[{label:"2025/2026",prior:values[0].prior,now:0},
-                {label:"2026/2027",prior:0,now:values[0].now}];
+        // Une seule barre par année : aucun zéro fictif dans le comparatif.
+        groups=[{label:"2025/2026",value:values[0].prior,color:blue},
+                {label:"2026/2027",value:values[0].now,color:red}];
       }
       const base=top+64,chartTop=top+16,chartHeight=base-chartTop;
       const max=Math.max(1,...values.flatMap(v=>[v.now,v.prior]));
@@ -2135,8 +2140,9 @@ function nraSplitStructuredFactPaths(value){
         const step=(bw-9)/Math.max(1,groups.length);
         groups.forEach((v,j)=>{
           const cx=x+4+step*(j+.5),barW=Math.min(15,step*.44);
-          [[v.prior,blue,-1],[v.now,red,1]].forEach(([value,color,side])=>{
-            const hh=chartHeight*value/max,bx=cx+(side<0?-barW:0);
+          const bars=i===0&&values.length===1?[[v.value,v.color,0]]:[[v.prior,blue,-1],[v.now,red,1]];
+          bars.forEach(([value,color,side])=>{
+            const hh=chartHeight*value/max,bx=side===0?cx-barW/2:cx+(side<0?-barW:0);
             doc.setFillColor(...color);doc.rect(bx,base-hh,barW-.5,hh,"F");
             doc.setFont("helvetica","bold");doc.setFontSize(7.2);doc.setTextColor(...color);doc.text(String(value),bx+barW/2,base-hh-1,{align:"center"});
           });
