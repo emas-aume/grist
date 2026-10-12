@@ -1558,6 +1558,25 @@
             if(date>=mon)selectedRows.push(r);
           });
         }
+        // Repli NRA : certaines dates Grist ne sont pas retrouvées par le filtre API
+        // sur Date_du_fait (format/date/horodatage). Une lecture complète garantit
+        // que les FE actifs de la semaine ne disparaissent pas des graphiques.
+        if (y.table === "FE26_27_2" && selectedRows.length === 0) {
+          const allRows = tableDataToRows(await grist.docApi.fetchTable(y.table));
+          const completeSeen = new Set();
+          cumulativeRows.length = 0;
+          selectedRows.length = 0;
+          for (const r of allRows) {
+            if (!isActiveFactRecord(r)) continue;
+            const id = String(r[FIELD.NUMERO_FE] || r.id || "");
+            if (!id || completeSeen.has(id)) continue;
+            const date = parseGristDate(r[FIELD.DATE_FAIT]);
+            if (!date || date < first || date > last) continue;
+            completeSeen.add(id);
+            cumulativeRows.push(r);
+            if (date >= mon) selectedRows.push(r);
+          }
+        }
         return {cumulative:cumulativeRows.length,selected:selectedRows.length,cumulativeRows,selectedRows};
       }));
       if(token!==nraComparisonToken||week!==nraWeek)return;
@@ -2014,11 +2033,11 @@ function nraSplitStructuredFactPaths(value){
     // Page 2 — trois tableaux compacts, titres directement au-dessus.
     doc.addPage();y=title("RECAPITULATIF ANNUEL :",16);
     const tables=cumulative.querySelectorAll("table");
-    y=drawTable(tables[0],y+4,43)+6;
+    y=drawTable(tables[0],y+1,43)+9;
     y=title("Comparatif par département années scolaires 2025-2026 et 2026-2027",y);
-    y=drawTable(tables[1],y+4,51)+6;
+    y=drawTable(tables[1],y+1,51)+9;
     y=title("Opérations cartables de la semaine sélectionnée",y);
-    y=drawTable(ops.querySelector('[data-scope="week"] table'),y+4,43);
+    y=drawTable(ops.querySelector('[data-scope="week"] table'),y+1,43);
     // Page 3 — quatre graphiques à barres VERTICALES, disposition 2 x 2.
     doc.addPage();
     const boxes=[...charts.querySelectorAll(".nra-chart")].slice(0,4);
@@ -2981,8 +3000,8 @@ function nraSplitStructuredFactPaths(value){
        La chaîne "false" est aussi reconnue pour les imports texte/CSV. */
     if (!record || !("Actif_FE" in record)) return true;
     const value = record.Actif_FE;
-    if (value === false) return false;
-    if (typeof value === "string" && value.trim().toLowerCase() === "false") return false;
+    if (value === false || value === 0) return false;
+    if (typeof value === "string" && ["false", "0"].includes(value.trim().toLowerCase())) return false;
     return true;
   }
 
