@@ -1993,12 +1993,27 @@ function nraSplitStructuredFactPaths(value){
       return y+lines.length*size*.42;
     };
     const title=(v,y,size=11)=>write(v,margin,y,size,true);
-    const paragraph=(v,x,y,w,size=8,maxY=H-17)=>{
+    // Paragraphes justifiés, avec respect des retours à la ligne et pagination explicite.
+    const paragraphLines=(value,w,size)=>{
+      doc.setFont("helvetica","normal");doc.setFontSize(size);
+      return String(value??"").replace(/\r\n?/g,"\n").split("\n").flatMap((part,i)=>{
+        const lines=part.trim()?doc.splitTextToSize(part,w):[""];
+        return lines.map((text,j)=>({text,justify:j<lines.length-1&&!!text.trim(),breakAfter:j===lines.length-1&&i<String(value??"").split(/\r?\n/).length-1}));
+      });
+    };
+    const drawJustifiedLine=(line,x,y,w,size)=>{
       doc.setFont("helvetica","normal");doc.setFontSize(size);doc.setTextColor(...ink);
-      const lines=doc.splitTextToSize(String(v??""),w),lh=size*.44;
-      const fit=Math.max(0,Math.floor((maxY-y)/lh));doc.text(lines.slice(0,fit),x,y);
-      if(lines.length>fit)doc.text("[…]",x,Math.min(maxY,y+fit*lh));
-      return y+Math.min(fit,lines.length)*lh;
+      const words=line.text.trim().split(/\s+/);
+      if(!line.justify||words.length<2){doc.text(line.text,x,y);return;}
+      const widths=words.map(t=>doc.getTextWidth(t));
+      const gap=(w-widths.reduce((a,b)=>a+b,0))/(words.length-1);
+      if(gap<0||gap>w*.12){doc.text(line.text,x,y);return;}
+      let xx=x;words.forEach((word,i)=>{doc.text(word,xx,y);xx+=widths[i]+gap;});
+    };
+    const paragraph=(v,x,y,w,size=8,maxY=H-17)=>{
+      const lines=paragraphLines(v,w,size),lh=size*.44;
+      for(const line of lines){if(y+lh>maxY)break;drawJustifiedLine(line,x,y,w,size);y+=lh+(line.breakAfter?lh*.38:0);}
+      return y;
     };
     const drawTable=(element,y,height)=>{
       if(!element)return y;
@@ -2032,22 +2047,40 @@ function nraSplitStructuredFactPaths(value){
     };
     const period=document.getElementById("nra-period").textContent;
     const iso=String(getISOWeekInfo(nraMonday(nraWeek)).week).padStart(2,"0");
-    // Page 1 — contenu éditorial. Le texte d'exemple n'est ni sauvegardé ni transmis à Grist.
+    // Page 1 — contenu éditorial, sans coupure ni marqueur « […] ».
     let y=title("Synthèse – État des signalements et mobilisation des EMAS",19,12);
     y=write("Semaine "+iso+" — "+period,margin,y+2,9);
     y=title("Contexte général :",y+6);
     const example="Exemple de mise en page (à remplacer) : La semaine considérée fait apparaître des situations contrastées dans les établissements de l'académie. Les signalements nécessitent une lecture différenciée selon les territoires, les degrés d'enseignement et la nature des atteintes. Les EMAS assurent quotidiennement le renseignement et l'appui sur le terrain, en lien avec les services compétents.";
     const context=document.getElementById("nra-Contexte_general").value.trim()||example;
-    y=paragraph(context,margin,y+4,usable,9,H-72);
-    y=title("Points saillants par départements :",y+9);
-    const deps=["34","30","66","11"],gap=3,cw=(usable-3*gap)/4,top=y+3;
-    deps.forEach((d,i)=>{
-      const x=margin+i*(cw+gap);
-      doc.setFillColor(235,240,245);doc.rect(x,top,cw,9,"F");doc.setDrawColor(175,188,200);
-      doc.rect(x,top,cw,Math.max(12,H-top-17));
-      write("EMAS "+d,x+3,top+6,9,true,cw-6);
-      paragraph(document.getElementById("nra-EMAS_"+d).value,x+3,top+14,cw-6,7.5,H-22);
-    });
+    const contextLines=paragraphLines(context,usable,9),contextLh=9*.44;
+    for(const line of contextLines){
+      if(y+contextLh>H-25){doc.addPage();y=19;}
+      drawJustifiedLine(line,margin,y+4,usable,9);
+      y+=contextLh+(line.breakAfter?contextLh*.38:0);
+    }
+    if(y+37>H-18){doc.addPage();y=19;}
+    y=title("Points saillants par départements :",y+10);
+    const deps=["34","30","66","11"],gap=3,cw=(usable-3*gap)/4;
+    const content=deps.map(d=>paragraphLines(document.getElementById("nra-EMAS_"+d).value,cw-6,7.5));
+    const positions=[0,0,0,0],lh=7.5*.44;
+    let firstPanel=true;
+    while(positions.some((pos,i)=>pos<content[i].length)){
+      if(!firstPanel){doc.addPage();y=title("Points saillants par départements (suite) :",19);}
+      const top=y+4,bottom=H-18,bodyTop=top+14,bodyBottom=bottom-4;
+      deps.forEach((d,i)=>{
+        const x=margin+i*(cw+gap);
+        doc.setFillColor(235,240,245);doc.rect(x,top,cw,9,"F");doc.setDrawColor(175,188,200);
+        doc.rect(x,top,cw,bottom-top);
+        write("EMAS "+d,x+3,top+6,9,true,cw-6);
+        let yy=bodyTop;
+        while(positions[i]<content[i].length&&yy+lh<=bodyBottom){
+          const line=content[i][positions[i]++];drawJustifiedLine(line,x+3,yy,cw-6,7.5);
+          yy+=lh+(line.breakAfter?lh*.38:0);
+        }
+      });
+      firstPanel=false;
+    }
     // Page 2 — trois tableaux compacts, titres directement au-dessus.
     doc.addPage();y=title("RECAPITULATIF ANNUEL :",16);
     const tables=cumulative.querySelectorAll("table");
