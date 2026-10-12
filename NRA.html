@@ -1534,7 +1534,7 @@
     const cum=document.getElementById("nra-cumulative-count"), weekly=document.getElementById("nra-week-count");
     cum.textContent="Calcul des FE cumulés (date du fait)…";
     weekly.textContent="Calcul des FE de la semaine (date du fait)…";
-    document.getElementById("nra-op-cartables").innerHTML=nraCartablesTable(null,"Chargement des opérations cartables…");
+    document.getElementById("nra-op-cartables").innerHTML=nraCartablesTable(null,"Chargement des opérations cartables…")+nraCartablesTable(null,"Chargement de la semaine…","week");
     try{
       const currentStart=NRA_START, previousStart=new Date(Date.UTC(2025,8,1));
       const years=[{table:"FE26_27_2",start:currentStart},{table:"FE25_26",start:previousStart}];
@@ -1785,7 +1785,7 @@ function nraSplitStructuredFactPaths(value){
     if(v==="fsi solo")return "FSI solo";
     return null;
   }
-  function nraCartablesTable(rows,message=""){
+  function nraCartablesTable(rows,message="",scope="total"){
     const deps=["34","30","11","48","66"];
     const modes=["DSDEN/EMAS","FSI-EMAS","FSI solo"];
     const num=(subset,mode,dep,kind)=>subset.filter(r=>
@@ -1802,10 +1802,10 @@ function nraSplitStructuredFactPaths(value){
       return '<tr'+(mode==="TOTAL"?' class="nra-cartables-total"':'')+
         '><th>'+escapeHtml(mode)+'</th>'+cells+'<td>'+val(rows,m,null,null)+'</td></tr>';
     }).join("");
-    return '<h5>Total des opérations cartables ouvertes par département depuis le 31/08/2026</h5>'+
+    return '<div class="nra-cartables-block" data-scope="'+scope+'"><h5>'+(scope==='week'?'Opérations cartables de la semaine sélectionnée':'Total des opérations cartables depuis le 31/08/2026')+'</h5>'+
       '<div class="nra-table-scroll"><table class="nra-table nra-cartables-table"><thead>'+
       head+'</thead><tbody>'+body+'</tbody></table></div>'+
-      '<p class="muted nra-quality">'+escapeHtml(message)+'</p>';
+      '<p class="muted nra-quality">'+escapeHtml(message)+'</p></div>';
   }
   async function nraLoadCartables(week,token){
     const target=document.getElementById("nra-op-cartables");
@@ -1819,7 +1819,8 @@ function nraSplitStructuredFactPaths(value){
       const byId=new Map(etabs.map(r=>[Number(r.id),r]));
       const byUai=new Map(etabs.filter(r=>r.UAI).map(r=>[String(r.UAI).trim().toUpperCase(),r]));
       const last=addDaysUTC(NRA_START,week*7-1);
-      const valid=[], invalid=[];
+      const valid=[], weekly=[], invalid=[];
+      const first=addDaysUTC(NRA_START,(week-1)*7);
       for(const op of ops){
         const date=parseGristDate(op.Date_operation);
         if(!date||date<NRA_START||date>last)continue;
@@ -1832,16 +1833,17 @@ function nraSplitStructuredFactPaths(value){
           continue;
         }
         valid.push({dep,kind,mode});
+        if(date>=first)weekly.push({dep,kind,mode});
       }
       if(token!==nraComparisonToken||week!==nraWeek)return;
       const msg=invalid.length?
         invalid.length+" opération(s) ignorée(s) : UAI introuvable, département, type d’établissement ou type d’opération non reconnu. Lignes Grist : "+invalid.slice(0,12).join(", ")+(invalid.length>12?"…":""):
         "Une ligne de OP_CA = une opération réalisée dans un établissement. Totaux cumulés jusqu’à la fin de la semaine sélectionnée.";
-      target.innerHTML=nraCartablesTable(valid,msg);
+      target.innerHTML=nraCartablesTable(valid,msg)+nraCartablesTable(weekly,"Du "+nraDateText(first)+" au "+nraDateText(last)+" (date de l’opération).","week");
     }catch(e){
       if(token!==nraComparisonToken||week!==nraWeek)return;
       console.error("OP_CA / ETABLISSEMENTS",e);
-      target.innerHTML=nraCartablesTable(null,"Données indisponibles : vérifiez l'accès aux tables OP_CA et ETABLISSEMENTS.");
+      target.innerHTML=nraCartablesTable(null,"Données indisponibles : vérifiez l'accès aux tables OP_CA et ETABLISSEMENTS.")+nraCartablesTable(null,"Données indisponibles.","week");
     }
   }
 
@@ -1927,7 +1929,7 @@ function nraSplitStructuredFactPaths(value){
         '<span class="nra-dot nra-dot-current" style="background:#cf2525"></span>2026-2027</div>'+data+'</section>';
     };
     return '<div class="nra-chart-grid">'+
-      make("SUIVI TENDANCIEL HEBDOMADAIRE FE — 2025-2026 ET N-1",[["Académie",()=>true]])+
+      make("SUIVI TENDANCIEL HEBDOMADAIRE FE — 2025-2026 ET 2026-2027",[["Académie",()=>true]])+
       make("FE HEBDOMADAIRE / DSDEN",dept.flatMap(d=>[
         [d+" — 1er D",p=>p.department===d&&p.degree==="1er"],
         [d+" — 2nd D",p=>p.department===d&&p.degree==="2nd"]
@@ -2012,18 +2014,18 @@ function nraSplitStructuredFactPaths(value){
     // Page 2 — trois tableaux compacts, titres directement au-dessus.
     doc.addPage();y=title("RECAPITULATIF ANNUEL :",16);
     const tables=cumulative.querySelectorAll("table");
-    y=drawTable(tables[0],y+1,43)+5;
+    y=drawTable(tables[0],y+4,43)+6;
     y=title("Comparatif par département années scolaires 2025-2026 et 2026-2027",y);
-    y=drawTable(tables[1],y+1,51)+5;
-    y=title("Total des opérations cartables par département depuis le 31/08/2026",y);
-    y=drawTable(ops.querySelector("table"),y+1,43);
+    y=drawTable(tables[1],y+4,51)+6;
+    y=title("Opérations cartables de la semaine sélectionnée",y);
+    y=drawTable(ops.querySelector('[data-scope="week"] table'),y+4,43);
     // Page 3 — quatre graphiques à barres VERTICALES, disposition 2 x 2.
     doc.addPage();
     const boxes=[...charts.querySelectorAll(".nra-chart")].slice(0,4);
-    const titles=["SUIVI TENDANCIEL HEBDOMADAIRE FE – 2025-2026 ET N-1","FE HEBDOMADAIRE / DSDEN","DONNÉES HEBDOMADAIRES – ATTEINTES","DONNÉES HEBDOMADAIRES – VIOLENCES"];
-    const bw=(usable-9)/2,bh=81;
+    const titles=["SUIVI TENDANCIEL HEBDOMADAIRE FE – 2025-2026 ET 2026-2027","FE HEBDOMADAIRE / DSDEN","DONNÉES HEBDOMADAIRES – ATTEINTES","DONNÉES HEBDOMADAIRES – VIOLENCES"];
+    const firstWidth=usable*.40,secondWidth=usable-firstWidth-9,bh=81;
     boxes.forEach((el,i)=>{
-      const x=margin+(i%2)*(bw+9),top=16+Math.floor(i/2)*91;
+      const bw=(i%2===0?firstWidth:secondWidth),x=margin+(i%2===0?0:firstWidth+9),top=16+Math.floor(i/2)*91;
       doc.setFont("helvetica","bold");doc.setFontSize(9);doc.setTextColor(...blue);
       const heading=doc.splitTextToSize(titles[i],bw-5);
       doc.text(heading,x+bw/2,top,{align:"center"});
