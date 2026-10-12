@@ -1048,8 +1048,8 @@
 #nra-section .nra-vertical-plot{display:flex;align-items:stretch;justify-content:space-around;gap:5px;height:205px;border-bottom:1px solid #ccd5e1;padding:6px 4px 0}
 #nra-section .nra-vertical-group{display:flex;flex-direction:column;justify-content:flex-end;align-items:center;min-width:0;flex:1;gap:3px}
 #nra-section .nra-vertical-bars{height:158px;width:100%;display:flex;align-items:flex-end;justify-content:center;gap:3px}
-#nra-section .nra-vertical-bar{width:min(22px,42%);min-height:0;position:relative;border-radius:2px 2px 0 0}
-#nra-section .nra-vertical-bar b{position:absolute;bottom:100%;left:50%;transform:translateX(-50%);font-size:10px;white-space:nowrap}
+#nra-section .nra-vertical-bar{width:min(44px,47%);min-height:0;position:relative;border-radius:2px 2px 0 0}
+#nra-section .nra-vertical-bar b{position:absolute;bottom:100%;left:50%;transform:translateX(-50%);font-size:11px;white-space:nowrap}
 #nra-section .nra-vertical-label{height:37px;text-align:center;font-size:10px;line-height:1.1;overflow-wrap:anywhere}
 #nra-section .nra-vertical-bar.now{background:#cf2525;color:#cf2525}
 #nra-section .nra-vertical-bar.prior{background:#102f69;color:#102f69}
@@ -1528,6 +1528,48 @@
   }
 
   let nraComparisonToken=0, nraGemmaData=null;
+  // Cache par semaine et par année : les requêtes Grist ciblent Date_de_saisie.
+  // Les semaines déjà chargées ne sont pas retéléchargées au changement de NRA.
+  const nraWeekFeCache = new Map();
+  async function nraGetFeRowsThroughWeek(tableName, start, lastWeek){
+    const keys=[];
+    for(let w=1;w<=lastWeek;w++){
+      const key=tableName+"|"+w;
+      if(!nraWeekFeCache.has(key))keys.push(w);
+    }
+    if(keys.length){
+      // Une requête ciblée par semaine ; toutes les semaines manquantes sont
+      // regroupées en une seule requête, avec une liste de dates explicites.
+      const dates=[];
+      for(const w of keys){
+        const monday=addDaysUTC(start,(w-1)*7);
+        for(let d=0;d<7;d++)dates.push(formatDateKey(addDaysUTC(monday,d)));
+      }
+      const pending=fetchFactsForDateKeys(tableName,dates);
+      // Dédupliquer les appels simultanés (changement rapide de semaine).
+      const pendingKey=tableName+"|pending";
+      let rows;
+      if(nraWeekFeCache.has(pendingKey)){
+        await nraWeekFeCache.get(pendingKey);
+        return nraGetFeRowsThroughWeek(tableName,start,lastWeek);
+      }
+      nraWeekFeCache.set(pendingKey,pending);
+      try{
+        rows=await pending;
+        for(const w of keys)nraWeekFeCache.set(tableName+"|"+w,[]);
+        for(const row of rows){
+          const date=parseGristDate(row[FIELD.DATE_SAISIE]);
+          if(!date)continue;
+          const w=Math.floor((date-start)/604800000)+1;
+          const key=tableName+"|"+w;
+          if(nraWeekFeCache.has(key))nraWeekFeCache.get(key).push(row);
+        }
+      }finally{nraWeekFeCache.delete(pendingKey)}
+    }
+    const result=[];
+    for(let w=1;w<=lastWeek;w++)result.push(...(nraWeekFeCache.get(tableName+"|"+w)||[]));
+    return result;
+  }
   async function nraLoadComparison(){
     const token=++nraComparisonToken, week=nraWeek;
     nraGemmaData=null;
@@ -1540,10 +1582,8 @@
       const years=[{table:"FE26_27_2",start:currentStart},{table:"FE25_26",start:previousStart}];
       const counts=await Promise.all(years.map(async y=>{
         const first=y.start, last=addDaysUTC(first,week*7-1), mon=addDaysUTC(first,(week-1)*7);
-        // Lire la table complète : les filtres API Grist sur Date_de_saisie
-        // peuvent manquer des horodatages non exactement égaux à minuit.
-        // Le contrôle des bornes est effectué sur les dates civiles normalisées.
-        const allRows=tableDataToRows(await grist.docApi.fetchTable(y.table));
+        // Grist renvoie uniquement les semaines nécessaires par date de saisie.
+        const allRows=await nraGetFeRowsThroughWeek(y.table,first,week);
         const seen=new Set(), cumulativeRows=[], selectedRows=[];
         for(const r of allRows){
           if(!isActiveFactRecord(r))continue;
@@ -1914,7 +1954,7 @@ function nraSplitStructuredFactPaths(value){
       const values=items.map(([label,pred])=>({label,now:profiles[0].filter(pred).length,prior:profiles[1].filter(pred).length}));
       const max=Math.max(1,...values.flatMap(v=>[v.now,v.prior]));
       const groups=values.map(v=>{
-        const bar=(num,cls)=>'<div class="nra-vertical-bar '+cls+'" style="height:'+(100*num/max)+'%">'+(num?'<b>'+num+'</b>':'')+'</div>';
+        const bar=(num,cls)=>'<div class="nra-vertical-bar '+cls+'" style="height:'+(100*num/max)+'%">'+'<b>'+num+'</b>'+'</div>';
         return '<div class="nra-vertical-group"><div class="nra-vertical-bars">'+bar(v.prior,'prior')+bar(v.now,'now')+
           '</div><div class="nra-vertical-label">'+escapeHtml(v.label)+'</div></div>';
       }).join("");
@@ -2045,11 +2085,11 @@ function nraSplitStructuredFactPaths(value){
       if(i===1){
         const deptColors=[[246,219,0],[9,40,99],[235,122,46],[80,110,183],[0,166,91]];
         groups.forEach((g,j)=>{
-          const groupX=x+13+j*(bw-26)/2,barW=5.5;
+          const groupWidth=(bw-30)/2,groupX=x+15+(j+.5)*groupWidth,barW=Math.min(11,(groupWidth-8)/5);
           g.parts.forEach((v,k)=>{
             const hh=chartHeight*v.now/max;
             doc.setFillColor(...deptColors[k]);doc.rect(groupX+(k-2)*barW,base-hh,barW-0.6,hh,"F");
-            if(v.now){doc.setFontSize(6);doc.setTextColor(...blue);doc.text(String(v.now),groupX+(k-1.5)*barW,base-hh-1,{align:"center"});}
+            doc.setFontSize(7);doc.setTextColor(...blue);doc.text(String(v.now),groupX+(k-1.5)*barW,base-hh-1,{align:"center"});
           });
           doc.setFontSize(6.8);doc.setTextColor(...blue);doc.text(g.label,x+18+j*(bw-26)/2,base+5);
         });
@@ -2061,11 +2101,11 @@ function nraSplitStructuredFactPaths(value){
       }else{
         const step=(bw-9)/Math.max(1,groups.length);
         groups.forEach((v,j)=>{
-          const cx=x+4+step*(j+.5),barW=Math.min(7,step*.35);
+          const cx=x+4+step*(j+.5),barW=Math.min(15,step*.44);
           [[v.prior,blue,-1],[v.now,red,1]].forEach(([value,color,side])=>{
             const hh=chartHeight*value/max,bx=cx+(side<0?-barW:0);
             doc.setFillColor(...color);doc.rect(bx,base-hh,barW-.5,hh,"F");
-            if(value){doc.setFont("helvetica","bold");doc.setFontSize(6.2);doc.setTextColor(...color);doc.text(String(value),bx+barW/2,base-hh-1,{align:"center"});}
+            doc.setFont("helvetica","bold");doc.setFontSize(7.2);doc.setTextColor(...color);doc.text(String(value),bx+barW/2,base-hh-1,{align:"center"});
           });
           doc.setFont("helvetica","normal");doc.setFontSize(groups.length>5?5.2:6.3);doc.setTextColor(...blue);
           const short=i===0?(j===0?"2025/26":"2026/27"):v.label.replace("Atteintes aux ","").replace("Violences ","");
