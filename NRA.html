@@ -1532,57 +1532,35 @@
     const token=++nraComparisonToken, week=nraWeek;
     nraGemmaData=null;
     const cum=document.getElementById("nra-cumulative-count"), weekly=document.getElementById("nra-week-count");
-    cum.textContent="Calcul des FE cumulés (date du fait)…";
-    weekly.textContent="Calcul des FE de la semaine (date du fait)…";
+    cum.textContent="Calcul des FE cumulés (date de saisie)…";
+    weekly.textContent="Calcul des FE de la semaine (date de saisie)…";
     document.getElementById("nra-op-cartables").innerHTML=nraCartablesTable(null,"Chargement des opérations cartables…")+nraCartablesTable(null,"Chargement de la semaine…","week");
     try{
       const currentStart=NRA_START, previousStart=new Date(Date.UTC(2025,8,1));
       const years=[{table:"FE26_27_2",start:currentStart},{table:"FE25_26",start:previousStart}];
       const counts=await Promise.all(years.map(async y=>{
         const first=y.start, last=addDaysUTC(first,week*7-1), mon=addDaysUTC(first,(week-1)*7);
+        // Lire la table complète : les filtres API Grist sur Date_de_saisie
+        // peuvent manquer des horodatages non exactement égaux à minuit.
+        // Le contrôle des bornes est effectué sur les dates civiles normalisées.
+        const allRows=tableDataToRows(await grist.docApi.fetchTable(y.table));
         const seen=new Set(), cumulativeRows=[], selectedRows=[];
-        for(let d=new Date(first);d<=last;d=addDaysUTC(d,28)){
-          const keys=[];
-          for(let i=0;i<28;i++){
-            const day=addDaysUTC(d,i);if(day>last)break;
-            keys.push(formatDateKey(day));
-          }
-          const rows=await fetchFactsForFieldDateKeys(y.table,FIELD.DATE_FAIT,keys);
-          rows.forEach(r=>{
-            if(!isActiveFactRecord(r))return;
-            const id=String(r[FIELD.NUMERO_FE]||r.id||"");
-            if(!id||seen.has(id))return;
-            const date=parseGristDate(r[FIELD.DATE_FAIT]);
-            if(!date||date<first||date>last)return;
-            seen.add(id);cumulativeRows.push(r);
-            if(date>=mon)selectedRows.push(r);
-          });
-        }
-        // Repli NRA : certaines dates Grist ne sont pas retrouvées par le filtre API
-        // sur Date_du_fait (format/date/horodatage). Une lecture complète garantit
-        // que les FE actifs de la semaine ne disparaissent pas des graphiques.
-        if (y.table === "FE26_27_2" && selectedRows.length === 0) {
-          const allRows = tableDataToRows(await grist.docApi.fetchTable(y.table));
-          const completeSeen = new Set();
-          cumulativeRows.length = 0;
-          selectedRows.length = 0;
-          for (const r of allRows) {
-            if (!isActiveFactRecord(r)) continue;
-            const id = String(r[FIELD.NUMERO_FE] || r.id || "");
-            if (!id || completeSeen.has(id)) continue;
-            const date = parseGristDate(r[FIELD.DATE_FAIT]);
-            if (!date || date < first || date > last) continue;
-            completeSeen.add(id);
-            cumulativeRows.push(r);
-            if (date >= mon) selectedRows.push(r);
-          }
+        for(const r of allRows){
+          if(!isActiveFactRecord(r))continue;
+          const id=String(r[FIELD.NUMERO_FE]||r.id||"");
+          if(!id||seen.has(id))continue;
+          const date=parseGristDate(r[FIELD.DATE_SAISIE]);
+          if(!date||date<first||date>last)continue;
+          seen.add(id);
+          cumulativeRows.push(r);
+          if(date>=mon)selectedRows.push(r);
         }
         return {cumulative:cumulativeRows.length,selected:selectedRows.length,cumulativeRows,selectedRows};
       }));
       if(token!==nraComparisonToken||week!==nraWeek)return;
       nraGemmaData={week,rows:counts[0].selectedRows,priorRows:counts[1].selectedRows};
       const delta=(a,b)=>b===0?"variation non calculable (base N−1 nulle)":((a-b)/b*100).toLocaleString("fr-FR",{maximumFractionDigits:1})+" %";
-      cum.textContent="Total des FE depuis la rentrée jusqu'à la fin de la semaine "+week+" : 2026-2027 : "+counts[0].cumulative+" ; 2025-2026 : "+counts[1].cumulative+" ; évolution : "+delta(counts[0].cumulative,counts[1].cumulative)+". Périodes comparées à rang de semaine équivalent, sur la date du fait.";
+      cum.textContent="Total des FE depuis la rentrée jusqu'à la fin de la semaine "+week+" : 2026-2027 : "+counts[0].cumulative+" ; 2025-2026 : "+counts[1].cumulative+" ; évolution : "+delta(counts[0].cumulative,counts[1].cumulative)+". Périodes comparées à rang de semaine équivalent, sur la date de saisie.";
       weekly.textContent="Total des FE sur la semaine "+week+" depuis la rentrée : 2026-2027 : "+counts[0].selected+" ; 2025-2026 : "+counts[1].selected+" ; évolution : "+delta(counts[0].selected,counts[1].selected)+".";
       document.getElementById("nra-cumulative-tables").innerHTML=nraBuildTables(counts[0].cumulativeRows,counts[1].cumulativeRows);
       void nraLoadCartables(week,token);
@@ -1908,7 +1886,7 @@ function nraSplitStructuredFactPaths(value){
     const table2='<h5>Comparatif par département années scolaires 2025-2026 et 2026-2027</h5><div class="nra-table-scroll"><table class="nra-table nra-reference-table"><thead>'+head2+'</thead><tbody>'+rows2+'</tbody></table></div>';
     const missingDegree=datasets.map(rows=>rows.filter(p=>!['1er','2nd'].includes(p.degree)).length);
     const missingDep=datasets.map(rows=>rows.filter(p=>!['11','30','34','48','66'].includes(p.department)).length);
-    const note='<p class="muted nra-quality">Période : cumul depuis la rentrée, à rang de semaine équivalent. Différences = 2026-2027 moins 2025-2026. FE sans degré reconnu : '+missingDegree.join(' / ')+' ; sans département reconnu : '+missingDep.join(' / ')+' (N−1 / N). Un FE peut relever de plusieurs familles.</p>';
+    const note='<p class="muted nra-quality">Période : cumul des FE actifs par date de saisie depuis la rentrée, à rang de semaine équivalent. Différences = 2026-2027 moins 2025-2026. FE sans degré reconnu : '+missingDegree.join(' / ')+' ; sans département reconnu : '+missingDep.join(' / ')+' (N−1 / N). Un FE peut relever de plusieurs familles.</p>';
     return table1+table2;
   }
 
