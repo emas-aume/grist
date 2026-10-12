@@ -1705,8 +1705,8 @@ const NRA_FACT_TAXONOMY={
     "Violences verbales":["Menaces orales ou écrites","Violences verbales à caractère sexiste, homophobe","Autres violences verbales"],
     "Violences physiques":["Vol avec ou sans violences","Extorsion et racket","Tentative d'homicide ou homicide","Jeux dangereux","Autres violences physiques"],
     "Violences sexuelles":["Insultes à caractère sexuel","Attouchements, gestes, rapports imposés","Autres violences sexuelles"],
-    "Cyber-violences":["Happy slapping ou vidéolynchage","Menaces, intimidation","Prise et diffusion d'images non désirées","Usurpation d'identité","Autres cyberviolences"],
-    "Harcèlement ou suspicion de harcèlement":[],"Cyber-harcèlement":[],"Disparition, fuite, fugue":[],"Tentative de suicide ou suicide":[],
+    "Cyberviolences":["Happy slapping ou vidéolynchage","Menaces, intimidation","Prise et diffusion d'images non désirées","Usurpation d'identité","Autres cyberviolences"],
+    "Harcèlement ou suspicion de harcèlement":[],"Cyber harcèlement":[],"Atteinte liée à l'orientation sexuelle, homophobie ou transphobie":[],"Risque Sanitaire":[],"Disparition, fuite, fugue":[],"Tentative de suicide ou suicide":[],
     "Décès, maladies, accidents graves":["Décès","Accident","Maladie grave, intoxications alimentaires","Fuite produit toxique"],
     "Autres atteintes aux personnes":[]
   },
@@ -1789,8 +1789,17 @@ function nraSplitStructuredFactPaths(value){
     return {department:getDepartement(r),degree:parsed.degree,types:parsed.types,paths,roots};
   }
   function nraHasBranch(p,branch){
-    const term=nraNorm(branch);
-    return p.paths.some(path=>path.split(" > ").includes(term));
+    // Les variantes d'espaces/tirets sont équivalentes pour les libellés cyber.
+    // Les autres branches conservent une comparaison exacte normalisée.
+    const canonical=v=>{
+      const n=nraNorm(v);
+      const compact=n.replace(/[\s\-_–—]+/g,"");
+      if(compact==="cyberviolences")return "cyberviolences";
+      if(compact==="cyberharcelement")return "cyberharcelement";
+      return n;
+    };
+    const term=canonical(branch);
+    return p.paths.some(path=>path.split(" > ").some(part=>canonical(part)===term));
   }
   /* OP_CA minimal : UAI (référence Grist ou code UAI), Date_operation, Type_operation.
      Chaque ligne représente une opération réalisée dans un établissement. */
@@ -1946,9 +1955,9 @@ function nraSplitStructuredFactPaths(value){
       ["Verbales",p=>nraHasBranch(p,"Violences verbales")],
       ["Physiques",p=>nraHasBranch(p,"Violences physiques")],
       ["Sexuelles",p=>nraHasBranch(p,"Violences sexuelles")],
-      ["Cyberviolences",p=>nraHasBranch(p,"Cyber-violences")],
+      ["Cyberviolences",p=>nraHasBranch(p,"Cyberviolences")],
       ["Harcèlement",p=>nraHasBranch(p,"Harcèlement ou suspicion de harcèlement")],
-      ["Cyberharcèlement",p=>nraHasBranch(p,"Cyber-harcèlement")]
+      ["Cyberharcèlement",p=>nraHasBranch(p,"Cyber harcèlement")]
     ];
     const make=(title,items)=>{
       const values=items.map(([label,pred])=>({label,now:profiles[0].filter(pred).length,prior:profiles[1].filter(pred).length}));
