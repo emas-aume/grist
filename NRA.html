@@ -1702,7 +1702,7 @@ const NRA_FACT_TAXONOMY={
     "Actes racistes et antisémites":[],"Suspicion de radicalisation":[],"Autres atteintes aux valeurs de la République":[]
   },
   "Atteintes aux personnes":{
-    "Violences verbales":["Menaces orales ou écrites","Violences verbales à caractère sexiste, homophobe","Autres violences verbales"],
+    "Violences verbales":["Menaces orales ou écrites","Violences verbales à caractère sexiste, homophobe","Violences verbales à caractère sexiste","Autres violences verbales"],
     "Violences physiques":["Vol avec ou sans violences","Extorsion et racket","Tentative d'homicide ou homicide","Jeux dangereux","Autres violences physiques"],
     "Violences sexuelles":["Insultes à caractère sexuel","Attouchements, gestes, rapports imposés","Autres violences sexuelles"],
     "Cyberviolences":["Happy slapping ou vidéolynchage","Menaces, intimidation","Prise et diffusion d'images non désirées","Usurpation d'identité","Autres cyberviolences"],
@@ -1728,7 +1728,14 @@ for(const [root,children] of Object.entries(NRA_FACT_TAXONOMY)){
     NRA_FACT_LEVEL3_BY_PARENT.set(nraNorm(root)+"|"+nraNorm(parent),new Map(leaves.map(x=>[nraNorm(x),x])));
   }
 }
-function nraSplitStructuredFactPaths(value){
+const NRA_FACT_ALIASES_2526={
+  // Ancienne formulation du sous-type : conserve sa famille « Violences verbales ».
+  [nraNorm("Violences verbales à caractère sexiste")]:nraNorm("Violences verbales à caractère sexiste, homophobe")
+};
+const NRA_FACT_ALIASES_2627={};
+function nraSplitStructuredFactPaths(value, schoolYear){
+  // Les libellés d’origine restent inchangés ; seuls les alias de lecture sont normalisés.
+  const aliases=schoolYear==="FE25_26"?NRA_FACT_ALIASES_2526:NRA_FACT_ALIASES_2627;
   if(value===null||value===undefined||String(value).trim()==="")return[];
   let rawItems=[];
   if(Array.isArray(value))rawItems=(value[0]==="L"?value.slice(1):value).map(String);
@@ -1752,7 +1759,7 @@ function nraSplitStructuredFactPaths(value){
     let root=null,parent=null,path=[];
     const flush=()=>{if(path.length)add(path);path=[];parent=null};
     for(const token of tokens){
-      const n=nraNorm(token),knownRoot=NRA_FACT_ROOT_BY_NORM.get(n),knownL2=NRA_FACT_LEVEL2_BY_NORM.get(n);
+      const n=nraNorm(token),canonical=aliases[n]||n,knownRoot=NRA_FACT_ROOT_BY_NORM.get(canonical),knownL2=NRA_FACT_LEVEL2_BY_NORM.get(canonical);
       if(knownRoot){flush();root=knownRoot;path=[root];continue}
       if(knownL2){
         // Si on vient juste de lire sa racine, ne pas créer une ligne "racine" isolée.
@@ -1761,7 +1768,7 @@ function nraSplitStructuredFactPaths(value){
       }
       if(root&&parent){
         const leaves=NRA_FACT_LEVEL3_BY_PARENT.get(nraNorm(root)+"|"+nraNorm(parent));
-        const leaf=leaves?.get(n);
+        const leaf=leaves?.get(canonical);
         if(leaf){
           // Port/usage d'arme ont des sous-libellés identiques : rendre la branche explicite.
           const displayLeaf=(parent==="Port d'arme"||parent==="Usage d'arme")?`${parent} : ${leaf}`:leaf;
@@ -1781,10 +1788,31 @@ function nraSplitStructuredFactPaths(value){
 
   /* Ventilations NRA : un FE peut appartenir à plusieurs familles d'atteintes.
      Les colonnes de typologie ne doivent donc jamais être additionnées pour retrouver le total. */
-  function nraFactProfile(r){
+  function nraFactProfile(r, schoolYear){
     const parsed=analyzeRecordFromColumns(r);
     const source=r[FIELD.TYPES_STRUCTURE]||r[FIELD.TYPES]||"";
-    const paths=nraSplitStructuredFactPaths(source).map(nraNorm);
+    const paths=nraSplitStructuredFactPaths(source,schoolYear).map(nraNorm);
+    // FE25_26 : l'export historique perd parfois tous les sous-types dans
+    // Types_de_fait_structure (ex. « Atteintes aux personnes » seul).
+    // Types_de_fait conserve alors les catégories, sans séparateurs « > ».
+    // On complète seulement les branches absentes, sans compter le récit libre.
+    if(schoolYear==="FE25_26"){
+      const legacy=nraNorm(r[FIELD.TYPES]||"");
+      const branchLabels=[
+        "Violences verbales", "Violences physiques", "Violences sexuelles",
+        "Cyberviolences", "Cyber harcèlement", "Harcèlement ou suspicion de harcèlement"
+      ];
+      const hasPhrase=(phrase)=>{
+        const needle=nraNorm(phrase).replace(/\s+/g,"\\s+");
+        return new RegExp("(?:^|[^a-z0-9])"+needle+"(?=$|[^a-z0-9])","i").test(legacy);
+      };
+      for(const branch of branchLabels){
+        if(hasPhrase(branch)){
+          const candidate=nraNorm("Atteintes aux personnes > "+branch);
+          if(!paths.includes(candidate))paths.push(candidate);
+        }
+      }
+    }
     const roots=new Set(paths.map(path=>path.split(" > ")[0]));
     return {department:getDepartement(r),degree:parsed.degree,types:parsed.types,paths,roots};
   }
@@ -1943,7 +1971,7 @@ function nraSplitStructuredFactPaths(value){
      Pour les sous-types, seules les étiquettes structurées sont prises en compte :
      on évite de compter une simple mention dans le récit d'un FE. */
   function nraBuildCharts(current, previous){
-    const profiles=[current,previous].map(rows=>rows.map(nraFactProfile));
+    const profiles=[current,previous].map((rows,i)=>rows.map(r=>nraFactProfile(r,i===0?"FE26_27_2":"FE25_26")));
     const dept=["11","30","34","48","66"];
     const broad=[
       ["ValRep",p=>p.roots.has(nraNorm("Atteintes aux valeurs de la République"))],
