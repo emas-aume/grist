@@ -1970,16 +1970,17 @@ function nraSplitStructuredFactPaths(value, schoolYear){
     if(blocks.length!==5){alert('Les cinq tableaux annexes ne sont pas encore chargés.');return;}
     const doc=new C({orientation:'landscape',unit:'mm',format:'a4'}),W=doc.internal.pageSize.getWidth(),H=doc.internal.pageSize.getHeight();
     const margin=12,usable=W-2*margin;
+    const ink=[32,48,69],navy=[12,40,103],blueLight=[232,238,243],green=[225,240,228],yellow=[255,246,209],orange=[230,111,22];
     let y=17;
     const newPage=()=>{doc.addPage();y=17;};
-    doc.setFont('helvetica','bold');doc.setFontSize(14);doc.setTextColor(12,40,103);doc.text('ANNEXES — NRA S'+String(getISOWeekInfo(nraMonday(nraWeek)).week).padStart(2,'0'),margin,y);y+=11;
+    doc.setFont('helvetica','bold');doc.setFontSize(14);doc.setTextColor(...navy);doc.text('ANNEXES — NRA S'+String(getISOWeekInfo(nraMonday(nraWeek)).week).padStart(2,'0'),margin,y);y+=11;
     blocks.forEach((block,bi)=>{
       const heading=block.querySelector('h5')?.textContent||'';
       const table=block.querySelector('table');if(!table)return;
       const trs=[...table.querySelectorAll('tr')],ncols=Math.max(...trs.map(r=>r.children.length));
       const rh=bi===4?9:8,headLines=doc.splitTextToSize(heading,usable),needed=12+headLines.length*5+trs.length*rh;
       if(y+needed>H-14)newPage();
-      doc.setFont('helvetica','bold');doc.setFontSize(10);doc.setTextColor(12,40,103);doc.text(headLines,margin,y);y+=headLines.length*5+3;
+      doc.setFont('helvetica','bold');doc.setFontSize(10);doc.setTextColor(...navy);doc.text(headLines,margin,y);y+=headLines.length*5+3;
       const firstW=bi===4?41:45,otherW=(usable-firstW)/(ncols-1);
       trs.forEach((tr,ri)=>{
         if(y+rh>H-14){newPage();}
@@ -1987,15 +1988,17 @@ function nraSplitStructuredFactPaths(value, schoolYear){
         [...tr.children].forEach((cell,ci)=>{
           const w=ci===0?firstW:otherW;
           const isHead=ri===0,cls=cell.className||'';
-          const fill=cls.includes('nra-year-diff')?[255,246,209]:cls.includes('nra-year-current')?[225,240,228]:isHead||ci===0?[232,238,245]:[255,255,255];
-          doc.setFillColor(...fill);doc.setDrawColor(90,105,125);doc.setLineWidth(.25);doc.rect(x,y,w,rh,'FD');
-          const value=cell.textContent.trim();doc.setFont('helvetica',isHead||ci===0?'bold':'normal');doc.setFontSize(isHead?6.4:7.7);doc.setTextColor(...(cls.includes('nra-year-diff')&&!isHead?[170,40,30]:[28,42,62]));
+          const fill=cls.includes('nra-year-diff')?yellow:cls.includes('nra-year-current')?green:isHead||ci===0?blueLight:[255,255,255];
+          doc.setFillColor(...fill);doc.setDrawColor(192,201,209);doc.setLineWidth(.15);doc.rect(x,y,w,rh,'FD');
+          const value=cell.textContent.trim();doc.setFont('helvetica',isHead||ci===0?'bold':'normal');doc.setFontSize(isHead?6.4:7.7);doc.setTextColor(...(cls.includes('nra-year-diff')&&!isHead?orange:ink));
           const lines=doc.splitTextToSize(value,w-2).slice(0,3);
           doc.text(lines,ci===0?x+1.5:x+w/2,y+rh/2-(lines.length-1)*1.5,{align:ci===0?'left':'center',baseline:'middle'});x+=w;
         });y+=rh;
       });y+=10;
     });
-    const total=doc.internal.getNumberOfPages();for(let i=1;i<=total;i++){doc.setPage(i);doc.setFontSize(7);doc.setTextColor(95,105,120);doc.text('Annexes — Centre opérationnel EMAS',margin,H-7);doc.text('Page '+i+'/'+total,W-margin,H-7,{align:'right'});}
+    // Identité graphique commune aux PDF NRA, NB, BRQ et statistiques :
+    // filigrane EMAS 34, mention de service et pagination.
+    addEmasPdfBranding(doc);
     doc.save('NRA_Annexes_S'+String(getISOWeekInfo(nraMonday(nraWeek)).week).padStart(2,'0')+'_26_27.pdf');
   }
 
