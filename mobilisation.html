@@ -6300,35 +6300,43 @@
       function ensure(h){if(y+h>ph-mb)page();}
       // PDF layout: measured paragraphs and whole-cell wrapping; no word fragments across columns.
       function paragraph(t,bold=false,italicPhrase=null){
-        doc.setFont('helvetica',bold?'bold':'normal');doc.setFontSize(8.7);doc.setTextColor(...ink);
-        if(!italicPhrase){
-          const ls=doc.splitTextToSize(clean(t),cw),lh=4.05;
-          let i=0;
-          while(i<ls.length){
-            if(y+lh+2>ph-mb)page();
-            const capacity=Math.max(1,Math.floor((ph-mb-y-2)/lh));
-            const part=ls.slice(i,i+capacity);
-            doc.text(part,mx,y+3);y+=part.length*lh;i+=part.length;
-          }
-          y+=2.0;return;
-        }
-        const full=clean(t),phrase=clean(italicPhrase),at=full.indexOf(phrase);
-        if(at<0){paragraph(t,bold,null);return;}
-        const segments=[{text:full.slice(0,at),style:bold?'bold':'normal'},
-          {text:phrase,style:'italic'},
-          {text:full.slice(at+phrase.length),style:bold?'bold':'normal'}];
-        let x=mx;const lh=4.05;
+        const full=clean(t),phrase=italicPhrase?clean(italicPhrase):null;
+        const at=phrase?full.indexOf(phrase):-1;
+        const segments=at<0?[{text:full,style:bold?'bold':'normal'}]:[
+          {text:full.slice(0,at),style:bold?'bold':'normal'},
+          {text:phrase,style:bold?'bolditalic':'italic'},
+          {text:full.slice(at+phrase.length),style:bold?'bold':'normal'}
+        ];
+        const fs=8.7,lh=4.05;
+        const words=[];
         for(const seg of segments){
-          for(const word of seg.text.match(/\S+|\s+/g)||[]){
-            doc.setFont('helvetica',seg.style);doc.setFontSize(8.7);
-            const w=doc.getTextWidth(word);
-            if(!/^\s+$/.test(word)&&x>mx&&x+w>mx+cw){y+=lh;x=mx;}
-            if(y+lh+2>ph-mb){page();x=mx;}
-            if(/^\s+$/.test(word)&&x===mx)continue;
-            doc.text(word,x,y+3);x+=w;
+          for(const word of seg.text.match(/\S+/g)||[]){
+            doc.setFont('helvetica',seg.style);doc.setFontSize(fs);
+            words.push({text:word,style:seg.style,width:doc.getTextWidth(word)});
           }
         }
-        y+=lh+2.0;
+        const spaceWidth=(()=>{doc.setFont('helvetica','normal');doc.setFontSize(fs);return doc.getTextWidth(' ');})();
+        const lines=[];let line=[],lineWidth=0;
+        for(const word of words){
+          const nextWidth=lineWidth+(line.length?spaceWidth:0)+word.width;
+          if(line.length&&nextWidth>cw){lines.push(line);line=[];lineWidth=0;}
+          lineWidth+=(line.length?spaceWidth:0)+word.width;
+          line.push(word);
+        }
+        if(line.length)lines.push(line);
+        lines.forEach((items,index)=>{
+          if(y+lh+2>ph-mb)page();
+          const sum=items.reduce((total,w)=>total+w.width,0);
+          const justify=index<lines.length-1&&items.length>1;
+          const gap=justify?(cw-sum)/(items.length-1):spaceWidth;
+          let x=mx;
+          for(let i=0;i<items.length;i++){
+            const word=items[i];doc.setFont('helvetica',word.style);doc.setFontSize(fs);doc.setTextColor(...ink);
+            doc.text(word.text,x,y+3);x+=word.width+(i<items.length-1?gap:0);
+          }
+          y+=lh;
+        });
+        y+=2.0;
       }
       function heading(t){
         doc.setFont('helvetica','bold');doc.setFontSize(11);
