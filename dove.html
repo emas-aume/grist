@@ -1089,6 +1089,8 @@
 .redaction-pdf-body th,.redaction-pdf-body td{white-space:normal!important;overflow-wrap:anywhere!important;font-size:10px!important;line-height:1.35!important;border:1px solid #d0d5dd!important;padding:8px!important;vertical-align:top!important}
 .redaction-pdf-body th{background:#f4f5f7!important;font-weight:bold!important;color:#1f2937!important}
 .redaction-pdf-body tr{break-inside:avoid!important;page-break-inside:avoid!important}
+
+.fro-filters,.fro-actions{display:flex;gap:12px;flex-wrap:wrap;align-items:end;margin:15px 0}.fro-filters label,.fro-actions label,.fro-title{display:flex;flex-direction:column;gap:5px;font-weight:600;font-size:12px;color:#263c60}.fro-filters select,.fro-filters input,.fro-actions select,.fro-title input{padding:9px;border:1px solid #cbd5e1;border-radius:5px;min-width:155px;background:#fff;color:#24314a}.fro-actions button,.fro-toolbar button{padding:9px 12px;border:1px solid #c5d1df;background:#f4f7fb;border-radius:5px;cursor:pointer}.fro-title input{width:100%;font-size:15px}.fro-toolbar{display:flex;gap:5px;margin-top:15px;margin-bottom:4px}.fro-preview{margin-top:22px;color:#273447}.fro-preview h3{color:#203f70;font-size:15px;margin:22px 0 8px}.fro-preview table{border-collapse:collapse;width:100%;font-size:12px;margin-bottom:14px}.fro-preview th,.fro-preview td{border:1px solid #ccd4df;padding:7px 9px;text-align:left}.fro-preview th{background:#eaf0f8;color:#203f70}.fro-preview .fro-right{text-align:right}.fro-preview .fro-note{font-size:12px;margin:7px 0 18px}.fro-preview .fro-warning{color:#9b4d00}
 </style>
 
 </head>
@@ -1115,6 +1117,7 @@
     <button id="tab-tableau" class="bureau-tab active" type="button" onclick="switchBureauTab('tableau')">TABLEAU</button>
     <button id="tab-documents" class="bureau-tab" type="button" onclick="switchBureauTab('documents')">DOCUMENTS</button>
     <button id="tab-nra" class="bureau-tab" type="button" onclick="switchBureauTab('nra')">NRA</button>
+    <button id="tab-fro" class="bureau-tab" type="button" onclick="switchBureauTab('fro')">FRO</button>
     <button id="tab-redaction" class="bureau-tab" type="button" onclick="switchBureauTab('redaction')">RÉDACTION</button>
     <button id="tab-statistiques" class="bureau-tab" type="button" onclick="switchBureauTab('statistiques')">STATISTIQUES</button>
     <div class="data-year-control" id="data-year-control">
@@ -1403,6 +1406,23 @@
   </section>
 
   <!-- RÉDACTION LIBRE -->
+  <section class="section bureau-panel hidden-panel" id="fro-section">
+    <div class="nra-header"><div><h2>FRO — Fiche de renseignement d’ambiance</h2><p>Réseau pédagogique (Bassin), période et tableaux calculés automatiquement depuis les FE.</p></div></div>
+    <div class="fro-filters">
+      <label>Réseau pédagogique<select id="fro-network" onchange="froChanged()"></select></label>
+      <label>Année scolaire<select id="fro-year" onchange="froYearChanged()"><option value="FE26_27_2">2026–2027</option><option value="FE25_26">2025–2026</option><option value="FE24_25">2024–2025</option></select></label>
+      <label>Période<select id="fro-period" onchange="froPeriodChanged()"><option value="week">Semaine</option><option value="month">Mois</option><option value="schoolyear">Depuis la rentrée</option><option value="custom">Dates personnalisées</option></select></label>
+      <label id="fro-anchor-wrap">Semaine ou mois<select id="fro-anchor" onchange="froPeriodChanged()"></select></label>
+      <label>Du<input id="fro-start" type="date" onchange="froDateChanged()"></label>
+      <label>Au<input id="fro-end" type="date" onchange="froDateChanged()"></label>
+    </div>
+    <div class="fro-actions"><label>Brouillons<select id="fro-drafts" onchange="froLoadDraft()"><option value="">Nouveau brouillon</option></select></label><button type="button" onclick="froNew()">Nouvelle FRO</button><button type="button" onclick="froSave()">Enregistrer brouillon FRO</button><button type="button" onclick="froExportPdf()">Exporter PDF</button></div>
+    <label class="fro-title">Titre<input id="fro-title" value="Fiche de renseignement d’ambiance" oninput="froDirty=true"></label>
+    <div class="fro-toolbar" onmousedown="froKeepSelection(event)"><button type="button" onclick="froFormat('bold')"><b>G</b></button><button type="button" onclick="froFormat('italic')"><i>I</i></button><button type="button" onclick="froFormat('underline')"><u>S</u></button></div>
+    <div id="fro-editor" class="redaction-editor" contenteditable="true" spellcheck="true" oninput="froDirty=true" role="textbox" aria-multiline="true"><p></p></div>
+    <div id="fro-status" class="nra-status"></div>
+    <div id="fro-preview" class="fro-preview"></div>
+  </section>
   <section class="section bureau-panel hidden-panel" id="redaction-section">
     <h2>Rédaction de documents</h2>
     <p class="muted">Créez et conservez vos analyses et notes. Le PDF applique automatiquement la charte EMAS, sans filigrane.</p>
@@ -3069,11 +3089,12 @@ function nraSplitStructuredFactPaths(value, schoolYear){
   }
 
   async function switchBureauTab(tab) {
-    if (!["tableau","documents","nra","redaction","statistiques"].includes(tab)) return;
+    if (!["tableau","documents","nra","fro","redaction","statistiques"].includes(tab)) return;
     if(activeBureauTab==="nra" && tab!=="nra" && nraDirty && !confirm("Des modifications NRA ne sont pas enregistrées. Quitter sans sauvegarder ?"))return;
+    if(activeBureauTab==="fro" && tab!=="fro" && froDirty && !confirm("Brouillon FRO non enregistré. Quitter ?"))return;
     if(activeBureauTab==="redaction" && tab!=="redaction" && redactionDirty && !confirm("Document non enregistré. Quitter sans sauvegarder ?"))return;
     activeBureauTab = tab;
-    ["tableau","documents","nra","redaction","statistiques"].forEach(function(name) {
+    ["tableau","documents","nra","fro","redaction","statistiques"].forEach(function(name) {
       const b = document.getElementById("tab-" + name); if (b) b.classList.toggle("active", name === tab);
     });
     const tableSection = document.getElementById("tableau-section");
@@ -3082,6 +3103,7 @@ function nraSplitStructuredFactPaths(value, schoolYear){
     const weeklyStats = document.getElementById("weekly-stats-section");
     const analyticsStats = document.getElementById("analytics-stats-section");
     const nraSection = document.getElementById("nra-section");
+    const froSection = document.getElementById("fro-section");
     const redactionSection = document.getElementById("redaction-section");
     if (tableSection) tableSection.classList.toggle("hidden-panel", tab !== "tableau");
     if (white) white.classList.toggle("hidden-panel", tab !== "documents");
@@ -3089,6 +3111,7 @@ function nraSplitStructuredFactPaths(value, schoolYear){
     if (weeklyStats) weeklyStats.classList.toggle("hidden-panel", tab !== "documents");
     if (analyticsStats) analyticsStats.classList.toggle("hidden-panel", tab !== "statistiques");
     if (nraSection) nraSection.classList.toggle("hidden-panel", tab !== "nra");
+    if (froSection) froSection.classList.toggle("hidden-panel", tab !== "fro");
     if (redactionSection) redactionSection.classList.toggle("hidden-panel", tab !== "redaction");
     const yearControl = document.getElementById("data-year-control");
     if (yearControl) yearControl.style.display = tab === "tableau" ? "flex" : "none";
@@ -3117,6 +3140,7 @@ function nraSplitStructuredFactPaths(value, schoolYear){
       return;
     }
     if (tab === "nra") { await nraInit(); return; }
+    if (tab === "fro") { await froInit(); return; }
     if (tab === "redaction") { await redactionInit(); return; }
     if (tab === "statistiques") {
       /* Chargement indépendant et ciblé : par défaut seulement 4 semaines. */
@@ -8093,6 +8117,125 @@ function nraSplitStructuredFactPaths(value, schoolYear){
       redactionStatus('Brouillon enregistré dans Grist.');
     }catch(e){redactionStatus('Enregistrement impossible : '+e.message);}finally{redactionBusy=false;redactionEl('save').disabled=false;}
   }
+
+  /* FRO — données de la période et du bassin, indépendantes de la NRA. */
+  const froTable='FRO_BROUILLONS';
+  let froDirty=false,froId=null,froOriginal='',froReady=false,froRows=[],froEstabs=[],froFacts=[],froBusy=false,froSelection=null;
+  const froEl=id=>document.getElementById('fro-'+id);
+  const froMsg=t=>{froEl('status').textContent=t;};
+  function froSafe(s){return escapeHtml(String(s??''));}
+  function froDate(v){const d=parseGristDate(v);return d&&Number.isFinite(d.getTime())?formatDateKey(d):'';}
+  function froNorm(v){return String(v??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();}
+  function froBassin(e){for(const k of ['Bassin','bassin','BASSIN'])if(e[k]!=null&&String(e[k]).trim())return String(e[k]).trim();return '';}
+  function froDegree(e){const c=getEtabCategory(e);return c==='first'?'1er':c==='college'||c==='lycee'?'2nd':'';}
+  function froPrivate(e){const s=froNorm([e.Secteur,e.secteur,e.Statut,e.statut,e.Public_prive,e.Type_etablissement].filter(Boolean).join(' '));return s.includes('prive');}
+  function froEstab(r){const v=r[FIELD.UAI];if(v!=null&&/^\d+$/.test(String(v).trim())){const e=etabByRowId.get(Number(v));if(e)return e;}const u=extractUai(v);return u?etabByUai.get(u)||null:null;}
+  function froChanged(){froDirty=true;froRender();}
+  function froDateChanged(){froEl('period').value='custom';froEl('anchor-wrap').style.display='none';froChanged();}
+  function froYearChanged(){froAnchors();froPeriodChanged();}
+  function froPeriodChanged(){froAnchors();froChanged();}
+  function froAnchors(){
+    const year=froEl('year').value,p=froEl('period').value,range=SCHOOL_YEAR_BY_TABLE[year],a=froEl('anchor'),wrap=froEl('anchor-wrap');
+    wrap.style.display=p==='week'||p==='month'?'flex':'none';if(!range)return;
+    const start=froDate(range.start),end=froDate(range.end);if(!start||!end)return;
+    const items=[],today=formatDateKey(new Date()),cap=end<today?end:today;
+    let d=new Date(start+'T00:00:00Z'),last=new Date(cap+'T00:00:00Z');
+    if(p==='week'){
+      d.setUTCDate(d.getUTCDate()-((d.getUTCDay()+6)%7));
+      while(d<=last){const b=new Date(d);b.setUTCDate(b.getUTCDate()+6);const key=formatDateKey(d),endKey=formatDateKey(b);items.push([key,'Semaine du '+key+' au '+endKey]);d.setUTCDate(d.getUTCDate()+7);}
+    }else if(p==='month'){
+      d.setUTCDate(1);while(d<=last){const key=formatDateKey(d).slice(0,7);items.push([key,d.toLocaleDateString('fr-FR',{month:'long',year:'numeric',timeZone:'UTC'})]);d.setUTCMonth(d.getUTCMonth()+1);}
+    }
+    const old=a.value;a.innerHTML=items.reverse().map(([k,v])=>'<option value="'+froSafe(k)+'">'+froSafe(v)+'</option>').join('');if(items.some(x=>x[0]===old))a.value=old;
+    if(p!=='custom'){
+      let from=start,to=cap;
+      if(p==='week'&&a.value){from=a.value;const z=new Date(from+'T00:00:00Z');z.setUTCDate(z.getUTCDate()+6);to=formatDateKey(z);}
+      if(p==='month'&&a.value){from=a.value+'-01';const [yy,mm]=a.value.split('-').map(Number);to=formatDateKey(new Date(Date.UTC(yy,mm,0)));}
+      froEl('start').value=from<start?start:from;froEl('end').value=to>cap?cap:to;
+    }
+  }
+  async function froInit(){
+    if(!froReady){
+      froMsg('Chargement des établissements et des réseaux pédagogiques…');
+      try{
+        if(etabLoadState==='idle'||etabLoadState==='error')await loadEtabTableForWeeklyStats();
+        froEstabs=etabRecords.slice();
+        const networks=[...new Set(froEstabs.map(froBassin).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'fr'));
+        froEl('network').innerHTML=networks.map(x=>'<option value="'+froSafe(x)+'">'+froSafe(x)+'</option>').join('');
+        froReady=true;froAnchors();
+      }catch(e){froMsg('Impossible de charger ETABLISSEMENTS : '+e.message);return;}
+    }
+    await froRefresh();await froRender();
+  }
+  async function froRefresh(){try{froRows=tableDataToRows(await grist.docApi.fetchTable(froTable));froEl('drafts').innerHTML='<option value="">Nouveau brouillon</option>'+froRows.slice().sort((a,b)=>Number(b.Date_modification||0)-Number(a.Date_modification||0)).map(r=>'<option value="'+r.id+'">'+froSafe(r.Titre||'Sans titre')+' — '+froSafe(r.Reseau||'')+'</option>').join('');if(froId)froEl('drafts').value=String(froId);froMsg('Brouillons Grist disponibles.');}catch(e){froMsg('Table FRO_BROUILLONS inaccessible : importez le modèle Excel dans Grist. '+e.message);}}
+  function froSnapshot(){return JSON.stringify({title:froEl('title').value,network:froEl('network').value,year:froEl('year').value,period:froEl('period').value,start:froEl('start').value,end:froEl('end').value,html:froEl('editor').innerHTML});}
+  function froNew(){if(froDirty&&!confirm('Abandonner les modifications non enregistrées ?'))return;froId=null;froEl('drafts').value='';froEl('title').value='Fiche de renseignement d’ambiance';froEl('editor').innerHTML='<p></p>';froDirty=false;froOriginal=froSnapshot();froMsg('Nouvelle FRO.');froRender();}
+  function froLoadDraft(){const id=Number(froEl('drafts').value);if(froDirty&&!confirm('Abandonner les modifications non enregistrées ?')){froEl('drafts').value=froId||'';return;}const r=froRows.find(x=>x.id===id);if(!r){froId=null;froDirty=false;return;}froId=r.id;froEl('title').value=r.Titre||'';froEl('network').value=r.Reseau||'';froEl('year').value=r.Annee_scolaire||'FE26_27_2';froEl('period').value=r.Type_periode||'custom';froAnchors();froEl('start').value=r.Date_debut||'';froEl('end').value=r.Date_fin||'';froEl('editor').innerHTML=froClean(r.Contenu_HTML||'');froDirty=false;froOriginal=froSnapshot();froRender();froMsg('Brouillon chargé.');}
+  function froClean(html){const t=document.createElement('template');t.innerHTML=String(html||'');const allowed=new Set(['P','DIV','BR','B','STRONG','I','EM','U']);function visit(root){for(const n of [...root.childNodes]){if(n.nodeType===8){n.remove();continue;}if(n.nodeType!==1)continue;if(['SCRIPT','STYLE','IFRAME','OBJECT','SVG','IMG'].includes(n.tagName)){n.remove();continue;}visit(n);if(!allowed.has(n.tagName)){n.replaceWith(...n.childNodes);continue;}for(const a of [...n.attributes])n.removeAttribute(a.name);}}visit(t.content);return t.innerHTML;}
+  function froKeepSelection(ev){if(!ev.target.closest('button'))return;const s=window.getSelection(),ed=froEl('editor');if(s&&s.rangeCount&&ed.contains(s.anchorNode)&&ed.contains(s.focusNode))froSelection=s.getRangeAt(0).cloneRange();ev.preventDefault();}
+  function froFormat(cmd){const ed=froEl('editor'),s=window.getSelection();ed.focus();if(froSelection&&ed.contains(froSelection.startContainer)){s.removeAllRanges();s.addRange(froSelection);}document.execCommand(cmd,false,null);froSelection=null;froDirty=true;}
+  async function froSave(){if(froBusy)return;const network=froEl('network').value,from=froEl('start').value,to=froEl('end').value;if(!network||!from||!to||from>to){froMsg('Choisissez un réseau et des dates valides.');return;}froBusy=true;try{const now=Math.floor(Date.now()/1000),row=froRows.find(r=>r.id===froId);if(row&&froOriginal!==froSnapshot()&&Number(row.Date_modification||0)>0){const latest=tableDataToRows(await grist.docApi.fetchTable(froTable)).find(r=>r.id===froId);if(latest&&Number(latest.Date_modification||0)!==Number(row.Date_modification||0))throw Error('Le brouillon a été modifié ailleurs. Rechargez-le.');}const fields={Titre:froEl('title').value.trim()||'FRO',Reseau:network,Annee_scolaire:froEl('year').value,Type_periode:froEl('period').value,Date_debut:from,Date_fin:to,Contenu_HTML:froClean(froEl('editor').innerHTML),Date_modification:now};if(!row)fields.Date_creation=now;const result=await grist.docApi.applyUserActions([[row?'UpdateRecord':'AddRecord',froTable,row?row.id:null,fields]]);froDirty=false;const oldId=froId;await froRefresh();froId=oldId||(Array.isArray(result)&&Number.isInteger(result[0])?result[0]:null);if(!froId){const match=froRows.filter(r=>r.Titre===fields.Titre&&r.Reseau===fields.Reseau&&r.Date_modification===now).sort((a,b)=>b.id-a.id)[0];if(match)froId=match.id;}froEl('drafts').value=froId||'';froOriginal=froSnapshot();froMsg('Brouillon FRO enregistré.');}catch(e){froMsg('Erreur d’enregistrement : '+e.message);}finally{froBusy=false;}}
+  function froStats(){
+    const network=froEl('network').value,from=froEl('start').value,to=froEl('end').value;
+    const es=froEstabs.filter(e=>froNorm(froBassin(e))===froNorm(network)&&froDegree(e));
+    const unique=new Map();es.forEach(e=>unique.set(String(getEtabUai(e)||e.id),e));
+    const etabs=[...unique.values()],validUais=new Set(etabs.map(e=>String(getEtabUai(e))));
+    const facts=froFacts.filter(r=>{const date=froDate(r[FIELD.DATE_FAIT]);if(!date||date<from||date>to)return false;const e=froEstab(r);return e&&validUais.has(String(getEtabUai(e)));});
+    const counts=new Map(),declarants=[new Set(),new Set()],att=[Array(7).fill(0),Array(7).fill(0)];
+    let totals=[0,0],privates=[0,0];
+    facts.forEach(r=>{const e=froEstab(r);if(!e)return;const d=froDegree(e)==='1er'?0:1,u=String(getEtabUai(e));totals[d]++;if(froPrivate(e))privates[d]++;declarants[d].add(u);counts.set(u,(counts.get(u)||0)+1);froCategoriesOf(r).forEach(i=>{att[d][i]++;});});
+    const groups=[etabs.filter(e=>froDegree(e)==='1er'),etabs.filter(e=>froDegree(e)==='2nd')];
+    const top=groups.map(arr=>arr.filter(e=>counts.has(String(getEtabUai(e)))).sort((a,b)=>(counts.get(String(getEtabUai(b)))||0)-(counts.get(String(getEtabUai(a)))||0)||getEtabName(a).localeCompare(getEtabName(b),'fr')).slice(0,10).map(e=>[getEtabName(e)+(getEtabCity(e)?', '+getEtabCity(e):''),counts.get(String(getEtabUai(e)))||0]));
+    return {groups,top,totals,privates,declarants,att,all:facts.length,from,to,network};
+  }
+  function froTableHtml(title,headers,rows){return '<h3>'+froSafe(title)+'</h3><table><thead><tr>'+headers.map(h=>'<th>'+froSafe(h)+'</th>').join('')+'</tr></thead><tbody>'+rows.map(row=>'<tr>'+row.map((v,i)=>'<td'+(i?' class="fro-right"':'')+'>'+froSafe(v)+'</td>').join('')+'</tr>').join('')+'</tbody></table>';}
+  function froTables(s){const n=s.groups.map(x=>x.length),np=s.groups.map(x=>x.filter(froPrivate).length),fmt=(a,b)=>a+' dont '+b+' privés';let h=froTableHtml('Tableau 1 : Nombre d’établissements/écoles du réseau de '+s.network,['Établissements / Écoles','Nombre'],[['1er degré',fmt(n[0],np[0])],['2nd degré',fmt(n[1],np[1])],['Total',fmt(n[0]+n[1],np[0]+np[1])]]);h+=froTableHtml('Tableau 2 : Nombre de FE par établissements/écoles',['Établissements / Écoles','Nombre de faits'],[['Total 1er degré',fmt(s.totals[0],s.privates[0])],['Total 2nd degré',fmt(s.totals[1],s.privates[1])],['Total général',fmt(s.all,s.privates[0]+s.privates[1])]]);h+='<p class="fro-note">'+s.declarants[0].size+' écoles sur '+n[0]+' ('+(n[0]?(100*s.declarants[0].size/n[0]).toFixed(2):'0')+' %) et '+s.declarants[1].size+' établissements sur '+n[1]+' ('+(n[1]?(100*s.declarants[1].size/n[1]).toFixed(2):'0')+' %) du 2nd degré ont établi au moins un FE.</p>';h+=froTableHtml('Tableau 3 : Établissements les plus représentés — 1er degré',['1er degré','Nombre de faits'],s.top[0].length?s.top[0]:[['Aucun établissement déclarant',0]]);h+=froTableHtml('Tableau 3 (suite) : Établissements les plus représentés — 2nd degré',['2nd degré','Nombre de faits'],s.top[1].length?s.top[1]:[['Aucun établissement déclarant',0]]);h+=froTableHtml('Tableau 4 : Nombre d’atteintes/violences par établissements/écoles',['Établissements / Écoles','AP','AB','ACS','VP','VV','VS','Harcèlement'],[['1er degré',...s.att[0]],['2nd degré',...s.att[1]],['Total général',...s.att[0].map((x,i)=>x+s.att[1][i])]]);h+='<p class="fro-note">AP : atteintes aux personnes ; AB : atteintes aux biens ; ACS : atteintes à la sécurité ; VP : violences physiques ; VV : violences verbales ; VS : violences sexuelles. Un même FE peut relever de plusieurs catégories.</p>';return h;}
+  /* Comparaison FRO : même décalage depuis la rentrée de chaque année, catégories structurées. */
+  const froYears=['FE24_25','FE25_26','FE26_27_2'];
+  const froYearNames=['2024-2025','2025-2026','2026-2027'];
+  const froCategories=['Atteintes aux personnes','Atteintes aux biens','Atteintes à la sécurité / climat','Violences physiques','Violences verbales','Violences sexuelles','Harcèlement'];
+  let froCompareData=null;
+  function froCategoriesOf(r){
+    const raw=String(r[FIELD.TYPES_STRUCTURE]||r[FIELD.TYPES]||'');
+    const branches=raw.split(/\s*\|\s*/).map(froNorm);
+    const matched=new Set();
+    for(const b of branches){
+      if(/atteintes? aux personnes/.test(b))matched.add(0);
+      if(/atteintes? aux biens/.test(b))matched.add(1);
+      if(/atteintes? a la securite|climat de l.etablissement/.test(b))matched.add(2);
+      if(/violences? physiques?/.test(b))matched.add(3);
+      if(/violences? verbales?/.test(b))matched.add(4);
+      if(/violences? sexuelles?/.test(b))matched.add(5);
+      if(/harcelement/.test(b))matched.add(6);
+    }
+    return [...matched];
+  }
+  function froShiftDate(key,year){const d=new Date(key+'T00:00:00Z');const base=new Date(SCHOOL_YEAR_BY_TABLE[froEl('year').value].start+'T00:00:00Z');const offset=Math.round((d-base)/86400000);const target=new Date(SCHOOL_YEAR_BY_TABLE[year].start+'T00:00:00Z');target.setUTCDate(target.getUTCDate()+offset);return formatDateKey(target);}
+  async function froComparison(network,from,to){
+    const permitted=new Set(froEstabs.filter(e=>froNorm(froBassin(e))===froNorm(network)).map(e=>String(getEtabUai(e))));
+    const results=await Promise.all(froYears.map(async year=>{
+      const rows=year===froEl('year').value?froFacts:tableDataToRows(await grist.docApi.fetchTable(year));
+      const a=froShiftDate(from,year),b=froShiftDate(to,year),cats=Array(7).fill(0);let count=0;
+      for(const r of rows){const dt=froDate(r[FIELD.DATE_FAIT]);if(!dt||dt<a||dt>b)continue;const e=froEstab(r);if(!e||!permitted.has(String(getEtabUai(e))))continue;count++;for(const i of froCategoriesOf(r))cats[i]++;}
+      return {year,count,cats,from:a,to:b};
+    }));
+    return results;
+  }
+  function froComparisonHtml(c){
+    const h=['Année scolaire',...froYearNames];
+    const totals=['Nombre de FE',...c.map(x=>x.count)];
+    const variations=['Évolution par rapport à l’année précédente','—',...c.slice(1).map((x,i)=>c[i].count?(((x.count-c[i].count)/c[i].count)*100).toFixed(1).replace('.',',')+' %':'n.c.')];
+    return froTableHtml('Tableau 5 : Comparaison des FE sur trois années',h,[totals,variations])+
+      '<p class="fro-note">Périodes comparées au même rang depuis la rentrée scolaire : '+c.map((x,i)=>froYearNames[i]+' ('+x.from+' au '+x.to+')').join(' ; ')+'</p>'+
+      froTableHtml('Tableau 6 : Comparaison des atteintes sur trois années',h,froCategories.map((label,i)=>[label,...c.map(x=>x.cats[i])]))+
+      '<p class="fro-note">Catégories issues de Types_de_fait_structure (repli sur Types_de_fait). Un FE peut relever de plusieurs catégories ; les totaux par atteinte ne s’additionnent pas.</p>';
+  }
+  let froRenderToken=0;
+  async function froRender(){if(!froReady)return;const token=++froRenderToken,from=froEl('start').value,to=froEl('end').value,network=froEl('network').value;if(!from||!to||from>to||!network){froEl('preview').innerHTML='<p class="fro-warning">Sélectionnez un réseau et une période valide.</p>';return;}froMsg('Calcul des tableaux sur les faits du '+from+' au '+to+'…');try{const table=froEl('year').value;const raw=await grist.docApi.fetchTable(table);if(token!==froRenderToken)return;froFacts=tableDataToRows(raw);const s=froStats();const comparison=await froComparison(network,from,to);if(token!==froRenderToken)return;froCompareData=comparison;froEl('preview').innerHTML='<h2>Aperçu des tableaux — '+froSafe(network)+'</h2><p>Du '+froSafe(from)+' au '+froSafe(to)+' — '+s.all+' FE</p>'+froTables(s)+froComparisonHtml(comparison);froMsg('Tableaux et comparaisons actualisés : '+s.all+' FE sur la période (date du fait).');}catch(e){froMsg('Calcul impossible : '+e.message);}}
+  async function froExportPdf(){if(!froReady)return;await froRender();if(!froFacts.length && froEl('preview').textContent.includes('Calcul impossible'))return;const JsPDF=window.jspdf?.jsPDF||window.jsPDF;if(!JsPDF){froMsg('jsPDF indisponible.');return;}const s=froStats(),pdf=new JsPDF({unit:'mm',format:'a4'}),L=17,R=17,W=210,H=297,B=21,TOP=20;let y=TOP;const navy=[32,73,117];const font=(size=9,bold=false)=>{pdf.setFont('helvetica',bold?'bold':'normal');pdf.setFontSize(size);pdf.setTextColor(34,45,63);};const page=()=>{pdf.addPage();y=TOP;};const ensure=h=>{if(y+h>H-B)page();};const line=(t,size=9,bold=false,after=3)=>{font(size,bold);const lines=pdf.splitTextToSize(String(t||''),W-L-R);const step=size*.43+1;for(const x of lines){ensure(step);pdf.text(x,L,y);y+=step;}y+=after;};const heading=t=>{ensure(15);y+=3;font(10,true);pdf.setTextColor(...navy);line(t,10,true,4);};const table=(headers,rows)=>{const widths=headers.length===2?[W-L-R-36,36]:[50,...Array(headers.length-1).fill((W-L-R-50)/(headers.length-1))];const draw=(vals,head=false)=>{font(7.7,head);const parts=vals.map((v,i)=>pdf.splitTextToSize(String(v??''),widths[i]-3));const height=Math.max(7,...parts.map(p=>p.length*3.3+3));ensure(height);let x=L;for(let i=0;i<vals.length;i++){pdf.setDrawColor(190,201,215);if(head){pdf.setFillColor(235,241,248);pdf.rect(x,y-3,widths[i],height,'FD');}else pdf.rect(x,y-3,widths[i],height);pdf.text(parts[i],x+1.5,y);x+=widths[i];}y+=height;};draw(headers,true);for(const row of rows){if(y+9>H-B){page();draw(headers,true);}draw(row);}y+=5;};
+    try{font(15,true);pdf.setTextColor(...navy);line(froEl('title').value||'Fiche de renseignement d’ambiance',15,true,5);line('Réseau pédagogique : '+s.network,10,true,1);line('Période : '+s.from+' au '+s.to,9,false,7);const holder=document.createElement('div');holder.innerHTML=froClean(froEl('editor').innerHTML);for(const block of [...holder.childNodes]){const txt=(block.textContent||'').trim();if(txt)line(txt,9,false,3);}const n=s.groups.map(a=>a.length),np=s.groups.map(a=>a.filter(froPrivate).length),fmt=(a,b)=>a+' dont '+b+' privés';heading('Tableau 1 : Nombre d’établissements/écoles du réseau de '+s.network);table(['Établissements / Écoles','Nombre'],[['1er degré',fmt(n[0],np[0])],['2nd degré',fmt(n[1],np[1])],['Total',fmt(n[0]+n[1],np[0]+np[1])]]);heading('Tableau 2 : Nombre de FE par établissements/écoles');table(['Établissements / Écoles','Nombre de faits'],[['Total 1er degré',fmt(s.totals[0],s.privates[0])],['Total 2nd degré',fmt(s.totals[1],s.privates[1])],['Total général',fmt(s.all,s.privates[0]+s.privates[1])]]);line(s.declarants[0].size+' écoles sur '+n[0]+' et '+s.declarants[1].size+' établissements sur '+n[1]+' du 2nd degré ont déclaré au moins un FE.',8,false,3);heading('Tableau 3 : Établissements les plus représentés — 1er degré');table(['1er degré','Nombre de faits'],s.top[0].length?s.top[0]:[['Aucun',0]]);heading('Tableau 3 (suite) : Établissements les plus représentés — 2nd degré');table(['2nd degré','Nombre de faits'],s.top[1].length?s.top[1]:[['Aucun',0]]);heading('Tableau 4 : Nombre d’atteintes/violences par établissements/écoles');table(['Établissements / Écoles','AP','AB','ACS','VP','VV','VS','Harcèlement'],[['1er degré',...s.att[0]],['2nd degré',...s.att[1]],['Total général',...s.att[0].map((v,i)=>v+s.att[1][i])]]);line('AP : atteintes aux personnes ; AB : atteintes aux biens ; ACS : atteintes à la sécurité ; VP : violences physiques ; VV : violences verbales ; VS : violences sexuelles. Catégories non exclusives.',7,false,3);if(froCompareData){heading('Tableau 5 : Comparaison des FE sur trois années');table(['Année scolaire',...froYearNames],[['Nombre de FE',...froCompareData.map(x=>x.count)],['Variation', '—',...froCompareData.slice(1).map((x,i)=>froCompareData[i].count?(((x.count-froCompareData[i].count)/froCompareData[i].count)*100).toFixed(1)+' %':'n.c.')]]);line('Périodes alignées depuis la rentrée : '+froCompareData.map((x,i)=>froYearNames[i]+' ('+x.from+' au '+x.to+')').join(' ; '),7,false,3);heading('Tableau 6 : Comparaison des atteintes sur trois années');table(['Atteinte',...froYearNames],froCategories.map((label,i)=>[label,...froCompareData.map(x=>x.cats[i])]));line('Catégories non exclusives issues des types de faits structurés.',7,false,3);}const total=pdf.getNumberOfPages();for(let i=1;i<=total;i++){pdf.setPage(i);pdf.setDrawColor(200,208,221);pdf.line(L,H-17,W-R,H-17);font(8);pdf.text('Cellule Administrative et Renseignement - EMAS 34',L,H-12);pdf.text('Page '+i+'/'+total,W-R,H-12,{align:'right'});}pdf.save('FRO_'+s.network.replace(/[^a-z0-9-]/gi,'_')+'_'+s.from+'_'+s.to+'.pdf');froMsg('PDF exporté.');}catch(e){froMsg('Export PDF impossible : '+e.message);}
+  }
+
   // Export vectoriel direct : évite html2canvas, qui renvoie une page blanche dans certaines iframes Grist.
   async function redactionExportPdf(){
     const title=redactionEl('title').value.trim();
