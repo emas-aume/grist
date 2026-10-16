@@ -1061,6 +1061,32 @@
 #nra-annex-tables .nra-annex-table{width:100%;min-width:900px;border-collapse:collapse}
 #nra-annex-tables .nra-annex-table th,#nra-annex-tables .nra-annex-table td{border:1px solid #8996a9;padding:8px;text-align:center}
 #nra-annex-tables .nra-annex-table tbody th{text-align:left}
+
+/* Éditeur libre EMAS */
+.redaction-controls{display:flex;gap:10px;align-items:end;flex-wrap:wrap;margin:16px 0}
+.redaction-controls label{display:flex;flex-direction:column;gap:5px;font-size:12px;font-weight:600;color:#667085}
+.redaction-controls select{min-width:270px;max-width:430px;padding:10px;border:1px solid #cbd5e1;border-radius:7px;background:white;color:#203045}
+.redaction-controls button{padding:10px 13px;background:#2f6fed;color:white;border:1px solid #2f6fed;border-radius:7px;cursor:pointer;font-weight:600}
+.redaction-controls button:disabled{opacity:.5}
+.redaction-title-label{display:block;margin:13px 0 5px;font-size:12px;font-weight:700;color:#475467}
+.redaction-title-input{width:100%;padding:11px;border:1px solid #cbd5e1;border-radius:7px;background:#fff;color:#203045;font-size:15px}
+.redaction-toolbar{display:flex;gap:6px;flex-wrap:wrap;margin:18px 0 0;padding:9px;background:#eef2f7;border:1px solid #cbd5e1;border-radius:8px 8px 0 0}
+.redaction-toolbar button{padding:7px 11px;background:#fff;border:1px solid #cbd5e1;border-radius:5px;cursor:pointer;color:#1f2937}
+.redaction-editor{background:#fff;color:#1f2937;min-height:550px;padding:30px 35px;border:1px solid #cbd5e1;border-top:0;border-radius:0 0 8px 8px;outline:none;font:14px/1.6 Arial,sans-serif;overflow-wrap:anywhere}
+.redaction-editor p{margin:0 0 11px;text-align:justify}.redaction-editor h2{font-size:17px;color:#204975;margin:23px 0 11px}.redaction-editor h3{font-size:15px;color:#204975;margin:17px 0 8px}
+.redaction-editor table{min-width:0;width:100%;table-layout:fixed;border-collapse:collapse;margin:14px 0}.redaction-editor th,.redaction-editor td{position:static;white-space:normal;border:1px solid #d0d5dd;padding:8px;font-size:13px;vertical-align:top}.redaction-editor th{background:#f4f5f7;font-weight:700}
+
+.redaction-pdf{font-family:Arial,Helvetica,sans-serif!important;color:#1f2937!important;font-size:12px!important;line-height:1.45!important}
+.redaction-pdf h1{font-size:21px!important;color:#1f2937!important;line-height:1.25!important;margin:0 0 10px!important}
+.redaction-pdf-subtitle{font-size:12px!important;color:#667085!important;margin:0 0 12px!important}
+.redaction-pdf hr{border:0;border-top:1px solid #d0d5dd;margin:15px 0 22px}
+.redaction-pdf-body p,.redaction-pdf-body div{font-size:12px!important;line-height:1.48!important;text-align:justify!important;margin:0 0 9px!important}
+.redaction-pdf-body h2{font-size:16px!important;line-height:1.25!important;color:#204975!important;margin:21px 0 12px!important;break-after:avoid!important;text-transform:uppercase}
+.redaction-pdf-body h3{font-size:14px!important;color:#204975!important;margin:17px 0 9px!important;break-after:avoid!important}
+.redaction-pdf-body table{width:100%!important;min-width:0!important;table-layout:fixed!important;border-collapse:collapse!important;margin:10px 0 15px!important}
+.redaction-pdf-body th,.redaction-pdf-body td{white-space:normal!important;overflow-wrap:anywhere!important;font-size:10px!important;line-height:1.35!important;border:1px solid #d0d5dd!important;padding:8px!important;vertical-align:top!important}
+.redaction-pdf-body th{background:#f4f5f7!important;font-weight:bold!important;color:#1f2937!important}
+.redaction-pdf-body tr{break-inside:avoid!important;page-break-inside:avoid!important}
 </style>
 
 </head>
@@ -1087,6 +1113,7 @@
     <button id="tab-tableau" class="bureau-tab active" type="button" onclick="switchBureauTab('tableau')">TABLEAU</button>
     <button id="tab-documents" class="bureau-tab" type="button" onclick="switchBureauTab('documents')">DOCUMENTS</button>
     <button id="tab-nra" class="bureau-tab" type="button" onclick="switchBureauTab('nra')">NRA</button>
+    <button id="tab-redaction" class="bureau-tab" type="button" onclick="switchBureauTab('redaction')">RÉDACTION</button>
     <button id="tab-statistiques" class="bureau-tab" type="button" onclick="switchBureauTab('statistiques')">STATISTIQUES</button>
     <div class="data-year-control" id="data-year-control">
       <label for="data-year-select">Année consultée</label>
@@ -1371,6 +1398,35 @@
       <hr class="nra-annex-divider"><h4>Annexes — Tableaux comparatifs</h4>
       <div id="nra-annex-tables" aria-live="polite">Chargement des annexes…</div>
     </div>
+  </section>
+
+  <!-- RÉDACTION LIBRE -->
+  <section class="section bureau-panel hidden-panel" id="redaction-section">
+    <h2>Rédaction de documents</h2>
+    <p class="muted">Créez et conservez vos analyses et notes. Le PDF applique automatiquement la charte EMAS, sans filigrane.</p>
+    <div class="redaction-controls">
+      <label>Documents enregistrés<select id="redaction-select" onchange="redactionSelect(this.value)"><option value="">Nouveau document</option></select></label>
+      <button type="button" onclick="redactionNew()">Nouveau</button>
+      <button id="redaction-save" type="button" onclick="redactionSave()">Enregistrer le brouillon</button>
+      <button type="button" onclick="redactionExportPdf()">Exporter PDF</button>
+    </div>
+    <label class="redaction-title-label" for="redaction-title">Titre du document</label>
+    <input id="redaction-title" class="redaction-title-input" maxlength="250" placeholder="Ex. Analyse de la situation académique" oninput="redactionDirty=true">
+    <label class="redaction-title-label" for="redaction-subtitle">Sous-titre / période (facultatif)</label>
+    <input id="redaction-subtitle" class="redaction-title-input" maxlength="300" placeholder="Ex. Académie de Montpellier — Situation au 16 octobre 2026" oninput="redactionDirty=true">
+    <div class="redaction-toolbar" role="toolbar" aria-label="Mise en forme du texte">
+      <button type="button" onclick="redactionCommand('bold')" title="Gras"><b>G</b></button>
+      <button type="button" onclick="redactionCommand('italic')" title="Italique"><i>I</i></button>
+      <button type="button" onclick="redactionCommand('underline')" title="Souligné"><u>S</u></button>
+      <button type="button" onclick="redactionBlock('P')">Paragraphe</button>
+      <button type="button" onclick="redactionBlock('H2')">Titre de section</button>
+      <button type="button" onclick="redactionBlock('H3')">Sous-titre</button>
+      <button type="button" onclick="redactionInsertTable()">Insérer un tableau</button>
+      <button type="button" onclick="redactionAddRow()">Ajouter une ligne</button>
+      <button type="button" onclick="redactionAddColumn()">Ajouter une colonne</button>
+    </div>
+    <div id="redaction-editor" class="redaction-editor" contenteditable="true" spellcheck="true" role="textbox" aria-multiline="true" oninput="redactionDirty=true"><p>Commencez votre rédaction ici…</p></div>
+    <div id="redaction-status" class="nra-status">Nouveau document non enregistré.</div>
   </section>
 
   <!-- ESPACE STATISTIQUES ANALYTIQUES -->
@@ -3008,10 +3064,11 @@ function nraSplitStructuredFactPaths(value, schoolYear){
   }
 
   async function switchBureauTab(tab) {
-    if (!["tableau","documents","nra","statistiques"].includes(tab)) return;
+    if (!["tableau","documents","nra","redaction","statistiques"].includes(tab)) return;
     if(activeBureauTab==="nra" && tab!=="nra" && nraDirty && !confirm("Des modifications NRA ne sont pas enregistrées. Quitter sans sauvegarder ?"))return;
+    if(activeBureauTab==="redaction" && tab!=="redaction" && redactionDirty && !confirm("Document non enregistré. Quitter sans sauvegarder ?"))return;
     activeBureauTab = tab;
-    ["tableau","documents","nra","statistiques"].forEach(function(name) {
+    ["tableau","documents","nra","redaction","statistiques"].forEach(function(name) {
       const b = document.getElementById("tab-" + name); if (b) b.classList.toggle("active", name === tab);
     });
     const tableSection = document.getElementById("tableau-section");
@@ -3020,12 +3077,14 @@ function nraSplitStructuredFactPaths(value, schoolYear){
     const weeklyStats = document.getElementById("weekly-stats-section");
     const analyticsStats = document.getElementById("analytics-stats-section");
     const nraSection = document.getElementById("nra-section");
+    const redactionSection = document.getElementById("redaction-section");
     if (tableSection) tableSection.classList.toggle("hidden-panel", tab !== "tableau");
     if (white) white.classList.toggle("hidden-panel", tab !== "documents");
     if (brq) brq.classList.toggle("hidden-panel", tab !== "documents");
     if (weeklyStats) weeklyStats.classList.toggle("hidden-panel", tab !== "documents");
     if (analyticsStats) analyticsStats.classList.toggle("hidden-panel", tab !== "statistiques");
     if (nraSection) nraSection.classList.toggle("hidden-panel", tab !== "nra");
+    if (redactionSection) redactionSection.classList.toggle("hidden-panel", tab !== "redaction");
     const yearControl = document.getElementById("data-year-control");
     if (yearControl) yearControl.style.display = tab === "tableau" ? "flex" : "none";
 
@@ -3053,6 +3112,7 @@ function nraSplitStructuredFactPaths(value, schoolYear){
       return;
     }
     if (tab === "nra") { await nraInit(); return; }
+    if (tab === "redaction") { await redactionInit(); return; }
     if (tab === "statistiques") {
       /* Chargement indépendant et ciblé : par défaut seulement 4 semaines. */
       if (etabLoadState === "idle") await loadEtabTableForWeeklyStats();
@@ -7895,6 +7955,90 @@ function nraSplitStructuredFactPaths(value, schoolYear){
       addEmasPdfBranding(doc);
       doc.save(`Statistiques établissements S${info?info.week:selectedWeeklyStatsWeek} année 2026-2027.pdf`);
     } catch(error){console.error("Erreur PDF statistiques hebdomadaires :",error);alert("Impossible de générer le PDF des statistiques pour le moment.");} finally {if(button){button.disabled=false;button.textContent="PDF";}}
+  }
+
+
+  /* Rédaction libre : stockage Grist, format HTML limité, export PDF A4 sans filigrane. */
+  let redactionLoaded=false,redactionId=null,redactionOriginal=null,redactionDirty=false,redactionBusy=false;
+  const redactionTable='REDACTION_DOCUMENTS';
+  const redactionEl=id=>document.getElementById('redaction-'+id);
+  const redactionStatus=t=>redactionEl('status').textContent=t;
+  function redactionClean(html){
+    const template=document.createElement('template');template.innerHTML=String(html||'');
+    const allowed=new Set(['P','DIV','BR','B','STRONG','I','EM','U','H2','H3','TABLE','THEAD','TBODY','TR','TH','TD','UL','OL','LI']);
+    function visit(node){
+      for(const child of [...node.childNodes]){
+        if(child.nodeType===8){child.remove();continue;}
+        if(child.nodeType!==1)continue;
+        visit(child);
+        if(!allowed.has(child.tagName)){child.replaceWith(...child.childNodes);continue;}
+        [...child.attributes].forEach(a=>child.removeAttribute(a.name));
+      }
+    }
+    visit(template.content);return template.innerHTML;
+  }
+  function redactionCommand(cmd){redactionEl('editor').focus();document.execCommand(cmd,false,null);redactionDirty=true;}
+  function redactionBlock(tag){redactionEl('editor').focus();document.execCommand('formatBlock',false,tag);redactionDirty=true;}
+  function redactionInsertTable(){
+    const r=Math.min(30,Math.max(1,Number(prompt('Nombre de lignes (en-tête compris) :','3'))||0));
+    const c=Math.min(10,Math.max(1,Number(prompt('Nombre de colonnes :','3'))||0));
+    if(!r||!c)return;
+    const html='<table><thead><tr>'+Array.from({length:c},(_,i)=>'<th>En-tête '+(i+1)+'</th>').join('')+'</tr></thead><tbody>'+Array.from({length:r-1},()=>'<tr>'+Array.from({length:c},()=>'<td>Texte</td>').join('')+'</tr>').join('')+'</tbody></table><p></p>';
+    redactionEl('editor').focus();document.execCommand('insertHTML',false,html);redactionDirty=true;
+  }
+  function redactionCell(){let n=window.getSelection()?.anchorNode;while(n&&n!==redactionEl('editor')){if(n.nodeType===1&&(n.tagName==='TD'||n.tagName==='TH'))return n;n=n.parentNode;}return null;}
+  function redactionAddRow(){const cell=redactionCell();if(!cell){alert('Placez le curseur dans une cellule du tableau.');return;}const tr=cell.closest('tr');const next=tr.cloneNode(true);next.querySelectorAll('td,th').forEach(c=>{c.textContent='';if(c.tagName==='TH'){const td=document.createElement('td');c.replaceWith(td);}});tr.after(next);redactionDirty=true;}
+  function redactionAddColumn(){const cell=redactionCell();if(!cell){alert('Placez le curseur dans une cellule du tableau.');return;}const index=[...cell.parentNode.children].indexOf(cell);cell.closest('table').querySelectorAll('tr').forEach(tr=>{const base=tr.children[index];if(!base)return;const c=document.createElement(base.tagName.toLowerCase());c.textContent='';base.after(c);});redactionDirty=true;}
+  function redactionNew(){if(redactionDirty&&!confirm('Abandonner les modifications non enregistrées ?'))return;redactionId=null;redactionOriginal=null;redactionDirty=false;redactionEl('select').value='';redactionEl('title').value='';redactionEl('subtitle').value='';redactionEl('editor').innerHTML='<p></p>';redactionStatus('Nouveau document.');}
+  async function redactionInit(){if(redactionLoaded)return;await redactionRefresh();}
+  async function redactionRefresh(){
+    try{const rows=tableDataToRows(await grist.docApi.fetchTable(redactionTable));const sel=redactionEl('select'),value=redactionId;
+      sel.innerHTML='<option value="">Nouveau document</option>';
+      rows.sort((a,b)=>Number(b.Date_modification||0)-Number(a.Date_modification||0));
+      for(const row of rows){const option=document.createElement('option');option.value=String(row.id);option.textContent=String(row.Titre||'Sans titre');sel.append(option);}
+      sel.value=value===null?'':String(value);redactionLoaded=true;
+      if(!value)redactionStatus('Sélectionnez un document existant ou créez-en un nouveau.');
+    }catch(e){redactionStatus('Table REDACTION_DOCUMENTS inaccessible : importez le modèle Excel dans Grist. '+e.message);}
+  }
+  async function redactionSelect(value){
+    if(redactionDirty&&!confirm('Abandonner les modifications non enregistrées ?')){redactionEl('select').value=redactionId===null?'':String(redactionId);return;}
+    if(!value){redactionNew();return;}
+    try{const rows=tableDataToRows(await grist.docApi.fetchTable(redactionTable));const row=rows.find(r=>String(r.id)===String(value));if(!row)throw Error('Document introuvable');
+      redactionId=row.id;redactionOriginal={Titre:String(row.Titre||''),Sous_titre:String(row.Sous_titre||''),Contenu_HTML:String(row.Contenu_HTML||'')};
+      redactionEl('title').value=redactionOriginal.Titre;redactionEl('subtitle').value=redactionOriginal.Sous_titre;redactionEl('editor').innerHTML=redactionClean(redactionOriginal.Contenu_HTML);redactionDirty=false;redactionStatus('Brouillon chargé depuis Grist.');
+    }catch(e){redactionStatus('Chargement impossible : '+e.message);}
+  }
+  async function redactionSave(){
+    if(redactionBusy)return;const title=redactionEl('title').value.trim();if(!title){redactionStatus('Renseignez le titre du document.');return;}
+    redactionBusy=true;redactionEl('save').disabled=true;
+    try{const rows=tableDataToRows(await grist.docApi.fetchTable(redactionTable));const row=rows.find(r=>String(r.id)===String(redactionId));
+      if(redactionId!==null&&!row)throw Error('Document supprimé ou inaccessible : rechargez la liste.');
+      if(row&&Object.keys(redactionOriginal||{}).some(k=>String(row[k]||'')!==redactionOriginal[k]))throw Error('Ce document a été modifié ailleurs : rechargez-le avant de sauvegarder.');
+      const now=Math.floor(Date.now()/1000),values={Titre:title,Sous_titre:redactionEl('subtitle').value.trim(),Contenu_HTML:redactionClean(redactionEl('editor').innerHTML),Statut:'Brouillon',Date_modification:now};
+      if(!row)values.Date_creation=now;
+      const action=row?['UpdateRecord',redactionTable,row.id,values]:['AddRecord',redactionTable,null,values];
+      await grist.docApi.applyUserActions([action]);redactionDirty=false;redactionId=null;redactionOriginal=null;
+      await redactionRefresh();const updated=tableDataToRows(await grist.docApi.fetchTable(redactionTable));const found=updated.filter(r=>r.Titre===title&&r.Contenu_HTML===values.Contenu_HTML).sort((a,b)=>Number(b.Date_modification||0)-Number(a.Date_modification||0))[0];
+      if(found){redactionId=found.id;redactionOriginal={Titre:values.Titre,Sous_titre:values.Sous_titre,Contenu_HTML:values.Contenu_HTML};redactionEl('select').value=String(found.id);}
+      redactionStatus('Brouillon enregistré dans Grist.');
+    }catch(e){redactionStatus('Enregistrement impossible : '+e.message);}finally{redactionBusy=false;redactionEl('save').disabled=false;}
+  }
+  async function redactionExportPdf(){
+    const title=redactionEl('title').value.trim();if(!title){redactionStatus('Renseignez le titre avant l’export.');return;}
+    if(!window.html2pdf){redactionStatus('Bibliothèque PDF indisponible.');return;}
+    const host=document.createElement('div');host.className='redaction-pdf';
+    const heading=document.createElement('h1');heading.textContent=title;host.append(heading);
+    const subtitle=redactionEl('subtitle').value.trim();if(subtitle){const sub=document.createElement('div');sub.className='redaction-pdf-subtitle';sub.textContent=subtitle;host.append(sub);}
+    const rule=document.createElement('hr');host.append(rule);
+    const body=document.createElement('div');body.className='redaction-pdf-body';body.innerHTML=redactionClean(redactionEl('editor').innerHTML);host.append(body);
+    host.style.cssText='position:fixed;left:-20000px;top:0;width:740px;background:white;z-index:-1;';document.body.append(host);
+    try{
+      const opt={margin:[18,16,18,16],filename:title.replace(/[\\/:*?"<>|]/g,'_').slice(0,100)+'.pdf',image:{type:'jpeg',quality:.98},html2canvas:{scale:2,useCORS:true,backgroundColor:'#ffffff'},jsPDF:{unit:'mm',format:'a4',orientation:'portrait'},pagebreak:{mode:['css','legacy'],avoid:['tr','h2','h3']}};
+      const pdf=await window.html2pdf().set(opt).from(host).toPdf().get('pdf');
+      const count=pdf.internal.getNumberOfPages(),pw=pdf.internal.pageSize.getWidth(),ph=pdf.internal.pageSize.getHeight();
+      for(let i=1;i<=count;i++){pdf.setPage(i);pdf.setDrawColor(208,213,221);pdf.line(16,ph-11,pw-16,ph-11);pdf.setFont('helvetica','normal');pdf.setFontSize(7);pdf.setTextColor(102,112,133);pdf.text('Cellule Administrative et Renseignement - EMAS 34',16,ph-6);pdf.text('Page '+i+' / '+count,pw-16,ph-6,{align:'right'});}
+      pdf.save(opt.filename);redactionStatus('PDF exporté. '+(redactionDirty?'Attention : des modifications ne sont pas enregistrées.':''));
+    }catch(e){console.error('Export rédaction',e);redactionStatus('Export PDF impossible : '+e.message);}finally{host.remove();}
   }
 
 </script>
