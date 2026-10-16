@@ -1074,6 +1074,7 @@
 .redaction-toolbar button{padding:7px 11px;background:#fff;border:1px solid #cbd5e1;border-radius:5px;cursor:pointer;color:#1f2937}
 .redaction-editor{background:#fff;color:#1f2937;min-height:550px;padding:30px 35px;border:1px solid #cbd5e1;border-top:0;border-radius:0 0 8px 8px;outline:none;font:14px/1.6 Arial,sans-serif;overflow-wrap:anywhere}
 .redaction-editor p{margin:0 0 11px;text-align:justify}.redaction-editor h2{font-size:17px;color:#204975;margin:23px 0 11px}.redaction-editor h3{font-size:15px;color:#204975;margin:17px 0 8px}
+.redaction-editor hr{border:0;border-top:2px solid #b5c3d5;margin:20px 0}
 .redaction-editor table{min-width:0;width:100%;table-layout:fixed;border-collapse:collapse;margin:14px 0}.redaction-editor th,.redaction-editor td{position:static;white-space:normal;border:1px solid #d0d5dd;padding:8px;font-size:13px;vertical-align:top}.redaction-editor th{background:#f4f5f7;font-weight:700}
 
 .redaction-pdf{font-family:Arial,Helvetica,sans-serif!important;color:#1f2937!important;font-size:12px!important;line-height:1.45!important}
@@ -1083,6 +1084,7 @@
 .redaction-pdf-body p,.redaction-pdf-body div{font-size:12px!important;line-height:1.48!important;text-align:justify!important;margin:0 0 9px!important}
 .redaction-pdf-body h2{font-size:16px!important;line-height:1.25!important;color:#204975!important;margin:21px 0 12px!important;break-after:avoid!important;text-transform:uppercase}
 .redaction-pdf-body h3{font-size:14px!important;color:#204975!important;margin:17px 0 9px!important;break-after:avoid!important}
+.redaction-pdf-body hr{border:0!important;border-top:1px solid #aebed1!important;margin:16px 0 20px!important}
 .redaction-pdf-body table{width:100%!important;min-width:0!important;table-layout:fixed!important;border-collapse:collapse!important;margin:10px 0 15px!important}
 .redaction-pdf-body th,.redaction-pdf-body td{white-space:normal!important;overflow-wrap:anywhere!important;font-size:10px!important;line-height:1.35!important;border:1px solid #d0d5dd!important;padding:8px!important;vertical-align:top!important}
 .redaction-pdf-body th{background:#f4f5f7!important;font-weight:bold!important;color:#1f2937!important}
@@ -1414,13 +1416,16 @@
     <input id="redaction-title" class="redaction-title-input" maxlength="250" placeholder="Ex. Analyse de la situation académique" oninput="redactionDirty=true">
     <label class="redaction-title-label" for="redaction-subtitle">Sous-titre / période (facultatif)</label>
     <input id="redaction-subtitle" class="redaction-title-input" maxlength="300" placeholder="Ex. Académie de Montpellier — Situation au 16 octobre 2026" oninput="redactionDirty=true">
-    <div class="redaction-toolbar" role="toolbar" aria-label="Mise en forme du texte">
+    <div class="redaction-toolbar" onmousedown="redactionKeepSelection(event)" role="toolbar" aria-label="Mise en forme du texte">
       <button type="button" onclick="redactionCommand('bold')" title="Gras"><b>G</b></button>
       <button type="button" onclick="redactionCommand('italic')" title="Italique"><i>I</i></button>
       <button type="button" onclick="redactionCommand('underline')" title="Souligné"><u>S</u></button>
       <button type="button" onclick="redactionBlock('P')">Paragraphe</button>
       <button type="button" onclick="redactionBlock('H2')">Titre de section</button>
       <button type="button" onclick="redactionBlock('H3')">Sous-titre</button>
+      <button type="button" onclick="redactionInsertSeparator()">Séparateur</button>
+      <button type="button" onclick="redactionChangeCase('upper')" title="Mettre la sélection en majuscules">MAJUSCULES</button>
+      <button type="button" onclick="redactionChangeCase('lower')" title="Mettre la sélection en minuscules">minuscules</button>
       <button type="button" onclick="redactionInsertTable()">Insérer un tableau</button>
       <button type="button" onclick="redactionAddRow()">Ajouter une ligne</button>
       <button type="button" onclick="redactionAddColumn()">Ajouter une colonne</button>
@@ -7965,7 +7970,7 @@ function nraSplitStructuredFactPaths(value, schoolYear){
   const redactionStatus=t=>redactionEl('status').textContent=t;
   function redactionClean(html){
     const template=document.createElement('template');template.innerHTML=String(html||'');
-    const allowed=new Set(['P','DIV','BR','B','STRONG','I','EM','U','H2','H3','TABLE','THEAD','TBODY','TR','TH','TD','UL','OL','LI']);
+    const allowed=new Set(['P','DIV','BR','B','STRONG','I','EM','U','H2','H3','HR','TABLE','THEAD','TBODY','TR','TH','TD','UL','OL','LI']);
     function visit(node){
       for(const child of [...node.childNodes]){
         if(child.nodeType===8){child.remove();continue;}
@@ -7977,8 +7982,73 @@ function nraSplitStructuredFactPaths(value, schoolYear){
     }
     visit(template.content);return template.innerHTML;
   }
-  function redactionCommand(cmd){redactionEl('editor').focus();document.execCommand(cmd,false,null);redactionDirty=true;}
-  function redactionBlock(tag){redactionEl('editor').focus();document.execCommand('formatBlock',false,tag);redactionDirty=true;}
+  // Conserver la sélection quand on clique sur un bouton de la barre d'outils.
+  let redactionSavedRange=null;
+  function redactionKeepSelection(event){
+    if(event.target.closest('button')){
+      const sel=window.getSelection(), editor=redactionEl('editor');
+      if(sel&&sel.rangeCount&&editor.contains(sel.anchorNode)&&editor.contains(sel.focusNode)){
+        redactionSavedRange=sel.getRangeAt(0).cloneRange();
+      }
+      event.preventDefault();
+    }
+  }
+  function redactionRestoreSelection(){
+    const editor=redactionEl('editor'),sel=window.getSelection();
+    editor.focus({preventScroll:true});
+    if(redactionSavedRange&&editor.contains(redactionSavedRange.startContainer)&&editor.contains(redactionSavedRange.endContainer)){
+      sel.removeAllRanges();sel.addRange(redactionSavedRange);
+    }
+    return sel;
+  }
+  function redactionCommand(cmd){
+    redactionRestoreSelection();document.execCommand(cmd,false,null);
+    redactionSavedRange=null;redactionDirty=true;
+  }
+  function redactionBlock(tag){
+    const editor=redactionEl('editor'),sel=redactionRestoreSelection();
+    if(!sel.rangeCount)return;
+    const range=sel.getRangeAt(0), blocks=[...editor.querySelectorAll('p,h2,h3,div')]
+      .filter(el=>!el.closest('table')&&!el.querySelector('p,h2,h3,div')&&range.intersectsNode(el));
+    // Convertir tous les paragraphes/titres concernés, même pour une sélection partielle.
+    if(blocks.length){
+      let first=null,last=null;
+      for(const block of blocks){
+        if(block.tagName===tag){first??=block;last=block;continue;}
+        const replacement=document.createElement(tag);
+        while(block.firstChild)replacement.appendChild(block.firstChild);
+        block.replaceWith(replacement);first??=replacement;last=replacement;
+      }
+      const r=document.createRange();r.selectNodeContents(first);
+      if(last!==first)r.setEndAfter(last);
+      sel.removeAllRanges();sel.addRange(r);
+    }else{
+      document.execCommand('formatBlock',false,tag);
+    }
+    redactionSavedRange=null;redactionDirty=true;
+  }
+  function redactionInsertSeparator(){
+    redactionRestoreSelection();document.execCommand('insertHTML',false,'<hr><p></p>');
+    redactionSavedRange=null;redactionDirty=true;
+  }
+  function redactionChangeCase(mode){
+    const editor=redactionEl('editor'),sel=redactionRestoreSelection();
+    if(!sel.rangeCount||sel.isCollapsed){redactionStatus('Sélectionnez le texte à convertir en majuscules ou minuscules.');return;}
+    const range=sel.getRangeAt(0),walker=document.createTreeWalker(editor,NodeFilter.SHOW_TEXT);
+    const nodes=[];let node;
+    while((node=walker.nextNode()))if(range.intersectsNode(node))nodes.push(node);
+    // Modifier seulement les caractères sélectionnés, sans supprimer le gras ni l'italique.
+    const start=range.startContainer,end=range.endContainer;
+    for(const textNode of nodes){
+      const from=textNode===start?range.startOffset:0;
+      const to=textNode===end?range.endOffset:textNode.length;
+      if(from>=to)continue;
+      const source=textNode.data,part=source.slice(from,to);
+      const changed=mode==='upper'?part.toLocaleUpperCase('fr-FR'):part.toLocaleLowerCase('fr-FR');
+      textNode.data=source.slice(0,from)+changed+source.slice(to);
+    }
+    redactionSavedRange=null;redactionDirty=true;
+  }
   function redactionInsertTable(){
     const r=Math.min(30,Math.max(1,Number(prompt('Nombre de lignes (en-tête compris) :','3'))||0));
     const c=Math.min(10,Math.max(1,Number(prompt('Nombre de colonnes :','3'))||0));
@@ -8031,7 +8101,11 @@ function nraSplitStructuredFactPaths(value, schoolYear){
     const subtitle=redactionEl('subtitle').value.trim();if(subtitle){const sub=document.createElement('div');sub.className='redaction-pdf-subtitle';sub.textContent=subtitle;host.append(sub);}
     const rule=document.createElement('hr');host.append(rule);
     const body=document.createElement('div');body.className='redaction-pdf-body';body.innerHTML=redactionClean(redactionEl('editor').innerHTML);host.append(body);
-    host.style.cssText='position:fixed;left:-20000px;top:0;width:740px;background:white;z-index:-1;';document.body.append(host);
+    // html2canvas ne capture pas correctement les éléments placés hors écran.
+    // L'export est rendu dans la zone visible, au-dessus de l'interface, puis retiré.
+    host.style.cssText='position:absolute;left:0;top:0;width:740px;padding:12px;background:#fff;z-index:2147483647;box-sizing:border-box;';
+    document.body.append(host);
+    redactionStatus('Génération du PDF en cours…');
     try{
       const opt={margin:[18,16,18,16],filename:title.replace(/[\\/:*?"<>|]/g,'_').slice(0,100)+'.pdf',image:{type:'jpeg',quality:.98},html2canvas:{scale:2,useCORS:true,backgroundColor:'#ffffff'},jsPDF:{unit:'mm',format:'a4',orientation:'portrait'},pagebreak:{mode:['css','legacy'],avoid:['tr','h2','h3']}};
       const pdf=await window.html2pdf().set(opt).from(host).toPdf().get('pdf');
