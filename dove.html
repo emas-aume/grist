@@ -1428,7 +1428,7 @@
 
   <!-- RÉDACTION LIBRE -->
   <section class="section bureau-panel hidden-panel" id="fro-section">
-    <div class="nra-header"><div><h2>FRO — Fiche de renseignement d’ambiance</h2><p>Réseau pédagogique (Bassin), période et tableaux calculés automatiquement depuis les FE.</p></div></div>
+    <div class="nra-header"><div><h2>FRO — Fiche de renseignement opérationnel</h2><p>Réseau pédagogique (Bassin), période et tableaux calculés automatiquement depuis les FE.</p></div></div>
     <div class="fro-filters nra-controls">
       <label>Réseau pédagogique<select id="fro-network" onchange="froChanged()"></select></label>
       <label>Année scolaire<select id="fro-year" onchange="froYearChanged()"><option value="FE26_27_2">2026–2027</option><option value="FE25_26">2025–2026</option><option value="FE24_25">2024–2025</option></select></label>
@@ -1437,8 +1437,8 @@
       <label>Du<input id="fro-start" type="date" onchange="froDateChanged()"></label>
       <label>Au<input id="fro-end" type="date" onchange="froDateChanged()"></label>
     </div>
-    <div class="fro-actions nra-controls"><button type="button" id="fro-generate" onclick="froRender()">Calculer les tableaux</button><label>Brouillons<select id="fro-drafts" onchange="froLoadDraft()"><option value="">Nouveau brouillon</option></select></label><button type="button" onclick="froNew()">Nouvelle FRO</button><button type="button" onclick="froSave()">Enregistrer brouillon FRO</button><button type="button" onclick="froExportPdf()">Exporter PDF</button></div>
-    <div class="fro-document nra-document"><label class="fro-title">Titre<input id="fro-title" value="Fiche de renseignement d’ambiance" oninput="froDirty=true"></label>
+    <div class="fro-actions nra-controls"><label>Brouillons<select id="fro-drafts" onchange="froLoadDraft()"><option value="">Nouveau brouillon</option></select></label><button type="button" onclick="froNew()">Nouvelle FRO</button><button type="button" onclick="froSave()">Enregistrer brouillon FRO</button><button type="button" onclick="froExportPdf()">Exporter PDF</button><button type="button" id="fro-generate" onclick="froRender()">Calculer les tableaux</button></div>
+    <div class="fro-document nra-document"><label class="fro-title">Titre<input id="fro-title" value="Fiche de renseignement opérationnel" oninput="froDirty=true"></label>
     <div class="fro-toolbar" onmousedown="froKeepSelection(event)"><button type="button" onclick="froFormat('bold')"><b>G</b></button><button type="button" onclick="froFormat('italic')"><i>I</i></button><button type="button" onclick="froFormat('underline')"><u>S</u></button></div>
     <div id="fro-editor" class="redaction-editor" contenteditable="true" spellcheck="true" oninput="froDirty=true" role="textbox" aria-multiline="true"><p></p></div>
     <div id="fro-status" class="nra-status"></div>
@@ -8146,7 +8146,9 @@ function nraSplitStructuredFactPaths(value, schoolYear){
   const froMsg=t=>{froEl('status').textContent=t;};
   function froSafe(s){return escapeHtml(String(s??''));}
   function froDate(v){const d=parseGristDate(v);return d&&Number.isFinite(d.getTime())?formatDateKey(d):'';}
-  function froNorm(v){return String(v??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();}
+  function froNorm(v){return String(v??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[’‘`´]/g,"'").replace(/\s+/g,' ').trim().toLocaleLowerCase('fr');}
+  let froNetworkCanonical=new Map();
+  function froCanonicalNetwork(v){return froNetworkCanonical.get(froNorm(v))||String(v??'').trim();}
   function froBassin(e){for(const k of ['Bassin','bassin','BASSIN'])if(e[k]!=null&&String(e[k]).trim())return String(e[k]).trim();return '';}
   function froDegree(e){const c=getEtabCategory(e);return c==='first'?'1er':c==='college'||c==='lycee'?'2nd':'';}
   function froPrivate(e){const s=froNorm([e.Secteur,e.secteur,e.Statut,e.statut,e.Public_prive,e.Type_etablissement].filter(Boolean).join(' '));return s.includes('prive');}
@@ -8181,7 +8183,9 @@ function nraSplitStructuredFactPaths(value, schoolYear){
       try{
         if(etabLoadState==='idle'||etabLoadState==='error')await loadEtabTableForWeeklyStats();
         froEstabs=etabRecords.slice();
-        const networks=[...new Set(froEstabs.map(froBassin).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'fr'));
+        const grouped=new Map();for(const e of froEstabs){const raw=froBassin(e),key=froNorm(raw);if(!key)continue;const g=grouped.get(key)||new Map();g.set(raw,(g.get(raw)||0)+1);grouped.set(key,g);}
+        froNetworkCanonical=new Map([...grouped].map(([key,variants])=>[key,[...variants].sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0],'fr'))[0][0]]));
+        const networks=[...froNetworkCanonical.values()].sort((a,b)=>a.localeCompare(b,'fr',{sensitivity:'base'}));
         froEl('network').innerHTML=networks.map(x=>'<option value="'+froSafe(x)+'">'+froSafe(x)+'</option>').join('');
         froReady=true;froAnchors();
       }catch(e){froMsg('Impossible de charger ETABLISSEMENTS : '+e.message);return;}
@@ -8191,7 +8195,7 @@ function nraSplitStructuredFactPaths(value, schoolYear){
   async function froRefresh(){try{froRows=tableDataToRows(await grist.docApi.fetchTable(froTable));froEl('drafts').innerHTML='<option value="">Nouveau brouillon</option>'+froRows.slice().sort((a,b)=>Number(b.Date_modification||0)-Number(a.Date_modification||0)).map(r=>'<option value="'+r.id+'">'+froSafe(r.Titre||'Sans titre')+' — '+froSafe(r.Reseau||'')+'</option>').join('');if(froId)froEl('drafts').value=String(froId);froMsg('Brouillons Grist disponibles.');}catch(e){froMsg('Table FRO_BROUILLONS inaccessible : importez le modèle Excel dans Grist. '+e.message);}}
   function froSnapshot(){return JSON.stringify({title:froEl('title').value,network:froEl('network').value,year:froEl('year').value,period:froEl('period').value,start:froEl('start').value,end:froEl('end').value,html:froEl('editor').innerHTML});}
   function froNew(){if(froDirty&&!confirm('Abandonner les modifications non enregistrées ?'))return;froId=null;froEl('drafts').value='';froEl('title').value='Fiche de renseignement d’ambiance';froEl('editor').innerHTML='<p></p>';froDirty=false;froOriginal=froSnapshot();froChanged();froDirty=false;froMsg('Nouvelle FRO : calcul à lancer manuellement.');}
-  function froLoadDraft(){const id=Number(froEl('drafts').value);if(froDirty&&!confirm('Abandonner les modifications non enregistrées ?')){froEl('drafts').value=froId||'';return;}const r=froRows.find(x=>x.id===id);if(!r){froId=null;froDirty=false;return;}froId=r.id;froEl('title').value=r.Titre||'';froEl('network').value=r.Reseau||'';froEl('year').value=r.Annee_scolaire||'FE26_27_2';froEl('period').value=r.Type_periode||'custom';froAnchors();froEl('start').value=r.Date_debut||'';froEl('end').value=r.Date_fin||'';froEl('editor').innerHTML=froClean(r.Contenu_HTML||'');froDirty=false;froOriginal=froSnapshot();froChanged();froDirty=false;froMsg('Brouillon chargé : cliquez sur « Calculer les tableaux ».');}
+  function froLoadDraft(){const id=Number(froEl('drafts').value);if(froDirty&&!confirm('Abandonner les modifications non enregistrées ?')){froEl('drafts').value=froId||'';return;}const r=froRows.find(x=>x.id===id);if(!r){froId=null;froDirty=false;return;}froId=r.id;froEl('title').value=r.Titre||'';froEl('network').value=froCanonicalNetwork(r.Reseau||'');froEl('year').value=r.Annee_scolaire||'FE26_27_2';froEl('period').value=r.Type_periode||'custom';froAnchors();froEl('start').value=r.Date_debut||'';froEl('end').value=r.Date_fin||'';froEl('editor').innerHTML=froClean(r.Contenu_HTML||'');froDirty=false;froOriginal=froSnapshot();froChanged();froDirty=false;froMsg('Brouillon chargé : cliquez sur « Calculer les tableaux ».');}
   function froClean(html){const t=document.createElement('template');t.innerHTML=String(html||'');const allowed=new Set(['P','DIV','BR','B','STRONG','I','EM','U']);function visit(root){for(const n of [...root.childNodes]){if(n.nodeType===8){n.remove();continue;}if(n.nodeType!==1)continue;if(['SCRIPT','STYLE','IFRAME','OBJECT','SVG','IMG'].includes(n.tagName)){n.remove();continue;}visit(n);if(!allowed.has(n.tagName)){n.replaceWith(...n.childNodes);continue;}for(const a of [...n.attributes])n.removeAttribute(a.name);}}visit(t.content);return t.innerHTML;}
   function froKeepSelection(ev){if(!ev.target.closest('button'))return;const s=window.getSelection(),ed=froEl('editor');if(s&&s.rangeCount&&ed.contains(s.anchorNode)&&ed.contains(s.focusNode))froSelection=s.getRangeAt(0).cloneRange();ev.preventDefault();}
   function froFormat(cmd){const ed=froEl('editor'),s=window.getSelection();ed.focus();if(froSelection&&ed.contains(froSelection.startContainer)){s.removeAllRanges();s.addRange(froSelection);}document.execCommand(cmd,false,null);froSelection=null;froDirty=true;}
