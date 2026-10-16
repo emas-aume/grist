@@ -1424,8 +1424,8 @@
       <button type="button" onclick="redactionBlock('H2')">Titre de section</button>
       <button type="button" onclick="redactionBlock('H3')">Sous-titre</button>
       <button type="button" onclick="redactionInsertSeparator()">Séparateur</button>
-      <button type="button" onclick="redactionChangeCase('upper')" title="Mettre la sélection en majuscules">MAJUSCULES</button>
-      <button type="button" onclick="redactionChangeCase('lower')" title="Mettre la sélection en minuscules">minuscules</button>
+      <button type="button" onclick="redactionChangeCase('upper')" title="Mettre la sélection en majuscules">Majuscules</button>
+      <button type="button" onclick="redactionChangeCase('lower')" title="Mettre la sélection en minuscules">Minuscules</button>
       <button type="button" onclick="redactionInsertTable()">Insérer un tableau</button>
       <button type="button" onclick="redactionAddRow()">Ajouter une ligne</button>
       <button type="button" onclick="redactionAddColumn()">Ajouter une colonne</button>
@@ -8093,26 +8093,106 @@ function nraSplitStructuredFactPaths(value, schoolYear){
       redactionStatus('Brouillon enregistré dans Grist.');
     }catch(e){redactionStatus('Enregistrement impossible : '+e.message);}finally{redactionBusy=false;redactionEl('save').disabled=false;}
   }
+  // Export vectoriel direct : évite html2canvas, qui renvoie une page blanche dans certaines iframes Grist.
   async function redactionExportPdf(){
-    const title=redactionEl('title').value.trim();if(!title){redactionStatus('Renseignez le titre avant l’export.');return;}
-    if(!window.html2pdf){redactionStatus('Bibliothèque PDF indisponible.');return;}
-    const host=document.createElement('div');host.className='redaction-pdf';
-    const heading=document.createElement('h1');heading.textContent=title;host.append(heading);
-    const subtitle=redactionEl('subtitle').value.trim();if(subtitle){const sub=document.createElement('div');sub.className='redaction-pdf-subtitle';sub.textContent=subtitle;host.append(sub);}
-    const rule=document.createElement('hr');host.append(rule);
-    const body=document.createElement('div');body.className='redaction-pdf-body';body.innerHTML=redactionClean(redactionEl('editor').innerHTML);host.append(body);
-    // html2canvas ne capture pas correctement les éléments placés hors écran.
-    // L'export est rendu dans la zone visible, au-dessus de l'interface, puis retiré.
-    host.style.cssText='position:absolute;left:0;top:0;width:740px;padding:12px;background:#fff;z-index:2147483647;box-sizing:border-box;';
-    document.body.append(host);
+    const title=redactionEl('title').value.trim();
+    if(!title){redactionStatus('Renseignez le titre avant l’export.');return;}
+    const JsPDF=window.jspdf?.jsPDF||window.jsPDF;
+    if(!JsPDF){redactionStatus('Bibliothèque jsPDF indisponible.');return;}
     redactionStatus('Génération du PDF en cours…');
     try{
-      const opt={margin:[18,16,18,16],filename:title.replace(/[\\/:*?"<>|]/g,'_').slice(0,100)+'.pdf',image:{type:'jpeg',quality:.98},html2canvas:{scale:2,useCORS:true,backgroundColor:'#ffffff'},jsPDF:{unit:'mm',format:'a4',orientation:'portrait'},pagebreak:{mode:['css','legacy'],avoid:['tr','h2','h3']}};
-      const pdf=await window.html2pdf().set(opt).from(host).toPdf().get('pdf');
-      const count=pdf.internal.getNumberOfPages(),pw=pdf.internal.pageSize.getWidth(),ph=pdf.internal.pageSize.getHeight();
-      for(let i=1;i<=count;i++){pdf.setPage(i);pdf.setDrawColor(208,213,221);pdf.line(16,ph-11,pw-16,ph-11);pdf.setFont('helvetica','normal');pdf.setFontSize(7);pdf.setTextColor(102,112,133);pdf.text('Cellule Administrative et Renseignement - EMAS 34',16,ph-6);pdf.text('Page '+i+' / '+count,pw-16,ph-6,{align:'right'});}
-      pdf.save(opt.filename);redactionStatus('PDF exporté. '+(redactionDirty?'Attention : des modifications ne sont pas enregistrées.':''));
-    }catch(e){console.error('Export rédaction',e);redactionStatus('Export PDF impossible : '+e.message);}finally{host.remove();}
+      const pdf=new JsPDF({unit:'mm',format:'a4',orientation:'portrait'});
+      const W=210,H=297,L=18,R=18,TOP=21,BOTTOM=22,CW=W-L-R;
+      let y=TOP;
+      const navy=[20,49,100],ink=[31,41,55],muted=[102,112,133];
+      function color(rgb){pdf.setTextColor(...rgb);}
+      function newPage(){pdf.addPage();y=TOP;}
+      function ensure(h){if(y+h>H-BOTTOM)newPage();}
+      function font(size=10,style='normal',rgb=ink){pdf.setFont('helvetica',style);pdf.setFontSize(size);color(rgb);}
+      function plain(value,size=10,style='normal',rgb=ink,indent=0,after=3){
+        font(size,style,rgb);const lines=pdf.splitTextToSize(String(value||''),CW-indent);
+        const step=size*.42+1.25;ensure(lines.length*step+after);
+        for(const line of lines){pdf.text(line,L+indent,y);y+=step;}y+=after;
+      }
+      // Extraire les fragments de texte sans perdre les attributs gras/italique/souligné.
+      function runs(node,style={bold:false,italic:false,underline:false}){
+        if(node.nodeType===3)return [{text:node.nodeValue||'',...style}];
+        if(node.nodeType!==1)return [];
+        const tag=node.tagName;
+        const next={...style,bold:style.bold||tag==='B'||tag==='STRONG',italic:style.italic||tag==='I'||tag==='EM',underline:style.underline||tag==='U'};
+        if(tag==='BR')return [{text:'\n',...next}];
+        return [...node.childNodes].flatMap(child=>runs(child,next));
+      }
+      function rich(node,opts={}){
+        const size=opts.size||10,step=size*.43+1.5,indent=opts.indent||0,available=CW-indent;
+        let parts=runs(node),lines=[[]],width=0;
+        // Le découpage par mots préserve les styles dans une même ligne.
+        for(const part of parts){
+          for(const piece of part.text.split(/(\s+)/u)){
+            if(!piece)continue;
+            if(piece.includes('\n')){lines.push([]);width=0;continue;}
+            const style=part.bold?'bold'+(part.italic?'italic':''):(part.italic?'italic':'normal');
+            font(size,style,opts.color||ink);
+            const w=pdf.getTextWidth(piece);
+            if(width+w>available&&width>0&&!/^\s+$/u.test(piece)){lines.push([]);width=0;}
+            if(width===0&&/^\s+$/u.test(piece))continue;
+            lines[lines.length-1].push({...part,text:piece,w,style});width+=w;
+          }
+        }
+        ensure(step*Math.max(lines.length,1)+(opts.after||0));
+        for(const line of lines){
+          let x=L+indent;
+          for(const r of line){font(size,r.style,opts.color||ink);pdf.text(r.text,x,y);if(r.underline){pdf.setDrawColor(...(opts.color||ink));pdf.setLineWidth(.17);pdf.line(x,y+.35,x+r.w,y+.35);}x+=r.w;}
+          y+=step;
+        }
+        y+=opts.after??2.6;
+      }
+      function table(el){
+        const rows=[...el.querySelectorAll('tr')];if(!rows.length)return;
+        const cols=Math.max(...rows.map(r=>r.children.length));const colw=CW/cols;
+        y+=2;
+        for(const [index,tr] of rows.entries()){
+          const cells=[...tr.children];const cellLines=cells.map(c=>{
+            font(8,c.tagName==='TH'||index===0?'bold':'normal');
+            return pdf.splitTextToSize((c.innerText||c.textContent||'').trim(),colw-4);
+          });
+          const rowH=Math.max(8,...cellLines.map(a=>a.length*3.6+3));ensure(rowH);
+          let x=L;
+          cells.forEach((cell,i)=>{
+            if(cell.tagName==='TH'||index===0){pdf.setFillColor(235,240,247);pdf.rect(x,y,colw,rowH,'F');}
+            pdf.setDrawColor(190,201,216);pdf.setLineWidth(.2);pdf.rect(x,y,colw,rowH);
+            font(8,cell.tagName==='TH'||index===0?'bold':'normal');
+            cellLines[i].forEach((line,k)=>pdf.text(line,x+2,y+4+k*3.6));x+=colw;
+          });
+          y+=rowH;
+        }
+        y+=4;
+      }
+      plain(title,17,'bold',navy,0,2);
+      const subtitle=redactionEl('subtitle').value.trim();if(subtitle)plain(subtitle,10,'normal',muted,0,3);
+      pdf.setDrawColor(160,177,202);pdf.setLineWidth(.4);pdf.line(L,y,L+CW,y);y+=7;
+      const container=document.createElement('div');container.innerHTML=redactionClean(redactionEl('editor').innerHTML);
+      const blocks=[...container.children];
+      for(const el of blocks){
+        const tag=el.tagName;
+        if(tag==='HR'){ensure(10);y+=3;pdf.setDrawColor(174,190,209);pdf.setLineWidth(.35);pdf.line(L,y,L+CW,y);y+=7;}
+        else if(tag==='TABLE')table(el);
+        else if(tag==='H2'){y+=3;rich(el,{size:13,color:navy,after:4});}
+        else if(tag==='H3'){y+=2;rich(el,{size:11,color:navy,after:3});}
+        else if(tag==='UL'||tag==='OL'){
+          [...el.children].forEach((li,i)=>{plain(tag==='OL'?String(i+1)+'.':'•',9,'normal',ink,0,-3);rich(li,{size:10,indent:8,after:2});});
+        }else rich(el,{size:10,after:3});
+      }
+      const count=pdf.internal.getNumberOfPages();
+      for(let i=1;i<=count;i++){
+        pdf.setPage(i);pdf.setDrawColor(208,213,221);pdf.setLineWidth(.2);pdf.line(L,H-14,W-R,H-14);
+        font(7,'normal',muted);pdf.text('Cellule Administrative et Renseignement - EMAS 34',L,H-9);
+        pdf.text('Page '+i+' / '+count,W-R,H-9,{align:'right'});
+      }
+      const filename=title.replace(/[\\/:*?"<>|]/g,'_').slice(0,100)+'.pdf';
+      pdf.save(filename);
+      redactionStatus('PDF exporté. '+(redactionDirty?'Attention : des modifications ne sont pas enregistrées.':''));
+    }catch(e){console.error('Export rédaction',e);redactionStatus('Export PDF impossible : '+e.message);}
   }
 
 </script>
