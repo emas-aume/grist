@@ -1091,6 +1091,27 @@
 .redaction-pdf-body tr{break-inside:avoid!important;page-break-inside:avoid!important}
 
 .fro-filters,.fro-actions{display:flex;gap:12px;flex-wrap:wrap;align-items:end;margin:15px 0}.fro-filters label,.fro-actions label,.fro-title{display:flex;flex-direction:column;gap:5px;font-weight:600;font-size:12px;color:#263c60}.fro-filters select,.fro-filters input,.fro-actions select,.fro-title input{padding:9px;border:1px solid #cbd5e1;border-radius:5px;min-width:155px;background:#fff;color:#24314a}.fro-actions button,.fro-toolbar button{padding:9px 12px;border:1px solid #c5d1df;background:#f4f7fb;border-radius:5px;cursor:pointer}.fro-title input{width:100%;font-size:15px}.fro-toolbar{display:flex;gap:5px;margin-top:15px;margin-bottom:4px}.fro-preview{margin-top:22px;color:#273447}.fro-preview h3{color:#203f70;font-size:15px;margin:22px 0 8px}.fro-preview table{border-collapse:collapse;width:100%;font-size:12px;margin-bottom:14px}.fro-preview th,.fro-preview td{border:1px solid #ccd4df;padding:7px 9px;text-align:left}.fro-preview th{background:#eaf0f8;color:#203f70}.fro-preview .fro-right{text-align:right}.fro-preview .fro-note{font-size:12px;margin:7px 0 18px}.fro-preview .fro-warning{color:#9b4d00}
+
+/* V51 : habillage FRO unifié avec la NRA, sans changer les traitements. */
+#fro-section .fro-filters,#fro-section .fro-actions{gap:12px;margin:16px 0;align-items:end}
+#fro-section .fro-filters label,#fro-section .fro-actions label{display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--muted)}
+#fro-section .fro-filters select,#fro-section .fro-filters input,#fro-section .fro-actions select{min-width:165px;padding:9px 12px;border:1px solid var(--line);border-radius:8px;background:#fff;color:#203045;font:inherit}
+#fro-section .fro-actions button{padding:10px 14px;border:1px solid var(--primary);background:var(--primary);color:#fff;border-radius:8px;font-weight:600;cursor:pointer}
+#fro-section .fro-actions button:hover{filter:brightness(.94)}
+#fro-section .fro-document{max-width:none;width:100%;margin:0;box-sizing:border-box;background:#fff;border:1px solid var(--line);border-radius:10px;padding:24px}
+#fro-section .fro-title{color:var(--muted);font-size:12px;font-weight:600;gap:6px}
+#fro-section .fro-title input{padding:12px;border:1px solid #d0d5dd;border-radius:8px;width:100%;box-sizing:border-box}
+#fro-section .fro-toolbar{margin:18px 0 0;padding:9px 10px;background:#f1f5f9;border:1px solid #d0d5dd;border-radius:8px 8px 0 0}
+#fro-section .fro-toolbar button{border:1px solid #cbd5e1;background:#fff;border-radius:5px;padding:7px 11px;color:#24314a}
+#fro-section #fro-editor{border:1px solid #d0d5dd;border-top:0;border-radius:0 0 8px 8px;min-height:170px;padding:16px;background:#fff;color:#203045;box-sizing:border-box;width:100%}
+#fro-section .fro-preview{margin-top:20px}
+#fro-section .fro-preview h3{font-size:15px;color:#203f70;margin:22px 0 8px}
+#fro-section .fro-preview table{width:100%;border-collapse:collapse;font-size:12px;margin:0 0 16px}
+#fro-section .fro-preview th{background:#eaf0f8;color:#203f70}
+#fro-section .fro-preview th,#fro-section .fro-preview td{border:1px solid #ccd4df;padding:8px}
+#fro-section .fro-filters :is(select,input):focus,#fro-section .fro-actions select:focus,#fro-section #fro-editor:focus{outline:2px solid #9cbbf8;outline-offset:1px}
+@media(max-width:720px){#fro-section .fro-document{padding:14px}#fro-section .fro-filters label{flex:1 1 180px}}
+
 </style>
 
 </head>
@@ -1408,7 +1429,7 @@
   <!-- RÉDACTION LIBRE -->
   <section class="section bureau-panel hidden-panel" id="fro-section">
     <div class="nra-header"><div><h2>FRO — Fiche de renseignement d’ambiance</h2><p>Réseau pédagogique (Bassin), période et tableaux calculés automatiquement depuis les FE.</p></div></div>
-    <div class="fro-filters">
+    <div class="fro-filters nra-controls">
       <label>Réseau pédagogique<select id="fro-network" onchange="froChanged()"></select></label>
       <label>Année scolaire<select id="fro-year" onchange="froYearChanged()"><option value="FE26_27_2">2026–2027</option><option value="FE25_26">2025–2026</option><option value="FE24_25">2024–2025</option></select></label>
       <label>Période<select id="fro-period" onchange="froPeriodChanged()"><option value="week">Semaine</option><option value="month">Mois</option><option value="schoolyear">Depuis la rentrée</option><option value="custom">Dates personnalisées</option></select></label>
@@ -1416,12 +1437,12 @@
       <label>Du<input id="fro-start" type="date" onchange="froDateChanged()"></label>
       <label>Au<input id="fro-end" type="date" onchange="froDateChanged()"></label>
     </div>
-    <div class="fro-actions"><label>Brouillons<select id="fro-drafts" onchange="froLoadDraft()"><option value="">Nouveau brouillon</option></select></label><button type="button" onclick="froNew()">Nouvelle FRO</button><button type="button" onclick="froSave()">Enregistrer brouillon FRO</button><button type="button" onclick="froExportPdf()">Exporter PDF</button></div>
-    <label class="fro-title">Titre<input id="fro-title" value="Fiche de renseignement d’ambiance" oninput="froDirty=true"></label>
+    <div class="fro-actions nra-controls"><button type="button" id="fro-generate" onclick="froRender()">Calculer les tableaux</button><label>Brouillons<select id="fro-drafts" onchange="froLoadDraft()"><option value="">Nouveau brouillon</option></select></label><button type="button" onclick="froNew()">Nouvelle FRO</button><button type="button" onclick="froSave()">Enregistrer brouillon FRO</button><button type="button" onclick="froExportPdf()">Exporter PDF</button></div>
+    <div class="fro-document nra-document"><label class="fro-title">Titre<input id="fro-title" value="Fiche de renseignement d’ambiance" oninput="froDirty=true"></label>
     <div class="fro-toolbar" onmousedown="froKeepSelection(event)"><button type="button" onclick="froFormat('bold')"><b>G</b></button><button type="button" onclick="froFormat('italic')"><i>I</i></button><button type="button" onclick="froFormat('underline')"><u>S</u></button></div>
     <div id="fro-editor" class="redaction-editor" contenteditable="true" spellcheck="true" oninput="froDirty=true" role="textbox" aria-multiline="true"><p></p></div>
     <div id="fro-status" class="nra-status"></div>
-    <div id="fro-preview" class="fro-preview"></div>
+    <div id="fro-preview" class="fro-preview"></div></div>
   </section>
   <section class="section bureau-panel hidden-panel" id="redaction-section">
     <h2>Rédaction de documents</h2>
@@ -8130,7 +8151,7 @@ function nraSplitStructuredFactPaths(value, schoolYear){
   function froDegree(e){const c=getEtabCategory(e);return c==='first'?'1er':c==='college'||c==='lycee'?'2nd':'';}
   function froPrivate(e){const s=froNorm([e.Secteur,e.secteur,e.Statut,e.statut,e.Public_prive,e.Type_etablissement].filter(Boolean).join(' '));return s.includes('prive');}
   function froEstab(r){const v=r[FIELD.UAI];if(v!=null&&/^\d+$/.test(String(v).trim())){const e=etabByRowId.get(Number(v));if(e)return e;}const u=extractUai(v);return u?etabByUai.get(u)||null:null;}
-  function froChanged(){froDirty=true;froRender();}
+  function froChanged(){froDirty=true;froCompareData=null;froEl('preview').innerHTML='<p class="fro-note">Sélectionnez votre période, puis cliquez sur « Calculer les tableaux ».</p>';froMsg('Paramètres modifiés : calcul en attente.');}
   function froDateChanged(){froEl('period').value='custom';froEl('anchor-wrap').style.display='none';froChanged();}
   function froYearChanged(){froAnchors();froPeriodChanged();}
   function froPeriodChanged(){froAnchors();froChanged();}
@@ -8165,12 +8186,12 @@ function nraSplitStructuredFactPaths(value, schoolYear){
         froReady=true;froAnchors();
       }catch(e){froMsg('Impossible de charger ETABLISSEMENTS : '+e.message);return;}
     }
-    await froRefresh();await froRender();
+    await froRefresh();froMsg('Choisissez un réseau et une période, puis cliquez sur « Calculer les tableaux ».');
   }
   async function froRefresh(){try{froRows=tableDataToRows(await grist.docApi.fetchTable(froTable));froEl('drafts').innerHTML='<option value="">Nouveau brouillon</option>'+froRows.slice().sort((a,b)=>Number(b.Date_modification||0)-Number(a.Date_modification||0)).map(r=>'<option value="'+r.id+'">'+froSafe(r.Titre||'Sans titre')+' — '+froSafe(r.Reseau||'')+'</option>').join('');if(froId)froEl('drafts').value=String(froId);froMsg('Brouillons Grist disponibles.');}catch(e){froMsg('Table FRO_BROUILLONS inaccessible : importez le modèle Excel dans Grist. '+e.message);}}
   function froSnapshot(){return JSON.stringify({title:froEl('title').value,network:froEl('network').value,year:froEl('year').value,period:froEl('period').value,start:froEl('start').value,end:froEl('end').value,html:froEl('editor').innerHTML});}
-  function froNew(){if(froDirty&&!confirm('Abandonner les modifications non enregistrées ?'))return;froId=null;froEl('drafts').value='';froEl('title').value='Fiche de renseignement d’ambiance';froEl('editor').innerHTML='<p></p>';froDirty=false;froOriginal=froSnapshot();froMsg('Nouvelle FRO.');froRender();}
-  function froLoadDraft(){const id=Number(froEl('drafts').value);if(froDirty&&!confirm('Abandonner les modifications non enregistrées ?')){froEl('drafts').value=froId||'';return;}const r=froRows.find(x=>x.id===id);if(!r){froId=null;froDirty=false;return;}froId=r.id;froEl('title').value=r.Titre||'';froEl('network').value=r.Reseau||'';froEl('year').value=r.Annee_scolaire||'FE26_27_2';froEl('period').value=r.Type_periode||'custom';froAnchors();froEl('start').value=r.Date_debut||'';froEl('end').value=r.Date_fin||'';froEl('editor').innerHTML=froClean(r.Contenu_HTML||'');froDirty=false;froOriginal=froSnapshot();froRender();froMsg('Brouillon chargé.');}
+  function froNew(){if(froDirty&&!confirm('Abandonner les modifications non enregistrées ?'))return;froId=null;froEl('drafts').value='';froEl('title').value='Fiche de renseignement d’ambiance';froEl('editor').innerHTML='<p></p>';froDirty=false;froOriginal=froSnapshot();froChanged();froDirty=false;froMsg('Nouvelle FRO : calcul à lancer manuellement.');}
+  function froLoadDraft(){const id=Number(froEl('drafts').value);if(froDirty&&!confirm('Abandonner les modifications non enregistrées ?')){froEl('drafts').value=froId||'';return;}const r=froRows.find(x=>x.id===id);if(!r){froId=null;froDirty=false;return;}froId=r.id;froEl('title').value=r.Titre||'';froEl('network').value=r.Reseau||'';froEl('year').value=r.Annee_scolaire||'FE26_27_2';froEl('period').value=r.Type_periode||'custom';froAnchors();froEl('start').value=r.Date_debut||'';froEl('end').value=r.Date_fin||'';froEl('editor').innerHTML=froClean(r.Contenu_HTML||'');froDirty=false;froOriginal=froSnapshot();froChanged();froDirty=false;froMsg('Brouillon chargé : cliquez sur « Calculer les tableaux ».');}
   function froClean(html){const t=document.createElement('template');t.innerHTML=String(html||'');const allowed=new Set(['P','DIV','BR','B','STRONG','I','EM','U']);function visit(root){for(const n of [...root.childNodes]){if(n.nodeType===8){n.remove();continue;}if(n.nodeType!==1)continue;if(['SCRIPT','STYLE','IFRAME','OBJECT','SVG','IMG'].includes(n.tagName)){n.remove();continue;}visit(n);if(!allowed.has(n.tagName)){n.replaceWith(...n.childNodes);continue;}for(const a of [...n.attributes])n.removeAttribute(a.name);}}visit(t.content);return t.innerHTML;}
   function froKeepSelection(ev){if(!ev.target.closest('button'))return;const s=window.getSelection(),ed=froEl('editor');if(s&&s.rangeCount&&ed.contains(s.anchorNode)&&ed.contains(s.focusNode))froSelection=s.getRangeAt(0).cloneRange();ev.preventDefault();}
   function froFormat(cmd){const ed=froEl('editor'),s=window.getSelection();ed.focus();if(froSelection&&ed.contains(froSelection.startContainer)){s.removeAllRanges();s.addRange(froSelection);}document.execCommand(cmd,false,null);froSelection=null;froDirty=true;}
@@ -8211,11 +8232,36 @@ function nraSplitStructuredFactPaths(value, schoolYear){
     return [...matched];
   }
   function froShiftDate(key,year){const d=new Date(key+'T00:00:00Z');const base=new Date(SCHOOL_YEAR_BY_TABLE[froEl('year').value].start+'T00:00:00Z');const offset=Math.round((d-base)/86400000);const target=new Date(SCHOOL_YEAR_BY_TABLE[year].start+'T00:00:00Z');target.setUTCDate(target.getUTCDate()+offset);return formatDateKey(target);}
+  // Cache en mémoire par année + intervalle : remis à zéro au rechargement de la page.
+  const froPeriodCache=new Map();
+  function froPeriodKeys(from,to){
+    const keys=[],d=new Date(from+'T00:00:00Z'),end=new Date(to+'T00:00:00Z');
+    if(!Number.isFinite(d.getTime())||!Number.isFinite(end.getTime())||d>end)throw Error('Période invalide');
+    for(;d<=end;d.setUTCDate(d.getUTCDate()+1))keys.push(formatDateKey(d));
+    return keys;
+  }
+  async function froFetchPeriod(year,from,to){
+    const key=JSON.stringify([year,from,to]);
+    if(!froPeriodCache.has(key)){
+      const task=(async()=>{
+        const keys=froPeriodKeys(from,to),unique=new Map();
+        // Requêtes REST filtrées côté Grist : jamais de fetchTable sur les bases FE.
+        // Lots limités pour éviter des URL trop longues sur les périodes étendues.
+        for(let i=0;i<keys.length;i+=25){
+          const rows=await fetchFactsForFieldDateKeys(year,FIELD.DATE_FAIT,keys.slice(i,i+25));
+          for(const row of rows)unique.set(String(row.id),row);
+        }
+        return [...unique.values()];
+      })().catch(e=>{froPeriodCache.delete(key);throw e;});
+      froPeriodCache.set(key,task);
+    }
+    return froPeriodCache.get(key);
+  }
   async function froComparison(network,from,to){
     const permitted=new Set(froEstabs.filter(e=>froNorm(froBassin(e))===froNorm(network)).map(e=>String(getEtabUai(e))));
     const results=await Promise.all(froYears.map(async year=>{
-      const rows=year===froEl('year').value?froFacts:tableDataToRows(await grist.docApi.fetchTable(year));
-      const a=froShiftDate(from,year),b=froShiftDate(to,year),cats=Array(7).fill(0);let count=0;
+      const a=froShiftDate(from,year),b=froShiftDate(to,year);
+      const rows=await froFetchPeriod(year,a,b),cats=Array(7).fill(0);let count=0;
       for(const r of rows){const dt=froDate(r[FIELD.DATE_FAIT]);if(!dt||dt<a||dt>b)continue;const e=froEstab(r);if(!e||!permitted.has(String(getEtabUai(e))))continue;count++;for(const i of froCategoriesOf(r))cats[i]++;}
       return {year,count,cats,from:a,to:b};
     }));
@@ -8231,8 +8277,29 @@ function nraSplitStructuredFactPaths(value, schoolYear){
       '<p class="fro-note">Catégories issues de Types_de_fait_structure (repli sur Types_de_fait). Un FE peut relever de plusieurs catégories ; les totaux par atteinte ne s’additionnent pas.</p>';
   }
   let froRenderToken=0;
-  async function froRender(){if(!froReady)return;const token=++froRenderToken,from=froEl('start').value,to=froEl('end').value,network=froEl('network').value;if(!from||!to||from>to||!network){froEl('preview').innerHTML='<p class="fro-warning">Sélectionnez un réseau et une période valide.</p>';return;}froMsg('Calcul des tableaux sur les faits du '+from+' au '+to+'…');try{const table=froEl('year').value;const raw=await grist.docApi.fetchTable(table);if(token!==froRenderToken)return;froFacts=tableDataToRows(raw);const s=froStats();const comparison=await froComparison(network,from,to);if(token!==froRenderToken)return;froCompareData=comparison;froEl('preview').innerHTML='<h2>Aperçu des tableaux — '+froSafe(network)+'</h2><p>Du '+froSafe(from)+' au '+froSafe(to)+' — '+s.all+' FE</p>'+froTables(s)+froComparisonHtml(comparison);froMsg('Tableaux et comparaisons actualisés : '+s.all+' FE sur la période (date du fait).');}catch(e){froMsg('Calcul impossible : '+e.message);}}
-  async function froExportPdf(){if(!froReady)return;await froRender();if(!froFacts.length && froEl('preview').textContent.includes('Calcul impossible'))return;const JsPDF=window.jspdf?.jsPDF||window.jsPDF;if(!JsPDF){froMsg('jsPDF indisponible.');return;}const s=froStats(),pdf=new JsPDF({unit:'mm',format:'a4'}),L=17,R=17,W=210,H=297,B=21,TOP=20;let y=TOP;const navy=[32,73,117];const font=(size=9,bold=false)=>{pdf.setFont('helvetica',bold?'bold':'normal');pdf.setFontSize(size);pdf.setTextColor(34,45,63);};const page=()=>{pdf.addPage();y=TOP;};const ensure=h=>{if(y+h>H-B)page();};const line=(t,size=9,bold=false,after=3)=>{font(size,bold);const lines=pdf.splitTextToSize(String(t||''),W-L-R);const step=size*.43+1;for(const x of lines){ensure(step);pdf.text(x,L,y);y+=step;}y+=after;};const heading=t=>{ensure(15);y+=3;font(10,true);pdf.setTextColor(...navy);line(t,10,true,4);};const table=(headers,rows)=>{const widths=headers.length===2?[W-L-R-36,36]:[50,...Array(headers.length-1).fill((W-L-R-50)/(headers.length-1))];const draw=(vals,head=false)=>{font(7.7,head);const parts=vals.map((v,i)=>pdf.splitTextToSize(String(v??''),widths[i]-3));const height=Math.max(7,...parts.map(p=>p.length*3.3+3));ensure(height);let x=L;for(let i=0;i<vals.length;i++){pdf.setDrawColor(190,201,215);if(head){pdf.setFillColor(235,241,248);pdf.rect(x,y-3,widths[i],height,'FD');}else pdf.rect(x,y-3,widths[i],height);pdf.text(parts[i],x+1.5,y);x+=widths[i];}y+=height;};draw(headers,true);for(const row of rows){if(y+9>H-B){page();draw(headers,true);}draw(row);}y+=5;};
+  let froLastComputed='';
+  async function froRender(){
+    if(!froReady)return false;
+    const token=++froRenderToken,from=froEl('start').value,to=froEl('end').value,network=froEl('network').value;
+    if(!from||!to||from>to||!network){froEl('preview').innerHTML='<p class="fro-warning">Sélectionnez un réseau et une période valide.</p>';return false;}
+    const btn=froEl('generate');if(btn)btn.disabled=true;
+    froMsg('Chargement à la demande des données FE et calcul des tableaux…');
+    try{
+      const year=froEl('year').value;
+      froFacts=await froFetchPeriod(year,from,to);
+      if(token!==froRenderToken)return false;
+      const s=froStats();
+      const comparison=await froComparison(network,from,to);
+      if(token!==froRenderToken)return false;
+      froCompareData=comparison;
+      froEl('preview').innerHTML='<h2>Aperçu des tableaux — '+froSafe(network)+'</h2><p>Du '+froSafe(from)+' au '+froSafe(to)+' — '+s.all+' FE</p>'+froTables(s)+froComparisonHtml(comparison);
+      froLastComputed=JSON.stringify([network,year,from,to]);
+      froMsg('Tableaux calculés : '+s.all+' FE sur la période. Périodes consultées conservées en cache jusqu’à l’actualisation de la page.');
+      return true;
+    }catch(e){froMsg('Calcul impossible : '+e.message);froLastComputed='';return false;}
+    finally{if(btn)btn.disabled=false;}
+  }
+  async function froExportPdf(){if(!froReady)return;const key=JSON.stringify([froEl('network').value,froEl('year').value,froEl('start').value,froEl('end').value]);if(froLastComputed!==key){if(!await froRender())return;} const JsPDF=window.jspdf?.jsPDF||window.jsPDF;if(!JsPDF){froMsg('jsPDF indisponible.');return;}const s=froStats(),pdf=new JsPDF({unit:'mm',format:'a4'}),L=17,R=17,W=210,H=297,B=21,TOP=20;let y=TOP;const navy=[32,73,117];const font=(size=9,bold=false)=>{pdf.setFont('helvetica',bold?'bold':'normal');pdf.setFontSize(size);pdf.setTextColor(34,45,63);};const page=()=>{pdf.addPage();y=TOP;};const ensure=h=>{if(y+h>H-B)page();};const line=(t,size=9,bold=false,after=3)=>{font(size,bold);const lines=pdf.splitTextToSize(String(t||''),W-L-R);const step=size*.43+1;for(const x of lines){ensure(step);pdf.text(x,L,y);y+=step;}y+=after;};const heading=t=>{ensure(15);y+=3;font(10,true);pdf.setTextColor(...navy);line(t,10,true,4);};const table=(headers,rows)=>{const widths=headers.length===2?[W-L-R-36,36]:[50,...Array(headers.length-1).fill((W-L-R-50)/(headers.length-1))];const draw=(vals,head=false)=>{font(7.7,head);const parts=vals.map((v,i)=>pdf.splitTextToSize(String(v??''),widths[i]-3));const height=Math.max(7,...parts.map(p=>p.length*3.3+3));ensure(height);let x=L;for(let i=0;i<vals.length;i++){pdf.setDrawColor(190,201,215);if(head){pdf.setFillColor(235,241,248);pdf.rect(x,y-3,widths[i],height,'FD');}else pdf.rect(x,y-3,widths[i],height);pdf.text(parts[i],x+1.5,y);x+=widths[i];}y+=height;};draw(headers,true);for(const row of rows){if(y+9>H-B){page();draw(headers,true);}draw(row);}y+=5;};
     try{font(15,true);pdf.setTextColor(...navy);line(froEl('title').value||'Fiche de renseignement d’ambiance',15,true,5);line('Réseau pédagogique : '+s.network,10,true,1);line('Période : '+s.from+' au '+s.to,9,false,7);const holder=document.createElement('div');holder.innerHTML=froClean(froEl('editor').innerHTML);for(const block of [...holder.childNodes]){const txt=(block.textContent||'').trim();if(txt)line(txt,9,false,3);}const n=s.groups.map(a=>a.length),np=s.groups.map(a=>a.filter(froPrivate).length),fmt=(a,b)=>a+' dont '+b+' privés';heading('Tableau 1 : Nombre d’établissements/écoles du réseau de '+s.network);table(['Établissements / Écoles','Nombre'],[['1er degré',fmt(n[0],np[0])],['2nd degré',fmt(n[1],np[1])],['Total',fmt(n[0]+n[1],np[0]+np[1])]]);heading('Tableau 2 : Nombre de FE par établissements/écoles');table(['Établissements / Écoles','Nombre de faits'],[['Total 1er degré',fmt(s.totals[0],s.privates[0])],['Total 2nd degré',fmt(s.totals[1],s.privates[1])],['Total général',fmt(s.all,s.privates[0]+s.privates[1])]]);line(s.declarants[0].size+' écoles sur '+n[0]+' et '+s.declarants[1].size+' établissements sur '+n[1]+' du 2nd degré ont déclaré au moins un FE.',8,false,3);heading('Tableau 3 : Établissements les plus représentés — 1er degré');table(['1er degré','Nombre de faits'],s.top[0].length?s.top[0]:[['Aucun',0]]);heading('Tableau 3 (suite) : Établissements les plus représentés — 2nd degré');table(['2nd degré','Nombre de faits'],s.top[1].length?s.top[1]:[['Aucun',0]]);heading('Tableau 4 : Nombre d’atteintes/violences par établissements/écoles');table(['Établissements / Écoles','AP','AB','ACS','VP','VV','VS','Harcèlement'],[['1er degré',...s.att[0]],['2nd degré',...s.att[1]],['Total général',...s.att[0].map((v,i)=>v+s.att[1][i])]]);line('AP : atteintes aux personnes ; AB : atteintes aux biens ; ACS : atteintes à la sécurité ; VP : violences physiques ; VV : violences verbales ; VS : violences sexuelles. Catégories non exclusives.',7,false,3);if(froCompareData){heading('Tableau 5 : Comparaison des FE sur trois années');table(['Année scolaire',...froYearNames],[['Nombre de FE',...froCompareData.map(x=>x.count)],['Variation', '—',...froCompareData.slice(1).map((x,i)=>froCompareData[i].count?(((x.count-froCompareData[i].count)/froCompareData[i].count)*100).toFixed(1)+' %':'n.c.')]]);line('Périodes alignées depuis la rentrée : '+froCompareData.map((x,i)=>froYearNames[i]+' ('+x.from+' au '+x.to+')').join(' ; '),7,false,3);heading('Tableau 6 : Comparaison des atteintes sur trois années');table(['Atteinte',...froYearNames],froCategories.map((label,i)=>[label,...froCompareData.map(x=>x.cats[i])]));line('Catégories non exclusives issues des types de faits structurés.',7,false,3);}const total=pdf.getNumberOfPages();for(let i=1;i<=total;i++){pdf.setPage(i);pdf.setDrawColor(200,208,221);pdf.line(L,H-17,W-R,H-17);font(8);pdf.text('Cellule Administrative et Renseignement - EMAS 34',L,H-12);pdf.text('Page '+i+'/'+total,W-R,H-12,{align:'right'});}pdf.save('FRO_'+s.network.replace(/[^a-z0-9-]/gi,'_')+'_'+s.from+'_'+s.to+'.pdf');froMsg('PDF exporté.');}catch(e){froMsg('Export PDF impossible : '+e.message);}
   }
 
