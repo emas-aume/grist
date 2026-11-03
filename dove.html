@@ -8328,29 +8328,55 @@ function nraSplitStructuredFactPaths(value, schoolYear){
       for(const part of lines){ensure(step);pdf.text(part,L,y);y+=step;}
       y+=after;
     };
-    // Justification du texte libre : répartition des espaces sur les lignes complètes.
-    // La dernière ligne d'un paragraphe reste alignée à gauche.
-    const writeJustified=(value,size=9,after=3)=>{
-      font(size,false,ink);
-      const paragraphs=String(value??'').replace(/\r\n?/g,'\n').split('\n');
+    // Mise en page de la synthèse en conservant les styles HTML autorisés.
+    // Les mots sont mesurés avec leur police réelle avant justification.
+    const writeRichBlock=(block,size=9,after=3)=>{
+      const tokens=[];
+      const walk=(node,style)=>{
+        if(node.nodeType===3){
+          const parts=(node.nodeValue||'').replace(/\u00a0/g,' ').split(/(\s+)/);
+          for(const part of parts)if(part)tokens.push({text:part,bold:style.bold,italic:style.italic,underline:style.underline});
+          return;
+        }
+        if(node.nodeType!==1)return;
+        if(node.tagName==='BR'){tokens.push({break:true});return;}
+        const next={bold:style.bold||['B','STRONG'].includes(node.tagName),italic:style.italic||['I','EM'].includes(node.tagName),underline:style.underline||node.tagName==='U'};
+        for(const child of node.childNodes)walk(child,next);
+        if(node.tagName==='DIV'||node.tagName==='P')tokens.push({break:true});
+      };
+      walk(block,{bold:false,italic:false,underline:false});
+      const setStyle=t=>{pdf.setFont('helvetica',t.bold?(t.italic?'bolditalic':'bold'):(t.italic?'italic':'normal'));pdf.setFontSize(size);pdf.setTextColor(...ink);};
+      const width=t=>{setStyle(t);return pdf.getTextWidth(t.text);};
+      const lines=[];let line=[],lineWidth=0,pendingSpace=false;
+      const flush=()=>{if(line.length)lines.push({items:line,full:false});line=[];lineWidth=0;pendingSpace=false;};
+      for(const token of tokens){
+        if(token.break){flush();continue;}
+        if(/^\s+$/.test(token.text)){pendingSpace=line.length>0;continue;}
+        // Scinder aussi les mots exceptionnellement plus larges que la page.
+        let chunks=[token.text];
+        if(width(token)>CW){chunks=[];let part='';for(const ch of token.text){const trial={...token,text:part+ch};if(part&&width(trial)>CW){chunks.push(part);part=ch;}else part+=ch;}if(part)chunks.push(part);}
+        for(const chunk of chunks){
+          const item={...token,text:chunk};const space=pendingSpace?{...token,text:' '}:null;
+          const addWidth=width(item)+(space?width(space):0);
+          if(line.length&&lineWidth+addWidth>CW){lines.push({items:line,full:true});line=[];lineWidth=0;pendingSpace=false;}
+          if(line.length&&space){line.push(space);lineWidth+=width(space);}
+          line.push(item);lineWidth+=width(item);pendingSpace=false;
+        }
+      }
+      flush();
       const step=size*.43+1;
-      paragraphs.forEach((paragraph,pi)=>{
-        const lines=pdf.splitTextToSize(paragraph.trim(),CW);
-        lines.forEach((line,i)=>{
-          ensure(step);
-          const words=String(line).trim().split(/\s+/).filter(Boolean);
-          if(i<lines.length-1 && words.length>1){
-            const textWidth=words.reduce((sum,word)=>sum+pdf.getTextWidth(word),0);
-            const space=(CW-textWidth)/(words.length-1);
-            if(space>=0 && space<15){
-              let x=L;
-              words.forEach(word=>{pdf.text(word,x,y);x+=pdf.getTextWidth(word)+space;});
-            }else pdf.text(line,L,y);
-          }else pdf.text(line,L,y);
-          y+=step;
-        });
-        if(pi<paragraphs.length-1)y+=1.5;
-      });
+      for(const ln of lines){
+        ensure(step);
+        const natural=ln.items.reduce((sum,t)=>sum+width(t),0);
+        const spaces=ln.items.filter(t=>t.text===' ').length;
+        const extra=ln.full&&spaces>0?Math.max(0,(CW-natural)/spaces):0;
+        let x=L;
+        for(const t of ln.items){setStyle(t);const w=width(t);
+          if(t.text!==' '){pdf.text(t.text,x,y);if(t.underline){pdf.setDrawColor(...ink);pdf.setLineWidth(.15);pdf.line(x,y+.45,x+w,y+.45);}}
+          x+=w+(t.text===' '?extra:0);
+        }
+        y+=step;
+      }
       y+=after;
     };
     const heading=(value)=>{
@@ -8384,7 +8410,7 @@ function nraSplitStructuredFactPaths(value, schoolYear){
           if(header||shade)pdf.rect(x,y,widths[i],h,'FD');
           else pdf.rect(x,y,widths[i],h,'S');
           const size=n>=8?7:8;
-          font(size,header||(!total&&numeric(value,i)));
+          font(size,header);
           const centered=header||numeric(value,i)||(i>0&&n>=4);
           const xx=centered?x+widths[i]/2:x+2;
           lines.forEach((part,k)=>pdf.text(part,xx,y+3.8+k*3.4,centered?{align:'center'}:undefined));
@@ -8402,14 +8428,14 @@ function nraSplitStructuredFactPaths(value, schoolYear){
       y+=7;
     };
     try{
-      write(froEl('title').value||'Fiche de renseignement opérationnel',16,true,2,navy);
-      write('Réseau pédagogique de '+s.network+'.',9,false,1);
-      write('La période étudiée s’étend du '+dateFR(s.from)+' au '+dateFR(s.to)+'.',8.5,false,5);
+      write(froEl('title').value||'Fiche de renseignement opérationnel',16,true,2,ink);
+      write(('Réseau pédagogique de '+s.network+'.').toLocaleUpperCase('fr-FR'),9,false,1);
+      write(('La période étudiée s’étend du '+dateFR(s.from)+' au '+dateFR(s.to)+'.').toLocaleUpperCase('fr-FR'),8.5,false,5);
       const holder=document.createElement('div');
       holder.innerHTML=froClean(froEl('editor').innerHTML);
       for(const block of [...holder.childNodes]){
         const value=(block.textContent||'').trim();
-        if(value)writeJustified(value,9,3);
+        if(value)writeRichBlock(block,9,3);
       }
       const n=s.groups.map(a=>a.length),np=s.groups.map(a=>a.filter(froPrivate).length);
       const fmt=(a,b)=>a+' dont '+b+' privés';
