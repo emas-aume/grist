@@ -1841,6 +1841,21 @@ async function exportCurrentFePdf(){
       }
       return true;
     }
+    function summaryInlineBlock(value){
+      if(!pdfHasValue(value))return false;
+      const prefix="En résumé : ";
+      const lines=doc.splitTextToSize(prefix+pdfTextValue(value),cw-8);
+      let index=0;
+      while(index<lines.length){
+        const available=H-mb-y;
+        if(available<12){doc.addPage();y=mt;continue}
+        const count=Math.max(1,Math.min(lines.length-index,Math.floor((available-5)/4)));
+        const chunk=lines.slice(index,index+count),h=Math.max(9,chunk.length*4+5);
+        ensure(h);doc.setFillColor.apply(doc,grayBg);doc.roundedRect(mx,y,cw,h,1.5,1.5,"F");
+        set(false,8.7,text);doc.text(chunk,mx+4,y+5.2);y+=h+3;index+=count;
+      }
+      return true;
+    }
     function compactFactTypes(paths){
       const seen=new Set();
       return (paths||[]).map(path=>{
@@ -1887,26 +1902,38 @@ async function exportCurrentFePdf(){
       if(first&&last)return first+" "+last.toUpperCase();
       return pdfTextValue(e.Nom||"");
     }
-    function footer(){const n=doc.getNumberOfPages();for(let i=1;i<=n;i++){doc.setPage(i);set(false,6.8,[128,128,128]);doc.text("Page "+i+" / "+n,W/2,H-6,{align:"center"})}}
+    function footer(){
+      const n=doc.getNumberOfPages();
+      const branding="Equipe Mobile Académique de Sécurité (EMAS) 34";
+      for(let i=1;i<=n;i++){
+        doc.setPage(i);
+        set(false,6.8,[128,128,128]);
+        doc.text(branding,W-12,7,{align:"right"});
+        doc.text(branding,12,H-5,{align:"left"});
+        doc.text("Page "+i+"/"+n,W-12,H-5,{align:"right"});
+      }
+    }
     const level=displayLevel(selected.Niveau),su=currentPdfSuivi();
     set(true,17,text);doc.text("Compte rendu EMAS 34",mx,y+5);y+=10;
     set(true,12,level==="3"?orange:text);doc.text("FE n°"+pdfTextValue(selected.Numero_FE)+" — Niveau "+pdfTextValue(level),mx,y+4);y+=7;
     set(false,9,muted);
-    const meta="Date du fait : "+dateFR(selected.Date_du_fait)+" — "+[selected.Etablissement,selected.Ville,selected.Departement].filter(pdfHasValue).join(" — ");
+    // La commune et le numéro de département sont regroupés dans une même mention.
+    const city=pdfTextValue(selected.Ville),deptRaw=pdfTextValue(selected.Departement);
+    const deptMatch=deptRaw.match(/(?:^|\D)(2A|2B|\d{2,3})(?:\D|$)/i);
+    const dept=deptMatch?deptMatch[1].toUpperCase():deptRaw;
+    const location=city?(city+(dept?" ("+dept+")":"")):(dept?"("+dept+")":"");
+    const meta=["Date de saisie : "+dateFR(selected.Date_de_saisie),"Date du fait : "+dateFR(selected.Date_du_fait),pdfTextValue(selected.Etablissement),location].filter(pdfHasValue).join(" — ");
     const metaLines=doc.splitTextToSize(meta,cw);doc.text(metaLines,mx,y+3);y+=metaLines.length*4+3;
-    const author=pdfAuthorName();
-    if(author){ensure(6);set(true,8.7,text);doc.text("CR établi par "+author,mx,y+3);y+=6}
 
-    section("Les faits");
-    narrativeBlock("Résumé du fait",selected.Resume_du_fait);
+    summaryInlineBlock(selected.Resume_du_fait);
+    section("Les caractéristiques du fait");
     narrativeBlock("Exposé des faits",selected.Expose_des_faits);
 
     const paths=splitStructuredFactPaths(selected.Types_de_fait_structure||selected.Types_de_fait||"");
     const compactTypes=compactFactTypes(paths);
     const hasCharacteristics=compactTypes.length||pdfHasValue(pdfListValue(selected.Victimes))||pdfHasValue(pdfListValue(selected.Auteurs_presumes))||pdfHasValue(pdfListValue(selected.Espaces));
     if(hasCharacteristics){
-      section("Caractéristiques du fait");
-      if(compactTypes.length)narrativeBlock("Nature des atteintes",compactTypes.join("  •  "));
+      if(compactTypes.length)compactRow([["Nature des atteintes",compactTypes.join(" • ")]]);
       compactRow([["Victime(s) présumée(s)",pdfListValue(selected.Victimes)],["Auteur(s) présumé(s)",pdfListValue(selected.Auteurs_presumes)]]);
       if(pdfHasValue(pdfListValue(selected.Espaces)))compactRow([["Espace(s) concerné(s)",pdfListValue(selected.Espaces)]]);
     }
@@ -1914,10 +1941,10 @@ async function exportCurrentFePdf(){
     const hasQualifications=[su.Securisation,su.Prevention,su.Accompagnement,su.Formation,su.Representation_Partenariat].some(v=>choiceValues(v).length);
     const hasFollowup=[su.Eleve_suivi,su.Suivi_etablissement,su.Accompagnement_EMAS,su.Notes_informations].some(pdfHasValue);
     if(hasFollowup||hasQualifications){
-      section("Suivi et intervention EMAS");
-      if(pdfHasValue(su.Eleve_suivi))compactRow([["Élève suivi",su.Eleve_suivi]]);
+      section("Suivi opérationnel EMAS");
       narrativeBlock("Suivi de l’établissement",su.Suivi_etablissement);
-      narrativeBlock("Traitement / accompagnement EMAS",su.Accompagnement_EMAS);
+      narrativeBlock("Accompagnement EMAS",su.Accompagnement_EMAS);
+      if(pdfHasValue(su.Eleve_suivi))compactRow([["Élève suivi",su.Eleve_suivi]]);
       narrativeBlock("Notes internes",su.Notes_informations);
       if(hasQualifications)compactQualifications([["Sécurisation",su.Securisation],["Prévention",su.Prevention],["Accompagnement",su.Accompagnement],["Formation",su.Formation],["Représentation / Partenariat",su.Representation_Partenariat]]);
     }
