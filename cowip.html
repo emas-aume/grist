@@ -1827,28 +1827,30 @@ async function exportCurrentFePdf(){
     }
     function narrativeBlock(label,value){
       if(!pdfHasValue(value))return false;
-      // Même encadrement que « Nature des atteintes », titre inclus.
-      // Les textes longs restent répartis sur plusieurs pages, sans débordement.
-      const pad=3,lineH=4,labelH=3.2,baseH=5;
+      // Cadre narratif compact : marge basse ajustée à la dernière ligne réelle.
+      // Les retours à la ligne entre paragraphes restent conservés.
+      const pad=3,lineH=4,labelH=3.2,bottomPad=1;
       set(false,8.7,text);
       const lines=doc.splitTextToSize(pdfTextValue(value),cw-pad*2);
+      while(lines.length&&String(lines[lines.length-1]).trim()==="")lines.pop();
+      if(!lines.length)return false;
       let index=0;
       while(index<lines.length){
         const first=index===0;
         const titleSpace=first?labelH+2:0;
-        const minimum=pad+titleSpace+lineH+pad;
+        const minimum=Math.max(12,pad+titleSpace+lineH+bottomPad);
         if(H-mb-y<minimum){doc.addPage();y=mt;continue}
         const available=H-mb-y;
-        const count=Math.min(lines.length-index,Math.max(1,Math.floor((available-pad*2-titleSpace)/lineH)));
+        const count=Math.min(lines.length-index,Math.max(1,Math.floor((available-pad-titleSpace-bottomPad)/lineH)));
         const chunk=lines.slice(index,index+count);
-        const h=Math.max(14,pad*2+titleSpace+chunk.length*lineH);
+        const h=Math.max(12,pad+titleSpace+chunk.length*lineH+bottomPad);
         ensure(h);
         doc.setFillColor.apply(doc,grayBg);
         doc.setDrawColor.apply(doc,gray);
         doc.roundedRect(mx,y,cw,h,1.5,1.5,"FD");
         if(first){set(true,7.2,muted);doc.text(String(label).toUpperCase(),mx+pad,y+4.5)}
         set(false,8.7,text);
-        doc.text(chunk,mx+pad,y+pad+titleSpace+3);
+        doc.text(chunk,mx+pad,y+pad+titleSpace+2);
         y+=h+3;index+=count;
       }
       return true;
@@ -1891,6 +1893,60 @@ async function exportCurrentFePdf(){
         const parts=String(path||"").split(/\s*>\s*/).filter(Boolean);
         return parts.length?parts[parts.length-1].trim():"";
       }).filter(label=>{const k=norm(label);if(!k||seen.has(k))return false;seen.add(k);return true});
+    }
+    function factTypePills(labels){
+      if(!labels||!labels.length)return false;
+      const level=displayLevel(selected.Niveau);
+      const pillBg=level==="3"?orangeBg:blueBg;
+      const pillText=level==="3"?orange:blue;
+      const pad=3,innerW=cw-2*pad,chipPadX=2.8,chipPadY=1.5;
+      const lineH=3.5,chipGapX=2,chipGapY=1.8;
+      const fontSize=7.7;
+      set(true,fontSize,pillText);
+      // Chaque libellé garde sa propre bulle, même s'il doit revenir à la ligne.
+      const chips=labels.map(label=>{
+        const str=String(label).trim();
+        const lines=doc.splitTextToSize(str,innerW-2*chipPadX);
+        const width=Math.min(innerW,Math.max(...lines.map(l=>doc.getTextWidth(l)),0)+chipPadX*2);
+        return {lines,width,height:lines.length*lineH+chipPadY*2};
+      });
+      const rows=[];let row=[],used=0,rowH=0;
+      for(const chip of chips){
+        if(row.length&&used+chipGapX+chip.width>innerW){rows.push({chips:row,height:rowH});row=[];used=0;rowH=0}
+        row.push(chip);used+=chip.width+(row.length>1?chipGapX:0);rowH=Math.max(rowH,chip.height);
+      }
+      if(row.length)rows.push({chips:row,height:rowH});
+      let ri=0;
+      while(ri<rows.length){
+        const first=ri===0;
+        const titleH=first?7:0;
+        let count=0,rowsH=0;
+        for(let j=ri;j<rows.length;j++){
+          const next=rowsH+(count?chipGapY:0)+rows[j].height;
+          if(pad+titleH+next+pad>H-mb-y&&count)break;
+          if(pad+titleH+next+pad>H-mb-y)break;
+          rowsH=next;count++;
+        }
+        if(!count){doc.addPage();y=mt;continue}
+        const boxH=pad+titleH+rowsH+pad;
+        doc.setFillColor.apply(doc,grayBg);doc.setDrawColor.apply(doc,gray);
+        doc.roundedRect(mx,y,cw,boxH,1.5,1.5,"FD");
+        if(first){set(true,7.2,muted);doc.text("NATURE DES ATTEINTES",mx+pad,y+4.5)}
+        let cy=y+pad+titleH;
+        for(let j=ri;j<ri+count;j++){
+          let cx=mx+pad;
+          for(const chip of rows[j].chips){
+            doc.setFillColor.apply(doc,pillBg);
+            doc.roundedRect(cx,cy,chip.width,chip.height,chip.height/2,chip.height/2,"F");
+            set(true,fontSize,pillText);
+            doc.text(chip.lines,cx+chipPadX,cy+chipPadY+2.7);
+            cx+=chip.width+chipGapX;
+          }
+          cy+=rows[j].height+chipGapY;
+        }
+        y+=boxH+3;ri+=count;
+      }
+      return true;
     }
     function compactQualifications(groups){
       const active=groups.map(([label,values])=>[label,choiceValues(values).map(v=>String(v||"").trim()).filter(Boolean)]).filter(([,items])=>items.length);
@@ -1965,7 +2021,7 @@ async function exportCurrentFePdf(){
     const compactTypes=compactFactTypes(paths);
     const hasCharacteristics=compactTypes.length||pdfHasValue(pdfListValue(selected.Victimes))||pdfHasValue(pdfListValue(selected.Auteurs_presumes))||pdfHasValue(pdfListValue(selected.Espaces));
     if(hasCharacteristics){
-      if(compactTypes.length)compactRow([["Nature des atteintes",compactTypes.join(" • ")]]);
+      if(compactTypes.length)factTypePills(compactTypes);
       compactRow([["Victime(s) présumée(s)",pdfListValue(selected.Victimes)],["Auteur(s) présumé(s)",pdfListValue(selected.Auteurs_presumes)]]);
       if(pdfHasValue(pdfListValue(selected.Espaces)))compactRow([["Espace(s) concerné(s)",pdfListValue(selected.Espaces)]]);
     }
