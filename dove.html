@@ -4136,7 +4136,7 @@ function nraSplitStructuredFactPaths(value, schoolYear){
     };
   }
 
-  function addEmasPdfBranding(doc) {
+  function addEmasPdfBranding(doc, options = {}) {
     const totalPages = doc.getNumberOfPages();
     const footerText = "Cellule Administrative et Renseignement - EMAS 34";
 
@@ -4148,6 +4148,7 @@ function nraSplitStructuredFactPaths(value, schoolYear){
       /* Filigrane commun NB / BRQ / STATS : position fixe centrée sur la zone de tableau.
          Placé légèrement sous le centre géométrique de la page et incliné de façon à
          avoir le « E » plus bas et le « 34 » plus haut. */
+      if (options.watermark !== false) {
       doc.saveGraphicsState();
       try {
         if (typeof doc.GState === "function" && typeof doc.setGState === "function") {
@@ -4164,6 +4165,7 @@ function nraSplitStructuredFactPaths(value, schoolYear){
         angle: 7
       });
       doc.restoreGraphicsState();
+      }
 
       /* Mention commune en haut à droite, avec exactement la même typographie que le pied de page. */
       doc.setFont("helvetica", "normal");
@@ -8303,8 +8305,167 @@ function nraSplitStructuredFactPaths(value, schoolYear){
     }catch(e){froMsg('Calcul impossible : '+e.message);froLastComputed='';return false;}
     finally{if(btn)btn.disabled=false;}
   }
-  async function froExportPdf(){if(!froReady)return;const key=JSON.stringify([froEl('network').value,froEl('year').value,froEl('start').value,froEl('end').value]);if(froLastComputed!==key){if(!await froRender())return;} const JsPDF=window.jspdf?.jsPDF||window.jsPDF;if(!JsPDF){froMsg('jsPDF indisponible.');return;}const s=froStats(),pdf=new JsPDF({unit:'mm',format:'a4'}),L=17,R=17,W=210,H=297,B=21,TOP=20;let y=TOP;const navy=[32,73,117];const font=(size=9,bold=false)=>{pdf.setFont('helvetica',bold?'bold':'normal');pdf.setFontSize(size);pdf.setTextColor(34,45,63);};const page=()=>{pdf.addPage();y=TOP;};const ensure=h=>{if(y+h>H-B)page();};const line=(t,size=9,bold=false,after=3)=>{font(size,bold);const lines=pdf.splitTextToSize(String(t||''),W-L-R);const step=size*.43+1;for(const x of lines){ensure(step);pdf.text(x,L,y);y+=step;}y+=after;};const heading=t=>{ensure(15);y+=3;font(10,true);pdf.setTextColor(...navy);line(t,10,true,4);};const table=(headers,rows)=>{const widths=headers.length===2?[W-L-R-36,36]:[50,...Array(headers.length-1).fill((W-L-R-50)/(headers.length-1))];const draw=(vals,head=false)=>{font(7.7,head);const parts=vals.map((v,i)=>pdf.splitTextToSize(String(v??''),widths[i]-3));const height=Math.max(7,...parts.map(p=>p.length*3.3+3));ensure(height);let x=L;for(let i=0;i<vals.length;i++){pdf.setDrawColor(190,201,215);if(head){pdf.setFillColor(235,241,248);pdf.rect(x,y-3,widths[i],height,'FD');}else pdf.rect(x,y-3,widths[i],height);pdf.text(parts[i],x+1.5,y);x+=widths[i];}y+=height;};draw(headers,true);for(const row of rows){if(y+9>H-B){page();draw(headers,true);}draw(row);}y+=5;};
-    try{font(15,true);pdf.setTextColor(...navy);line(froEl('title').value||'Fiche de renseignement d’ambiance',15,true,5);line('Réseau pédagogique : '+s.network,10,true,1);line('Période : '+s.from+' au '+s.to,9,false,7);const holder=document.createElement('div');holder.innerHTML=froClean(froEl('editor').innerHTML);for(const block of [...holder.childNodes]){const txt=(block.textContent||'').trim();if(txt)line(txt,9,false,3);}const n=s.groups.map(a=>a.length),np=s.groups.map(a=>a.filter(froPrivate).length),fmt=(a,b)=>a+' dont '+b+' privés';heading('Tableau 1 : Nombre d’établissements/écoles du réseau de '+s.network);table(['Établissements / Écoles','Nombre'],[['1er degré',fmt(n[0],np[0])],['2nd degré',fmt(n[1],np[1])],['Total',fmt(n[0]+n[1],np[0]+np[1])]]);heading('Tableau 2 : Nombre de FE par établissements/écoles');table(['Établissements / Écoles','Nombre de faits'],[['Total 1er degré',fmt(s.totals[0],s.privates[0])],['Total 2nd degré',fmt(s.totals[1],s.privates[1])],['Total général',fmt(s.all,s.privates[0]+s.privates[1])]]);line(s.declarants[0].size+' écoles sur '+n[0]+' et '+s.declarants[1].size+' établissements sur '+n[1]+' du 2nd degré ont déclaré au moins un FE.',8,false,3);heading('Tableau 3 : Établissements les plus représentés — 1er degré');table(['1er degré','Nombre de faits'],s.top[0].length?s.top[0]:[['Aucun',0]]);heading('Tableau 3 (suite) : Établissements les plus représentés — 2nd degré');table(['2nd degré','Nombre de faits'],s.top[1].length?s.top[1]:[['Aucun',0]]);heading('Tableau 4 : Nombre d’atteintes/violences par établissements/écoles');table(['Établissements / Écoles','AP','AB','ACS','VP','VV','VS','Harcèlement'],[['1er degré',...s.att[0]],['2nd degré',...s.att[1]],['Total général',...s.att[0].map((v,i)=>v+s.att[1][i])]]);line('AP : atteintes aux personnes ; AB : atteintes aux biens ; ACS : atteintes à la sécurité ; VP : violences physiques ; VV : violences verbales ; VS : violences sexuelles. Catégories non exclusives.',7,false,3);if(froCompareData){heading('Tableau 5 : Comparaison des FE sur trois années');table(['Année scolaire',...froYearNames],[['Nombre de FE',...froCompareData.map(x=>x.count)],['Variation', '—',...froCompareData.slice(1).map((x,i)=>froCompareData[i].count?(((x.count-froCompareData[i].count)/froCompareData[i].count)*100).toFixed(1)+' %':'n.c.')]]);line('Périodes alignées depuis la rentrée : '+froCompareData.map((x,i)=>froYearNames[i]+' ('+x.from+' au '+x.to+')').join(' ; '),7,false,3);heading('Tableau 6 : Comparaison des atteintes sur trois années');table(['Atteinte',...froYearNames],froCategories.map((label,i)=>[label,...froCompareData.map(x=>x.cats[i])]));line('Catégories non exclusives issues des types de faits structurés.',7,false,3);}const total=pdf.getNumberOfPages();for(let i=1;i<=total;i++){pdf.setPage(i);pdf.setDrawColor(200,208,221);pdf.line(L,H-17,W-R,H-17);font(8);pdf.text('Cellule Administrative et Renseignement - EMAS 34',L,H-12);pdf.text('Page '+i+'/'+total,W-R,H-12,{align:'right'});}pdf.save('FRO_'+s.network.replace(/[^a-z0-9-]/gi,'_')+'_'+s.from+'_'+s.to+'.pdf');froMsg('PDF exporté.');}catch(e){froMsg('Export PDF impossible : '+e.message);}
+  async function froExportPdf(){
+    if(!froReady)return;
+    const key=JSON.stringify([froEl('network').value,froEl('year').value,froEl('start').value,froEl('end').value]);
+    if(froLastComputed!==key){if(!await froRender())return;}
+    const JsPDF=window.jspdf?.jsPDF||window.jsPDF;
+    if(!JsPDF){froMsg('jsPDF indisponible.');return;}
+    const s=froStats(),pdf=new JsPDF({unit:'mm',format:'a4'});
+    const W=210,H=297,L=15,R=15,CW=W-L-R,TOP=18,BOTTOM=18;
+    const navy=[12,40,103],ink=[32,48,69],border=[192,201,209];
+    let y=TOP;
+    const font=(size=9,bold=false,color=ink)=>{
+      pdf.setFont('helvetica',bold?'bold':'normal');
+      pdf.setFontSize(size);pdf.setTextColor(...color);
+    };
+    const nextPage=()=>{pdf.addPage();y=TOP;};
+    const ensure=h=>{if(y+h>H-BOTTOM)nextPage();};
+    const write=(value,size=9,bold=false,after=3,color=ink)=>{
+      font(size,bold,color);
+      const lines=pdf.splitTextToSize(String(value??''),CW);
+      const step=size*.43+1;
+      for(const part of lines){ensure(step);pdf.text(part,L,y);y+=step;}
+      y+=after;
+    };
+    // Justification du texte libre : répartition des espaces sur les lignes complètes.
+    // La dernière ligne d'un paragraphe reste alignée à gauche.
+    const writeJustified=(value,size=9,after=3)=>{
+      font(size,false,ink);
+      const paragraphs=String(value??'').replace(/\r\n?/g,'\n').split('\n');
+      const step=size*.43+1;
+      paragraphs.forEach((paragraph,pi)=>{
+        const lines=pdf.splitTextToSize(paragraph.trim(),CW);
+        lines.forEach((line,i)=>{
+          ensure(step);
+          const words=String(line).trim().split(/\s+/).filter(Boolean);
+          if(i<lines.length-1 && words.length>1){
+            const textWidth=words.reduce((sum,word)=>sum+pdf.getTextWidth(word),0);
+            const space=(CW-textWidth)/(words.length-1);
+            if(space>=0 && space<15){
+              let x=L;
+              words.forEach(word=>{pdf.text(word,x,y);x+=pdf.getTextWidth(word)+space;});
+            }else pdf.text(line,L,y);
+          }else pdf.text(line,L,y);
+          y+=step;
+        });
+        if(pi<paragraphs.length-1)y+=1.5;
+      });
+      y+=after;
+    };
+    const heading=(value)=>{
+      const lines=pdf.splitTextToSize(String(value),CW);
+      ensure(9+lines.length*5);
+      y+=3;write(value,10,true,2,navy);
+    };
+    const dateFR=value=>{
+      const m=String(value??'').match(/^(\d{4})[-\/](\d{2})[-\/](\d{2})$/);
+      return m?m[3]+'/'+m[2]+'/'+m[1]:String(value??'');
+    };
+    // Même logique visuelle que les tableaux « Opérations cartables » du NRA :
+    // en-têtes colorés, filets discrets, nombres centrés, lignes de total mises en valeur.
+    const table=(headers,rows)=>{
+      const n=headers.length;
+      const widths=n===2?[CW-43,43]:[n===8?47:51,...Array(n-1).fill((CW-(n===8?47:51))/(n-1))];
+      const numeric=(value,i)=>i>0 && /^[-+]?[\d\s.,]+(?:\s*%|\s+dont\s+\d+\s+privés)?$/.test(String(value??'').trim());
+      const rowHeight=(vals)=>{
+        font(n>=8?7:8);
+        return Math.max(7.5,...vals.map((v,i)=>pdf.splitTextToSize(String(v??''),widths[i]-4).length*3.4+3.2));
+      };
+      const draw=(vals,header=false,total=false,shade=false)=>{
+        const h=rowHeight(vals);
+        ensure(h);
+        let x=L;
+        vals.forEach((v,i)=>{
+          const value=String(v??''),lines=pdf.splitTextToSize(value,widths[i]-4);
+          pdf.setDrawColor(...border);pdf.setLineWidth(.16);
+          if(header)pdf.setFillColor(232,238,243);
+          else if(total)pdf.setFillColor(225,240,228);
+          else if(shade)pdf.setFillColor(248,250,252);
+          if(header||total||shade)pdf.rect(x,y,widths[i],h,'FD');
+          else pdf.rect(x,y,widths[i],h,'S');
+          const size=n>=8?7:8;
+          font(size,header||total||numeric(value,i));
+          const centered=header||numeric(value,i)||(i>0&&n>=4);
+          const xx=centered?x+widths[i]/2:x+2;
+          lines.forEach((part,k)=>pdf.text(part,xx,y+3.8+k*3.4,centered?{align:'center'}:undefined));
+          x+=widths[i];
+        });
+        y+=h;
+      };
+      draw(headers,true);
+      rows.forEach((row,i)=>{
+        const isTotal=/^(total|nombre de fe|variation)/i.test(String(row[0]??''));
+        const h=rowHeight(row);
+        if(y+h>H-BOTTOM){nextPage();draw(headers,true);}
+        draw(row,false,isTotal,i%2===1);
+      });
+      y+=4;
+    };
+    try{
+      write(froEl('title').value||'Fiche de renseignement opérationnel',16,true,2,navy);
+      write('Réseau pédagogique de '+s.network,9,false,1);
+      write('La période étudiée s’étend du '+dateFR(s.from)+' au '+dateFR(s.to)+'.',8.5,false,5);
+      const holder=document.createElement('div');
+      holder.innerHTML=froClean(froEl('editor').innerHTML);
+      for(const block of [...holder.childNodes]){
+        const value=(block.textContent||'').trim();
+        if(value)writeJustified(value,9,3);
+      }
+      const n=s.groups.map(a=>a.length),np=s.groups.map(a=>a.filter(froPrivate).length);
+      const fmt=(a,b)=>a+' dont '+b+' privés';
+      heading('Nombre d’établissements du réseau de '+s.network);
+      table(['Établissements','Nombre'],[
+        ['1er degré',fmt(n[0],np[0])],['2nd degré',fmt(n[1],np[1])],
+        ['Total',fmt(n[0]+n[1],np[0]+np[1])]
+      ]);
+      heading('Nombre de FE par établissements');
+      table(['Établissements','Nombre de faits'],[
+        ['Total 1er degré',fmt(s.totals[0],s.privates[0])],
+        ['Total 2nd degré',fmt(s.totals[1],s.privates[1])],
+        ['Total général',fmt(s.all,s.privates[0]+s.privates[1])]
+      ]);
+      write(s.declarants[0].size+' écoles sur '+n[0]+' et '+s.declarants[1].size+
+        ' établissements sur '+n[1]+' du 2nd degré ont déclaré au moins un FE.',8,false,3);
+      heading('Établissements les plus représentés — 1er degré');
+      table(['1er degré','Nombre de faits'],s.top[0].length?s.top[0]:[['Aucun',0]]);
+      heading('Établissements les plus représentés — 2nd degré');
+      table(['2nd degré','Nombre de faits'],s.top[1].length?s.top[1]:[['Aucun',0]]);
+      heading('Nombre d’atteintes/violences par établissements');
+      table(['Établissements','AP','AB','ACS','VP','VV','VS','Harcèl.'],[
+        ['1er degré',...s.att[0]],['2nd degré',...s.att[1]],
+        ['Total général',...s.att[0].map((v,i)=>v+s.att[1][i])]
+      ]);
+      write('AP : atteintes aux personnes ; AB : atteintes aux biens ; ACS : atteintes à la sécurité ; VP : violences physiques ; VV : violences verbales ; VS : violences sexuelles.',7,false,3);
+      if(froCompareData){
+        heading('Comparaison des FE sur trois années');
+        table(['Année scolaire',...froYearNames],[
+          ['Nombre de FE',...froCompareData.map(x=>x.count)],
+          ['Variation','—',...froCompareData.slice(1).map((x,i)=>froCompareData[i].count?
+            (((x.count-froCompareData[i].count)/froCompareData[i].count)*100).toFixed(1)+' %':'n.c.')]
+        ]);
+        write('Périodes alignées depuis la rentrée : '+froCompareData.map((x,i)=>
+          froYearNames[i]+' ('+dateFR(x.from)+' au '+dateFR(x.to)+')').join(' ; '),7,false,3);
+        heading('Comparaison des atteintes sur trois années');
+        table(['Atteinte',...froYearNames],froCategories.map((label,i)=>
+          [label,...froCompareData.map(x=>x.cats[i])]));
+      }
+      // FRO : pied de page historique, sans séparateur ni filigrane.
+      // Même mention discrète en haut à droite, sur chaque page.
+      const pageCount=pdf.internal.getNumberOfPages();
+      const froBrand='Cellule Administrative et Renseignement - EMAS 34';
+      for(let page=1;page<=pageCount;page++){
+        pdf.setPage(page);
+        pdf.setFont('helvetica','normal');
+        pdf.setFontSize(7);
+        pdf.setTextColor(102,112,133);
+        pdf.text(froBrand,W-R,8,{align:'right'});
+        pdf.text(froBrand,L,H-9);
+        pdf.text('Page '+page+'/'+pageCount,W-R,H-9,{align:'right'});
+      }
+      pdf.save('FRO_'+s.network.replace(/[^a-z0-9-]/gi,'_')+'_'+s.from+'_'+s.to+'.pdf');
+      froMsg('PDF exporté.');
+    }catch(e){console.error('Export FRO',e);froMsg('Export PDF impossible : '+e.message);}
   }
 
   // Export vectoriel direct : évite html2canvas, qui renvoie une page blanche dans certaines iframes Grist.
