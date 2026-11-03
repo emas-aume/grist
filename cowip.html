@@ -1101,11 +1101,12 @@ async function initFeBell(){
     await feNoticeInitialize();;
   }catch(e){console.warn("Centre d’information indisponible ; nouvelle tentative à la prochaine ouverture",e)}
 }
-const LIVE_REFRESH_MS=10000; const CLAIM_TTL_SECONDS=180,CLAIM_HEARTBEAT_MS=30000;
+const LIVE_REFRESH_MS=15000; const CLAIM_TTL_SECONDS=180,CLAIM_HEARTBEAT_MS=30000;
 let claimMap=new Map(),currentEquipier=null,currentUserProfile=null,currentClaimSession=(crypto.randomUUID?crypto.randomUUID():String(Date.now())+"-"+Math.random().toString(36).slice(2)),claimHeartbeatTimer=null,claimBusy=false,editLockHeartbeatTimer=null,currentEtabLock=null;
 let liveRefreshBusy=false,liveRefreshTimer=null,lastLiveRefreshAt=0;
+const LIVE_REFRESH_MIN_GAP_MS=4000;
 async function refreshLiveSuivi(){
-  if(liveRefreshBusy||document.hidden)return;
+  if(liveRefreshBusy||document.hidden||Date.now()-lastLiveRefreshAt<LIVE_REFRESH_MIN_GAP_MS)return;
   const facts=rows.filter(f=>!isArchivedFact(f)&&isActiveFact(f));
   const ids=[...new Set(facts.map(f=>feNumericKey(f.Numero_FE)).filter(Boolean))];
   if(!ids.length)return;
@@ -1712,6 +1713,19 @@ function markOpsClean(){opsCleanSnapshot=opsSnapshot()}
 function opsDirty(){const cur=opsSnapshot();return cur!==null&&opsCleanSnapshot!==null&&cur!==opsCleanSnapshot}
 function ambianceDirty(){return !$('ambianceEditor').classList.contains('hidden')&&ambianceCleanSnapshot!==null&&$('ambianceText').value!==ambianceCleanSnapshot}
 function anyUnsaved(){return opsDirty()||ambianceDirty()}
+function copyOpsDraft(){
+  if(!selected||isArchivedFact(selected))return;
+  const lines=[`FE : ${selected.Numero_FE||''}`,`Établissement : ${selected.Etablissement||''}`,
+    `Équipier (référence) : ${$("equipier").value||''}`,`Statut : ${$("editStatus").value||''}`,
+    `Suivi établissement : ${$("suivi").value||''}`,`Accompagnement EMAS : ${$("emas").value||''}`,
+    `Notes internes : ${$("notes").value||''}`,`Élève suivi : ${$("eleveSuivi").value||''}`];
+  for(const f of Object.keys(ACTIVITY_CHOICES))lines.push(`${f} : ${getChoiceBox(f).join(' ; ')}`);
+  const data=lines.join('\n');
+  if(navigator.clipboard&&navigator.clipboard.writeText){
+    navigator.clipboard.writeText(data).then(()=>toast('Saisie copiée dans le presse-papiers.','success','Copie de secours'),
+      ()=>showModal({title:'Copie de secours',message:data,confirmText:'Fermer'}));
+  }else showModal({title:'Copie de secours',message:data,confirmText:'Fermer'});
+}
 async function confirmLeaveIfDirty(){
   if(!anyUnsaved())return true;
   return showModal({title:'Modifications non enregistrées',message:'Des modifications ont été apportées mais n’ont pas été enregistrées.',confirmText:'Quitter sans enregistrer',cancelText:'Continuer la saisie'});
@@ -1814,54 +1828,98 @@ async function exportCurrentFePdf(){
     function narrativeBlock(label,value){
       if(!pdfHasValue(value))return false;
       ensure(13);set(true,7.7,muted);doc.text(String(label).toUpperCase(),mx,y+4);y+=7;
-      set(false,8.7,text);const lines=doc.splitTextToSize(pdfTextValue(value),cw-8);const h=Math.max(9,lines.length*4+5);ensure(h);
-      doc.setFillColor.apply(doc,grayBg);doc.roundedRect(mx,y,cw,h,1.5,1.5,"F");doc.text(lines,mx+4,y+5.2);y+=h+3;return true;
-    }
-    function factPill(path,isN3){
-      if(!pdfHasValue(path))return;
-      const fill=isN3?orangeBg:blueBg,stroke=isN3?orangeBorder:blueBorder,fg=isN3?orange:blue;
-      set(true,8.1,fg);const lines=doc.splitTextToSize(path,cw-10);const h=Math.max(8,lines.length*3.8+4);ensure(h+2);
-      doc.setFillColor.apply(doc,fill);doc.setDrawColor.apply(doc,stroke);doc.roundedRect(mx,y,cw,h,4,4,"FD");doc.text(lines,mx+5,y+5.2);y+=h+2;
-    }
-    function checkedQualification(label,values){
-      const items=choiceValues(values).map(x=>String(x||"").trim()).filter(Boolean);if(!items.length)return false;
-      ensure(8);set(true,8,muted);doc.text(String(label).toUpperCase(),mx,y+4);y+=7;
-      for(const item of items){
-        const lines=doc.splitTextToSize(item,cw-12),h=Math.max(6,lines.length*3.8+2);ensure(h+1);
-        doc.setDrawColor.apply(doc,green);doc.setLineWidth(.45);doc.roundedRect(mx+1,y+1,4,4,.6,.6,"S");
-        doc.line(mx+1.8,y+3,mx+2.8,y+4);doc.line(mx+2.8,y+4,mx+4.5,y+1.8);
-        set(false,8.6,text);doc.text(lines,mx+8,y+4.2);y+=h+1;
+      set(false,8.7,text);
+      const lines=doc.splitTextToSize(pdfTextValue(value),cw-8);
+      let index=0;
+      while(index<lines.length){
+        const available=H-mb-y;
+        if(available<12){doc.addPage();y=mt;continue}
+        const count=Math.max(1,Math.min(lines.length-index,Math.floor((available-5)/4)));
+        const chunk=lines.slice(index,index+count),h=Math.max(9,chunk.length*4+5);
+        ensure(h);doc.setFillColor.apply(doc,grayBg);doc.roundedRect(mx,y,cw,h,1.5,1.5,"F");
+        set(false,8.7,text);doc.text(chunk,mx+4,y+5.2);y+=h+3;index+=count;
       }
-      y+=1;return true;
+      return true;
+    }
+    function compactFactTypes(paths){
+      const seen=new Set();
+      return (paths||[]).map(path=>{
+        const parts=String(path||"").split(/\s*>\s*/).filter(Boolean);
+        return parts.length?parts[parts.length-1].trim():"";
+      }).filter(label=>{const k=norm(label);if(!k||seen.has(k))return false;seen.add(k);return true});
+    }
+    function compactQualifications(groups){
+      const active=groups.map(([label,values])=>[label,choiceValues(values).map(v=>String(v||"").trim()).filter(Boolean)]).filter(([,items])=>items.length);
+      if(!active.length)return false;
+      ensure(10);set(true,8.2,muted);doc.text("QUALIFICATION DE L’ACTIVITÉ EMAS",mx,y+4);y+=7;
+      const labelW=40,lh=3.5,pad=2.2;
+      for(const [label,items] of active){
+        set(true,7.4,muted);const ll=doc.splitTextToSize(label.toUpperCase(),labelW-2);
+        set(false,7.6,text);
+        // Helvetica ne contient pas toujours le glyphe de coche : tracer les petites coches vectoriellement.
+        const lines=[];
+        for(const item of items){
+          const wrapped=doc.splitTextToSize(item,cw-labelW-7);
+          wrapped.forEach((line,index)=>lines.push({text:line,first:index===0}));
+        }
+        const h=Math.max(ll.length*lh,lines.length*lh)+pad*2;
+        ensure(h+1);
+        set(true,7.4,muted);doc.text(ll,mx,y+3.5);
+        let cy=y+3.5;
+        for(let i=0;i<lines.length;i++){
+          set(false,7.6,text);doc.text(lines[i].text,mx+labelW+4,cy);
+          // Une coche miniature au début de chaque activité (première ligne de son libellé).
+          if(lines[i].first){const xx=mx+labelW+0.7;doc.setDrawColor.apply(doc,green);doc.setLineWidth(.28);doc.line(xx,cy-1.0,xx+.65,cy-.35);doc.line(xx+.65,cy-.35,xx+1.8,cy-1.7)}
+          cy+=lh;
+        }
+        y+=h+1;
+      }
+      return true;
+    }
+    function pdfAuthorName(){
+      // Le rédacteur est l'utilisateur Grist authentifié, jamais l'équipier attribué au FE.
+      const e=currentEquipier;
+      if(!e)return "";
+      const full=pdfTextValue(e["Prénom nom complet"]||e["Prenom nom complet"]||"");
+      if(full)return full;
+      const first=pdfTextValue(e.Prenom||e["Prénom"]||"");
+      const last=pdfTextValue(e.Nom_de_famille||e["Nom de famille"]||e.Nom_famille||"");
+      if(first&&last)return first+" "+last.toUpperCase();
+      return pdfTextValue(e.Nom||"");
     }
     function footer(){const n=doc.getNumberOfPages();for(let i=1;i<=n;i++){doc.setPage(i);set(false,6.8,[128,128,128]);doc.text("Page "+i+" / "+n,W/2,H-6,{align:"center"})}}
     const level=displayLevel(selected.Niveau),su=currentPdfSuivi();
-    const rawEq=isArchivedFact(selected)?pdfTextValue(su.Equipier):eqName(su.Equipier),eq=pdfHasValue(rawEq)?rawEq:"";
     set(true,17,text);doc.text("Compte rendu EMAS 34",mx,y+5);y+=10;
     set(true,12,level==="3"?orange:text);doc.text("FE n°"+pdfTextValue(selected.Numero_FE)+" — Niveau "+pdfTextValue(level),mx,y+4);y+=7;
-    set(false,9,muted);const origin=factOriginLabel(selected);const meta=(origin?.cls==="update"?"Date de saisie : "+dateFR(selected.Date_de_saisie)+" — ":"")+"Date du fait : "+dateFR(selected.Date_du_fait)+" — "+[selected.Etablissement,selected.Ville,selected.Departement].filter(pdfHasValue).join(" — ");const metaLines=doc.splitTextToSize(meta,cw);doc.text(metaLines,mx,y+3);y+=metaLines.length*4+4;
-    section("Fait établissement");
-    const paths=splitStructuredFactPaths(selected.Types_de_fait_structure||selected.Types_de_fait||"");
-    paths.forEach(p=>factPill(p,level==="3"));
-    compactRow([["Victime(s) présumée(s)",pdfListValue(selected.Victimes)],["Auteur(s) présumé(s)",pdfListValue(selected.Auteurs_presumes)]]);
-    if(pdfHasValue(pdfListValue(selected.Espaces)))compactRow([["Espace(s)",pdfListValue(selected.Espaces)]]);
+    set(false,9,muted);
+    const meta="Date du fait : "+dateFR(selected.Date_du_fait)+" — "+[selected.Etablissement,selected.Ville,selected.Departement].filter(pdfHasValue).join(" — ");
+    const metaLines=doc.splitTextToSize(meta,cw);doc.text(metaLines,mx,y+3);y+=metaLines.length*4+3;
+    const author=pdfAuthorName();
+    if(author){ensure(6);set(true,8.7,text);doc.text("CR établi par "+author,mx,y+3);y+=6}
+
+    section("Les faits");
     narrativeBlock("Résumé du fait",selected.Resume_du_fait);
     narrativeBlock("Exposé des faits",selected.Expose_des_faits);
 
-    const hasFollowup=[eq,su.Statut,su.Date_traitement_EMS,su.Eleve_suivi,su.Suivi_etablissement,su.Accompagnement_EMAS,su.Notes_informations].some(pdfHasValue);
-    if(hasFollowup){
-      section("Suivi opérationnel");
-      compactRow([["Équipier",eq],["Statut",su.Statut],["Première prise en charge",su.Date_traitement_EMS?dateFR(su.Date_traitement_EMS):""]]);
-      if(pdfHasValue(su.Eleve_suivi))compactRow([["Élève suivi",su.Eleve_suivi]]);
-      narrativeBlock("Suivi établissement",su.Suivi_etablissement);
-      narrativeBlock("Traitement / accompagnement EMAS",su.Accompagnement_EMAS);
-      narrativeBlock("Notes internes",su.Notes_informations);
+    const paths=splitStructuredFactPaths(selected.Types_de_fait_structure||selected.Types_de_fait||"");
+    const compactTypes=compactFactTypes(paths);
+    const hasCharacteristics=compactTypes.length||pdfHasValue(pdfListValue(selected.Victimes))||pdfHasValue(pdfListValue(selected.Auteurs_presumes))||pdfHasValue(pdfListValue(selected.Espaces));
+    if(hasCharacteristics){
+      section("Caractéristiques du fait");
+      if(compactTypes.length)narrativeBlock("Nature des atteintes",compactTypes.join("  •  "));
+      compactRow([["Victime(s) présumée(s)",pdfListValue(selected.Victimes)],["Auteur(s) présumé(s)",pdfListValue(selected.Auteurs_presumes)]]);
+      if(pdfHasValue(pdfListValue(selected.Espaces)))compactRow([["Espace(s) concerné(s)",pdfListValue(selected.Espaces)]]);
     }
 
     const hasQualifications=[su.Securisation,su.Prevention,su.Accompagnement,su.Formation,su.Representation_Partenariat].some(v=>choiceValues(v).length);
-    if(hasQualifications){
-      section("Qualification de l’activité EMAS");
-      checkedQualification("Sécurisation",su.Securisation);checkedQualification("Prévention",su.Prevention);checkedQualification("Accompagnement",su.Accompagnement);checkedQualification("Formation",su.Formation);checkedQualification("Représentation / Partenariat",su.Representation_Partenariat);
+    const hasFollowup=[su.Eleve_suivi,su.Suivi_etablissement,su.Accompagnement_EMAS,su.Notes_informations].some(pdfHasValue);
+    if(hasFollowup||hasQualifications){
+      section("Suivi et intervention EMAS");
+      if(pdfHasValue(su.Eleve_suivi))compactRow([["Élève suivi",su.Eleve_suivi]]);
+      narrativeBlock("Suivi de l’établissement",su.Suivi_etablissement);
+      narrativeBlock("Traitement / accompagnement EMAS",su.Accompagnement_EMAS);
+      narrativeBlock("Notes internes",su.Notes_informations);
+      if(hasQualifications)compactQualifications([["Sécurisation",su.Securisation],["Prévention",su.Prevention],["Accompagnement",su.Accompagnement],["Formation",su.Formation],["Représentation / Partenariat",su.Representation_Partenariat]]);
     }
     footer();doc.save("Compte rendu EMAS 34 - FE "+pdfTextValue(selected.Numero_FE)+".pdf");
   }catch(e){console.error("Erreur export PDF FE",e);showModal({title:"Erreur d’export",message:"Impossible de générer le PDF pour le moment.",confirmText:"OK",cancelText:null})}
@@ -2362,7 +2420,23 @@ async function saveAmbiance(){
 }
 
 let establishmentLoadGeneration=0;
-async function openEstablishment(e,ref){if(Number(selectedEtab?.UAI)!==Number(ref))liveEtabFingerprint="";const generation=++establishmentLoadGeneration;selectedEtab=e||etabMap.get(Number(ref))||null;$("etabBack").textContent=etabReturnTarget==="detail"?"← Retour à la fiche":"← Retour";$("detailView").classList.add("hidden");$("etabView").classList.remove("hidden");$("etabTitle").textContent=e?.Etablissement||selected?.Etablissement||"Établissement";$("etabSub").textContent=[e?.UAI,e?.Ville,e?.Departement].filter(Boolean).join(" — ");$("etabGrid").innerHTML=[info("UAI",e?.UAI),info("Degré",e?.Degre),info("Ville",e?.Ville),info("Département",e?.Departement),info("Bassin",e?.Bassin),info("Type",e?.Type_etablissement),info("Secteur",e?.Secteur),info("Code postal",e?.Code_postal)].join("");$("history").innerHTML='<div class="loading">Chargement de l’historique par UAI…</div>';$("etabCounts").textContent="Chargement du nombre de faits…";$("ambianceDisplay").classList.remove("hidden");$("ambianceEditor").classList.add("hidden");$("ambianceDisplay").innerHTML='<div class="loading">Chargement…</div>';loadAmbiance(e);try{let [cur,old,old2]=await Promise.all([apiAllPaged(T.CUR,{filter:{UAI:[ref]},sort:"-Date_de_saisie"}),apiAllPaged(T.OLD,{filter:{UAI:[ref]},sort:"-Date_de_saisie"}),apiAllPaged(T.OLD2,{filter:{UAI:[ref]},sort:"-Date_de_saisie"})]);if(generation!==establishmentLoadGeneration)return;cur=cur.filter(isActiveFact);$("etabCounts").innerHTML=`<strong>Nombre de faits établissement :</strong> 2026-2027 : <strong>${cur.length}</strong> &nbsp;•&nbsp; 2025-2026 : <strong>${old.length}</strong> &nbsp;•&nbsp; 2024-2025 : <strong>${old2.length}</strong>`;let all=[...cur,...old,...old2].sort((a,b)=>(date(b.Date_de_saisie)?.getTime()||0)-(date(a.Date_de_saisie)?.getTime()||0));await loadSuiviFor(cur);if(generation!==establishmentLoadGeneration)return;let lastSchoolYear=null;$("history").innerHTML=all.length?all.map(f=>{const level=displayLevel(f.Niveau);const warning=level==="3"?'<span class="level-warning" title="Fait de niveau 3" aria-label="Fait de niveau 3">⚠</span>':"";const schoolYear=String(f.Annee_scolaire|| (f._source===T.CUR?"2026-2027":f._source===T.OLD?"2025-2026":"2024-2025"));const separator=schoolYear!==lastSchoolYear?`<div class="school-year-separator"><span>Année scolaire ${esc(schoolYear)}</span></div>`:"";lastSchoolYear=schoolYear;const oldYear=isArchivedFact(f);return `${separator}<div class="event ${oldYear?"old-school-year":""}"><div class="event-title">FE n°${esc(f.Numero_FE)} — <span class="${level==="3"?"event-level3":""}">Niveau ${esc(level)}</span> ${warning}</div><div class="event-meta">${dateFR(f.Date_de_saisie)} — ${esc(schoolYear)} — Équipier : ${esc(isArchivedFact(f)?(String(f.Equipier||"N/A").trim()||"N/A"):eqName(suiviMap.get(feNumericKey(f.Numero_FE)) ? suiviMap.get(feNumericKey(f.Numero_FE)).Equipier : f.Equipier))}</div>${historyTypeBadges(f,level)}<div>${esc(cleanDisplayText((isArchivedFact(f) && (!String(f.Resume_du_fait||"").trim() || norm(f.Resume_du_fait).includes("resume non renseigne"))) ? (f.Expose_des_faits||"Résumé non renseigné") : (f.Resume_du_fait||"Résumé non renseigné")))}</div><button class="btn" style="margin-top:7px" data-hist="${f._source}:${f.id}">Ouvrir la fiche</button></div>`}).join(""):'<div class="muted">Aucun fait trouvé pour cet UAI.</div>';if(generation!==establishmentLoadGeneration)return;const existing=new Set(rows.map(r=>`${r._source}:${r.id}`));all.forEach(f=>{const key=`${f._source}:${f.id}`;if(!existing.has(key)){rows.push(f);existing.add(key)}});document.querySelectorAll("[data-hist]").forEach(b=>b.onclick=()=>openFact(b.dataset.hist))}catch(e){if(generation===establishmentLoadGeneration)$("history").innerHTML='<div class="notice error">Impossible de charger l’historique : '+esc(e.message)+'</div>'}}
+// Cache en mémoire des historiques archivés, indexé par année et référence UAI.
+// Ne stocke jamais les FE courants : ils sont rechargés pour préserver les mises à jour.
+const archivedHistoryCache=new Map();
+const ARCHIVED_HISTORY_CACHE_LIMIT=100;
+async function archivedHistoryFor(table,ref){
+  const key=table+":"+String(ref);
+  if(archivedHistoryCache.has(key))return archivedHistoryCache.get(key);
+  const pending=apiAllPaged(table,{filter:{UAI:[ref]},sort:"-Date_de_saisie"});
+  archivedHistoryCache.set(key,pending);
+  if(archivedHistoryCache.size>ARCHIVED_HISTORY_CACHE_LIMIT){
+    const oldest=archivedHistoryCache.keys().next().value;
+    if(oldest!==key)archivedHistoryCache.delete(oldest);
+  }
+  try{return await pending}
+  catch(e){if(archivedHistoryCache.get(key)===pending)archivedHistoryCache.delete(key);throw e}
+}
+async function openEstablishment(e,ref){if(Number(selectedEtab?.UAI)!==Number(ref))liveEtabFingerprint="";const generation=++establishmentLoadGeneration;selectedEtab=e||etabMap.get(Number(ref))||null;$("etabBack").textContent=etabReturnTarget==="detail"?"← Retour à la fiche":"← Retour";$("detailView").classList.add("hidden");$("etabView").classList.remove("hidden");$("etabTitle").textContent=e?.Etablissement||selected?.Etablissement||"Établissement";$("etabSub").textContent=[e?.UAI,e?.Ville,e?.Departement].filter(Boolean).join(" — ");$("etabGrid").innerHTML=[info("UAI",e?.UAI),info("Degré",e?.Degre),info("Ville",e?.Ville),info("Département",e?.Departement),info("Bassin",e?.Bassin),info("Type",e?.Type_etablissement),info("Secteur",e?.Secteur),info("Code postal",e?.Code_postal)].join("");$("history").innerHTML='<div class="loading">Chargement de l’historique par UAI…</div>';$("etabCounts").textContent="Chargement du nombre de faits…";$("ambianceDisplay").classList.remove("hidden");$("ambianceEditor").classList.add("hidden");$("ambianceDisplay").innerHTML='<div class="loading">Chargement…</div>';loadAmbiance(e);try{let [cur,old,old2]=await Promise.all([apiAllPaged(T.CUR,{filter:{UAI:[ref]},sort:"-Date_de_saisie"}),archivedHistoryFor(T.OLD,ref),archivedHistoryFor(T.OLD2,ref)]);if(generation!==establishmentLoadGeneration)return;cur=cur.filter(isActiveFact);$("etabCounts").innerHTML=`<strong>Nombre de faits établissement :</strong> 2026-2027 : <strong>${cur.length}</strong> &nbsp;•&nbsp; 2025-2026 : <strong>${old.length}</strong> &nbsp;•&nbsp; 2024-2025 : <strong>${old2.length}</strong>`;let all=[...cur,...old,...old2].sort((a,b)=>(date(b.Date_de_saisie)?.getTime()||0)-(date(a.Date_de_saisie)?.getTime()||0));await loadSuiviFor(cur);if(generation!==establishmentLoadGeneration)return;let lastSchoolYear=null;$("history").innerHTML=all.length?all.map(f=>{const level=displayLevel(f.Niveau);const warning=level==="3"?'<span class="level-warning" title="Fait de niveau 3" aria-label="Fait de niveau 3">⚠</span>':"";const schoolYear=String(f.Annee_scolaire|| (f._source===T.CUR?"2026-2027":f._source===T.OLD?"2025-2026":"2024-2025"));const separator=schoolYear!==lastSchoolYear?`<div class="school-year-separator"><span>Année scolaire ${esc(schoolYear)}</span></div>`:"";lastSchoolYear=schoolYear;const oldYear=isArchivedFact(f);return `${separator}<div class="event ${oldYear?"old-school-year":""}"><div class="event-title">FE n°${esc(f.Numero_FE)} — <span class="${level==="3"?"event-level3":""}">Niveau ${esc(level)}</span> ${warning}</div><div class="event-meta">${dateFR(f.Date_de_saisie)} — ${esc(schoolYear)} — Équipier : ${esc(isArchivedFact(f)?(String(f.Equipier||"N/A").trim()||"N/A"):eqName(suiviMap.get(feNumericKey(f.Numero_FE)) ? suiviMap.get(feNumericKey(f.Numero_FE)).Equipier : f.Equipier))}</div>${historyTypeBadges(f,level)}<div>${esc(cleanDisplayText((isArchivedFact(f) && (!String(f.Resume_du_fait||"").trim() || norm(f.Resume_du_fait).includes("resume non renseigne"))) ? (f.Expose_des_faits||"Résumé non renseigné") : (f.Resume_du_fait||"Résumé non renseigné")))}</div><button class="btn" style="margin-top:7px" data-hist="${f._source}:${f.id}">Ouvrir la fiche</button></div>`}).join(""):'<div class="muted">Aucun fait trouvé pour cet UAI.</div>';if(generation!==establishmentLoadGeneration)return;const existing=new Set(rows.map(r=>`${r._source}:${r.id}`));all.forEach(f=>{const key=`${f._source}:${f.id}`;if(!existing.has(key)){rows.push(f);existing.add(key)}});document.querySelectorAll("[data-hist]").forEach(b=>b.onclick=()=>openFact(b.dataset.hist))}catch(e){if(generation===establishmentLoadGeneration)$("history").innerHTML='<div class="notice error">Impossible de charger l’historique : '+esc(e.message)+'</div>'}}
 document.querySelectorAll("[data-inline-edit]").forEach(b=>b.onclick=()=>editInlineField(b.dataset.inlineEdit));
 document.querySelectorAll("[data-inline-cancel]").forEach(b=>b.onclick=()=>cancelInlineField(b.dataset.inlineCancel));
 document.querySelectorAll("[data-inline-save]").forEach(b=>b.onclick=()=>saveInlineField(b.dataset.inlineSave));
@@ -2373,7 +2447,17 @@ $("ambianceSave").onclick=saveAmbiance;
 
 $("q").onkeydown=async e=>{if(e.key!=="Enter")return;e.preventDefault();let raw=$("q").value.trim();if(!raw){rows=[...currentRows];page=1;render();return}let idMatch=/^id\s*=\s*(\d+)$/i.exec(raw);if(idMatch){await searchOperationalId(idMatch[1])}else if(/^\d{6,}$/.test(raw)){await searchExactFE(raw)}else{rows=[...currentRows];page=1;render();await renderEtabMatches(raw)}};
 $("equipier").onchange=()=>{equipierSelectionTouched=true};["dep","degree","level","status","equipierFilter"].forEach(id=>$(id).onchange=()=>{page=1;render()});$("daySelect").onchange=()=>{loadCurrent()};$("weekSelect").onchange=()=>{populateDayOptions($("weekSelect").value);loadCurrent()};$("prev").onclick=()=>{page--;render()};$("next").onclick=()=>{page++;render()};$("exportFePdf").onclick=exportCurrentFePdf;$("assignOperationalId").onclick=assignOperationalId;
-$("back").onclick=async()=>{if(!(await confirmLeaveIfDirty()))return;await releaseCurrentEditResources();opsCleanSnapshot=null;ambianceCleanSnapshot=null;const wasOperationalSearch=/^id\s*=\s*\d+$/i.test($("q").value.trim());if(wasOperationalSearch){$("q").value="";rows=[...currentRows];page=1;notice("")}$("detailView").classList.add("hidden");$("listView").classList.remove("hidden");render()};$("openEtab").onclick=showEstablishment;$("etabBack").onclick=async()=>{if(!(await confirmLeaveIfDirty()))return;const lockUai=String(selectedEtab?.UAI||"").trim();await releaseEditLock("ETAB",lockUai);currentEtabLock=null;ambianceCleanSnapshot=null;$("etabView").classList.add("hidden");if(etabReturnTarget==="detail"&&selected){$("detailView").classList.remove("hidden");markOpsClean()}else{$("listView").classList.remove("hidden");render()}};$("save").onclick=saveOps;$("toggleDone").onclick=toggleDone;$("resetFollowup").onclick=resetFollowup;
+$("back").onclick=async()=>{if(!(await confirmLeaveIfDirty()))return;await releaseCurrentEditResources();opsCleanSnapshot=null;ambianceCleanSnapshot=null;const wasOperationalSearch=/^id\s*=\s*\d+$/i.test($("q").value.trim());if(wasOperationalSearch){$("q").value="";rows=[...currentRows];page=1;notice("")}$("detailView").classList.add("hidden");$("listView").classList.remove("hidden");render()};$("openEtab").onclick=showEstablishment;$("etabBack").onclick=async()=>{if(!(await confirmLeaveIfDirty()))return;const lockUai=String(selectedEtab?.UAI||"").trim();await releaseEditLock("ETAB",lockUai);currentEtabLock=null;ambianceCleanSnapshot=null;$("etabView").classList.add("hidden");if(etabReturnTarget==="detail"&&selected){$("detailView").classList.remove("hidden");markOpsClean()}else{$("listView").classList.remove("hidden");render()}};$("save").onclick=saveOps;
+// Copie de secours accessible sans modifier les mécanismes de sauvegarde ou de verrouillage.
+const opsSaveButton=$("save");
+if(opsSaveButton&&opsSaveButton.parentElement&&!$("copyOpsDraftButton")){
+  const draftButton=document.createElement("button");
+  draftButton.id="copyOpsDraftButton";draftButton.type="button";draftButton.className="btn";
+  draftButton.textContent="Copier ma saisie";
+  draftButton.title="Copier les champs en cours de rédaction avant un éventuel conflit";
+  draftButton.onclick=copyOpsDraft;
+  opsSaveButton.parentElement.insertBefore(draftButton,opsSaveButton);
+}$("toggleDone").onclick=toggleDone;$("resetFollowup").onclick=resetFollowup;
 (async()=>{try{initIssueJournal();initActivityFields();
 // Chargements indépendants en parallèle : référentiels, identifiants et index des périodes.
 await loadSmallTables();
