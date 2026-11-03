@@ -8356,7 +8356,7 @@ function nraSplitStructuredFactPaths(value, schoolYear){
     const heading=(value)=>{
       const lines=pdf.splitTextToSize(String(value),CW);
       ensure(9+lines.length*5);
-      y+=3;write(value,10,true,2,navy);
+      y+=2;write(value,10,true,0,ink);
     };
     const dateFR=value=>{
       const m=String(value??'').match(/^(\d{4})[-\/](\d{2})[-\/](\d{2})$/);
@@ -8380,12 +8380,11 @@ function nraSplitStructuredFactPaths(value, schoolYear){
           const value=String(v??''),lines=pdf.splitTextToSize(value,widths[i]-4);
           pdf.setDrawColor(...border);pdf.setLineWidth(.16);
           if(header)pdf.setFillColor(232,238,243);
-          else if(total)pdf.setFillColor(225,240,228);
           else if(shade)pdf.setFillColor(248,250,252);
-          if(header||total||shade)pdf.rect(x,y,widths[i],h,'FD');
+          if(header||shade)pdf.rect(x,y,widths[i],h,'FD');
           else pdf.rect(x,y,widths[i],h,'S');
           const size=n>=8?7:8;
-          font(size,header||total||numeric(value,i));
+          font(size,header||(!total&&numeric(value,i)));
           const centered=header||numeric(value,i)||(i>0&&n>=4);
           const xx=centered?x+widths[i]/2:x+2;
           lines.forEach((part,k)=>pdf.text(part,xx,y+3.8+k*3.4,centered?{align:'center'}:undefined));
@@ -8400,11 +8399,11 @@ function nraSplitStructuredFactPaths(value, schoolYear){
         if(y+h>H-BOTTOM){nextPage();draw(headers,true);}
         draw(row,false,isTotal,i%2===1);
       });
-      y+=4;
+      y+=7;
     };
     try{
       write(froEl('title').value||'Fiche de renseignement opérationnel',16,true,2,navy);
-      write('Réseau pédagogique de '+s.network,9,false,1);
+      write('Réseau pédagogique de '+s.network+'.',9,false,1);
       write('La période étudiée s’étend du '+dateFR(s.from)+' au '+dateFR(s.to)+'.',8.5,false,5);
       const holder=document.createElement('div');
       holder.innerHTML=froClean(froEl('editor').innerHTML);
