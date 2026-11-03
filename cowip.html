@@ -1827,17 +1827,29 @@ async function exportCurrentFePdf(){
     }
     function narrativeBlock(label,value){
       if(!pdfHasValue(value))return false;
-      ensure(13);set(true,7.7,muted);doc.text(String(label).toUpperCase(),mx,y+4);y+=7;
+      // Même encadrement que « Nature des atteintes », titre inclus.
+      // Les textes longs restent répartis sur plusieurs pages, sans débordement.
+      const pad=3,lineH=4,labelH=3.2,baseH=5;
       set(false,8.7,text);
-      const lines=doc.splitTextToSize(pdfTextValue(value),cw-8);
+      const lines=doc.splitTextToSize(pdfTextValue(value),cw-pad*2);
       let index=0;
       while(index<lines.length){
+        const first=index===0;
+        const titleSpace=first?labelH+2:0;
+        const minimum=pad+titleSpace+lineH+pad;
+        if(H-mb-y<minimum){doc.addPage();y=mt;continue}
         const available=H-mb-y;
-        if(available<12){doc.addPage();y=mt;continue}
-        const count=Math.max(1,Math.min(lines.length-index,Math.floor((available-5)/4)));
-        const chunk=lines.slice(index,index+count),h=Math.max(9,chunk.length*4+5);
-        ensure(h);doc.setFillColor.apply(doc,grayBg);doc.roundedRect(mx,y,cw,h,1.5,1.5,"F");
-        set(false,8.7,text);doc.text(chunk,mx+4,y+5.2);y+=h+3;index+=count;
+        const count=Math.min(lines.length-index,Math.max(1,Math.floor((available-pad*2-titleSpace)/lineH)));
+        const chunk=lines.slice(index,index+count);
+        const h=Math.max(14,pad*2+titleSpace+chunk.length*lineH);
+        ensure(h);
+        doc.setFillColor.apply(doc,grayBg);
+        doc.setDrawColor.apply(doc,gray);
+        doc.roundedRect(mx,y,cw,h,1.5,1.5,"FD");
+        if(first){set(true,7.2,muted);doc.text(String(label).toUpperCase(),mx+pad,y+4.5)}
+        set(false,8.7,text);
+        doc.text(chunk,mx+pad,y+pad+titleSpace+3);
+        y+=h+3;index+=count;
       }
       return true;
     }
@@ -1845,14 +1857,31 @@ async function exportCurrentFePdf(){
       if(!pdfHasValue(value))return false;
       const prefix="En résumé : ";
       const lines=doc.splitTextToSize(prefix+pdfTextValue(value),cw-8);
+      const level=displayLevel(selected.Niveau);
+      const fill=level==="3"?orangeBg:level==="2"?blueBg:grayBg;
+      const border=level==="3"?orangeBorder:level==="2"?blueBorder:gray;
       let index=0;
       while(index<lines.length){
         const available=H-mb-y;
         if(available<12){doc.addPage();y=mt;continue}
         const count=Math.max(1,Math.min(lines.length-index,Math.floor((available-5)/4)));
         const chunk=lines.slice(index,index+count),h=Math.max(9,chunk.length*4+5);
-        ensure(h);doc.setFillColor.apply(doc,grayBg);doc.roundedRect(mx,y,cw,h,1.5,1.5,"F");
-        set(false,8.7,text);doc.text(chunk,mx+4,y+5.2);y+=h+3;index+=count;
+        ensure(h);
+        doc.setFillColor.apply(doc,fill);
+        doc.setDrawColor.apply(doc,border);
+        doc.roundedRect(mx,y,cw,h,1.5,1.5,"FD");
+        set(false,8.7,text);
+        if(index===0){
+          // Afficher le préfixe en gras sans le dupliquer dans le texte courant.
+          set(true,8.7,text);
+          doc.text(prefix.trimEnd(),mx+4,y+5.2);
+          const prefixWidth=doc.getTextWidth(prefix);
+          set(false,8.7,text);
+          const firstLine=String(chunk[0]).slice(prefix.length);
+          if(firstLine)doc.text(firstLine,mx+4+prefixWidth,y+5.2);
+          if(chunk.length>1)doc.text(chunk.slice(1),mx+4,y+9.2);
+        }else doc.text(chunk,mx+4,y+5.2);
+        y+=h+3;index+=count;
       }
       return true;
     }
@@ -1884,7 +1913,7 @@ async function exportCurrentFePdf(){
         for(let i=0;i<lines.length;i++){
           set(false,7.6,text);doc.text(lines[i].text,mx+labelW+4,cy);
           // Une coche miniature au début de chaque activité (première ligne de son libellé).
-          if(lines[i].first){const xx=mx+labelW+0.7;doc.setDrawColor.apply(doc,green);doc.setLineWidth(.28);doc.line(xx,cy-1.0,xx+.65,cy-.35);doc.line(xx+.65,cy-.35,xx+1.8,cy-1.7)}
+          if(lines[i].first){const xx=mx+labelW+0.7;doc.setDrawColor.apply(doc,blue);doc.setLineWidth(.28);doc.line(xx,cy-1.0,xx+.65,cy-.35);doc.line(xx+.65,cy-.35,xx+1.8,cy-1.7)}
           cy+=lh;
         }
         y+=h+1;
@@ -1922,8 +1951,11 @@ async function exportCurrentFePdf(){
     const deptMatch=deptRaw.match(/(?:^|\D)(2A|2B|\d{2,3})(?:\D|$)/i);
     const dept=deptMatch?deptMatch[1].toUpperCase():deptRaw;
     const location=city?(city+(dept?" ("+dept+")":"")):(dept?"("+dept+")":"");
-    const meta=["Date de saisie : "+dateFR(selected.Date_de_saisie),"Date du fait : "+dateFR(selected.Date_du_fait),pdfTextValue(selected.Etablissement),location].filter(pdfHasValue).join(" — ");
-    const metaLines=doc.splitTextToSize(meta,cw);doc.text(metaLines,mx,y+3);y+=metaLines.length*4+3;
+    const dates=["Date de saisie : "+dateFR(selected.Date_de_saisie),"Date du fait : "+dateFR(selected.Date_du_fait)].filter(pdfHasValue).join(" — ");
+    const establishment=[pdfTextValue(selected.Etablissement),location].filter(pdfHasValue).join(" — ");
+    // Retour à la ligne obligatoire après les dates, sans forcer la coupure de la commune et du département.
+    const metaLines=[...doc.splitTextToSize(dates,cw),...(establishment?doc.splitTextToSize(establishment,cw):[])];
+    ensure(metaLines.length*4+4);doc.text(metaLines,mx,y+3);y+=metaLines.length*4+3;
 
     summaryInlineBlock(selected.Resume_du_fait);
     section("Les caractéristiques du fait");
