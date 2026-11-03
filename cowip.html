@@ -1855,12 +1855,14 @@ async function exportCurrentFePdf(){
       }
       return true;
     }
+    // Palette commune aux encadrés de résumé et aux bulles de qualification.
+    const factLevelBackground=level=>level==="3"?orangeBg:level==="2"?blueBg:grayBg;
     function summaryInlineBlock(value){
       if(!pdfHasValue(value))return false;
       const prefix="En résumé : ";
       const lines=doc.splitTextToSize(prefix+pdfTextValue(value),cw-8);
       const level=displayLevel(selected.Niveau);
-      const fill=level==="3"?orangeBg:level==="2"?blueBg:grayBg;
+      const fill=factLevelBackground(level);
       const border=level==="3"?orangeBorder:level==="2"?blueBorder:gray;
       let index=0;
       while(index<lines.length){
@@ -1897,7 +1899,7 @@ async function exportCurrentFePdf(){
     function factTypePills(labels){
       if(!labels||!labels.length)return false;
       const level=displayLevel(selected.Niveau);
-      const pillBg=level==="3"?orangeBg:blueBg;
+      const pillBg=factLevelBackground(level);
       const pillText=level==="3"?orange:blue;
       const pad=3,innerW=cw-2*pad,chipPadX=2.8,chipPadY=1.5;
       const lineH=3.5,chipGapX=2,chipGapY=1.8;
@@ -1919,7 +1921,7 @@ async function exportCurrentFePdf(){
       let ri=0;
       while(ri<rows.length){
         const first=ri===0;
-        const titleH=first?7:0;
+        const titleH=first?3.8:0;
         let count=0,rowsH=0;
         for(let j=ri;j<rows.length;j++){
           const next=rowsH+(count?chipGapY:0)+rows[j].height;
