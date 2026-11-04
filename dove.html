@@ -7282,6 +7282,13 @@ function nraSplitStructuredFactPaths(value, schoolYear){
     return rows;
   }
 
+  /* Référentiel : seule la valeur FERME de Statut exclut une unité des effectifs.
+     Les FE historiques restent conservés dans leurs statistiques de faits. */
+  function isEtabClosed(row) {
+    return !!row && String(row.Statut ?? row.statut ?? '').normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '').trim().toUpperCase() === 'FERME';
+  }
+
   async function loadEtabTableForWeeklyStats() {
     etabLoadState = "loading";
     renderWeeklyStats();
@@ -7348,7 +7355,7 @@ function nraSplitStructuredFactPaths(value, schoolYear){
   }
   function analyticsAttackLabel(){const s=document.getElementById('analytics-attack-type');return s&&s.selectedOptions&&s.selectedOptions[0]?s.selectedOptions[0].textContent:'Atteintes';}
 
-  function analyticsTotalEstablishments(){return etabRecords.filter(e=>{if(analyticsDepartment!=='all'&&getEtabDepartment(e)!==analyticsDepartment)return false;if(analyticsDegree!=='all'){const c=getEtabCategory(e),d=c==='first'?'1er':(c==='college'||c==='lycee'?'2nd':'');if(d!==analyticsDegree)return false;}return true;}).length;}
+  function analyticsTotalEstablishments(){return etabRecords.filter(e=>{if(isEtabClosed(e))return false;if(analyticsDepartment!=='all'&&getEtabDepartment(e)!==analyticsDepartment)return false;if(analyticsDegree!=='all'){const c=getEtabCategory(e),d=c==='first'?'1er':(c==='college'||c==='lycee'?'2nd':'');if(d!==analyticsDegree)return false;}return true;}).length;}
   function renderAnalyticsBars(id,entries){const e=document.getElementById(id);if(!e)return;if(!entries.length){e.innerHTML='<div class="analytics-empty">Aucune donnée sur la période.</div>';return;}const max=Math.max(...entries.map(x=>x[1]))||1;e.innerHTML='<div class="analytics-bars">'+entries.map(x=>`<div class="analytics-bar-row"><div>${escapeHtml(x[0])}</div><div class="analytics-bar-track"><div class="analytics-bar-fill" style="width:${Math.max(2,x[1]/max*100).toFixed(1)}%"></div></div><div class="analytics-bar-value">${x[1]}</div></div>`).join('')+'</div>';}
   function analyticsCurveDayKey(r){
     const d=parseGristDate(r&&r._dateDuFait);if(!d)return '';
@@ -7778,7 +7785,7 @@ function nraSplitStructuredFactPaths(value, schoolYear){
     /* Population de référence connue. */
     etabByKey.forEach(function(row) {
       const cat = getEtabCategory(row);
-      if (data[cat]) data[cat].total++;
+      if (data[cat] && !isEtabClosed(row)) data[cat].total++;
     });
 
     const activeDetails = new Map();
@@ -7807,17 +7814,17 @@ function nraSplitStructuredFactPaths(value, schoolYear){
 
       if (data[cat]) {
         data[cat].facts++;
-        data[cat].active.add(key);
+        if (!isEtabClosed(etab)) data[cat].active.add(key);
       } else if (classification.degree === "second") {
         /* Cas 2nd degré non départageable collège/lycée :
            il contribue au total 2nd degré sans être inventé dans une sous-catégorie. */
         otherSecondFacts++;
-        otherSecondActive.add(key);
+        if (!isEtabClosed(etab)) otherSecondActive.add(key);
       } else {
-        unclassifiedActive.add(key);
+        if (!isEtabClosed(etab)) unclassifiedActive.add(key);
       }
 
-      if (!activeDetails.has(key)) {
+      if (!isEtabClosed(etab) && !activeDetails.has(key)) {
         activeDetails.set(key, {
           key:key,
           name:etab ? getEtabName(etab) : String(record[FIELD.ID_NOM] || "Établissement non renseigné").replace(/^\s*0\d{6}[A-Z]\s*[-–—:]?\s*/i,""),
@@ -7828,7 +7835,7 @@ function nraSplitStructuredFactPaths(value, schoolYear){
           outsideReference:!etab
         });
       }
-      activeDetails.get(key).facts++;
+      if (activeDetails.has(key)) activeDetails.get(key).facts++;
     });
 
     const totalFacts = weekFacts.length;
@@ -8185,7 +8192,7 @@ function nraSplitStructuredFactPaths(value, schoolYear){
       try{
         if(etabLoadState==='idle'||etabLoadState==='error')await loadEtabTableForWeeklyStats();
         froEstabs=etabRecords.slice();
-        const grouped=new Map();for(const e of froEstabs){const raw=froBassin(e),key=froNorm(raw);if(!key)continue;const g=grouped.get(key)||new Map();g.set(raw,(g.get(raw)||0)+1);grouped.set(key,g);}
+        const grouped=new Map();for(const e of froEstabs){if(isEtabClosed(e))continue;const raw=froBassin(e),key=froNorm(raw);if(!key)continue;const g=grouped.get(key)||new Map();g.set(raw,(g.get(raw)||0)+1);grouped.set(key,g);}
         froNetworkCanonical=new Map([...grouped].map(([key,variants])=>[key,[...variants].sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0],'fr'))[0][0]]));
         const networks=[...froNetworkCanonical.values()].sort((a,b)=>a.localeCompare(b,'fr',{sensitivity:'base'}));
         froEl('network').innerHTML=networks.map(x=>'<option value="'+froSafe(x)+'">'+froSafe(x)+'</option>').join('');
@@ -8206,11 +8213,13 @@ function nraSplitStructuredFactPaths(value, schoolYear){
     const network=froEl('network').value,from=froEl('start').value,to=froEl('end').value;
     const es=froEstabs.filter(e=>froNorm(froBassin(e))===froNorm(network)&&froDegree(e));
     const unique=new Map();es.forEach(e=>unique.set(String(getEtabUai(e)||e.id),e));
-    const etabs=[...unique.values()],validUais=new Set(etabs.map(e=>String(getEtabUai(e))));
+    const allEtabs=[...unique.values()];
+    const etabs=allEtabs.filter(e=>!isEtabClosed(e));
+    const validUais=new Set(allEtabs.map(e=>String(getEtabUai(e))));
     const facts=froFacts.filter(r=>{const date=froDate(r[FIELD.DATE_FAIT]);if(!date||date<from||date>to)return false;const e=froEstab(r);return e&&validUais.has(String(getEtabUai(e)));});
     const counts=new Map(),declarants=[new Set(),new Set()],att=[Array(7).fill(0),Array(7).fill(0)];
     let totals=[0,0],privates=[0,0];
-    facts.forEach(r=>{const e=froEstab(r);if(!e)return;const d=froDegree(e)==='1er'?0:1,u=String(getEtabUai(e));totals[d]++;if(froPrivate(e))privates[d]++;declarants[d].add(u);counts.set(u,(counts.get(u)||0)+1);froCategoriesOf(r).forEach(i=>{att[d][i]++;});});
+    facts.forEach(r=>{const e=froEstab(r);if(!e)return;const d=froDegree(e)==='1er'?0:1,u=String(getEtabUai(e));totals[d]++;if(froPrivate(e))privates[d]++;if(!isEtabClosed(e))declarants[d].add(u);counts.set(u,(counts.get(u)||0)+1);froCategoriesOf(r).forEach(i=>{att[d][i]++;});});
     const groups=[etabs.filter(e=>froDegree(e)==='1er'),etabs.filter(e=>froDegree(e)==='2nd')];
     const top=groups.map(arr=>arr.filter(e=>counts.has(String(getEtabUai(e)))).sort((a,b)=>(counts.get(String(getEtabUai(b)))||0)-(counts.get(String(getEtabUai(a)))||0)||getEtabName(a).localeCompare(getEtabName(b),'fr')).slice(0,10).map(e=>[getEtabName(e)+(getEtabCity(e)?', '+getEtabCity(e):''),counts.get(String(getEtabUai(e)))||0]));
     return {groups,top,totals,privates,declarants,att,all:facts.length,from,to,network};
