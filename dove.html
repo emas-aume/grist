@@ -1428,9 +1428,9 @@
 
   <!-- RÉDACTION LIBRE -->
   <section class="section bureau-panel hidden-panel" id="fro-section">
-    <div class="nra-header"><div><h2>FRO — Fiche de renseignement opérationnel</h2><p>Réseau pédagogique (Bassin), période et tableaux calculés automatiquement depuis les FE.</p></div></div>
+    <div class="nra-header"><div><h2>FRO — Fiche de renseignement opérationnel</h2><p>Réseau pédagogique (Bassin) ou arrondissement (Ville), période et tableaux calculés automatiquement depuis les FE.</p></div></div>
     <div class="fro-filters nra-controls">
-      <label>Réseau pédagogique<select id="fro-network" onchange="froChanged()"></select></label>
+      <label>Territoire (réseau ou arrondissement)<select id="fro-network" onchange="froChanged()"></select></label>
       <label>Année scolaire<select id="fro-year" onchange="froYearChanged()"><option value="FE26_27_2">2026–2027</option><option value="FE25_26">2025–2026</option><option value="FE24_25">2024–2025</option></select></label>
       <label>Période<select id="fro-period" onchange="froPeriodChanged()"><option value="week">Semaine</option><option value="month">Mois</option><option value="schoolyear">Depuis la rentrée</option><option value="custom">Dates personnalisées</option></select></label>
       <label id="fro-anchor-wrap">Semaine ou mois<select id="fro-anchor" onchange="froPeriodChanged()"></select></label>
@@ -8159,6 +8159,352 @@ function nraSplitStructuredFactPaths(value, schoolYear){
   let froNetworkCanonical=new Map();
   function froCanonicalNetwork(v){return froNetworkCanonical.get(froNorm(v))||String(v??'').trim();}
   function froBassin(e){for(const k of ['Bassin','bassin','BASSIN'])if(e[k]!=null&&String(e[k]).trim())return String(e[k]).trim();return '';}
+
+  // Communes extraites des trois listes d’arrondissements fournies.
+  // Marseillan est affectée uniquement à l’arrondissement de Béziers.
+  const froArrondissementCommunes = {
+    "Béziers": [
+        "Abeilhan",
+        "Marseillan",
+        "Espondeilhan",
+        "Adissan",
+        "Faugères",
+        "Agde",
+        "Ferrals-les-Montagnes",
+        "Agel",
+        "Ferrières-Poussarou",
+        "Aigne",
+        "Florensac",
+        "Aigues-Vives",
+        "Fontès",
+        "Les Aires",
+        "Fos",
+        "Alignan-du-Vent",
+        "Fouzilhon",
+        "Assignan",
+        "Fraisse-sur-Agout",
+        "Aumes",
+        "Félines-Minervois",
+        "Autignac",
+        "Gabian",
+        "Azillanet",
+        "Graissessac",
+        "Babeau-Bouldoux",
+        "Hérépian",
+        "Bassan",
+        "Lamalou-les-Bains",
+        "Beaufort",
+        "Laurens",
+        "Berlou",
+        "Lespignan",
+        "Bessan",
+        "Lieuran-Cabrières",
+        "Boisset",
+        "Lieuran-lès-Béziers",
+        "Boujan-sur-Libron",
+        "Lignan-sur-Orb",
+        "Bédarieux",
+        "La Livinière",
+        "Béziers",
+        "Lézignan-la-Cèbe",
+        "Cabrerolles",
+        "Magalas",
+        "Cabrières",
+        "Maraussan",
+        "Cambon-et-Salvergues",
+        "Margon",
+        "Camplong",
+        "Capestang",
+        "Maureilhan",
+        "Carlencas-et-Levas",
+        "Minerve",
+        "Cassagnoles",
+        "Mons",
+        "Castanet-le-Haut",
+        "Montady",
+        "Castelnau-de-Guers",
+        "Montagnac",
+        "La Caunette",
+        "Montblanc",
+        "Causses-et-Veyran",
+        "Montels",
+        "Caussiniojouls",
+        "Montesquieu",
+        "Caux",
+        "Montouliers",
+        "Cazedarnes",
+        "Murviel-lès-Béziers",
+        "Cazouls-d'Hérault",
+        "Neffiès",
+        "Cazouls-lès-Béziers",
+        "Nissan-lez-Enserune",
+        "Cers",
+        "Nizas",
+        "Cessenon-sur-Orb",
+        "Nézignan-l'Évêque",
+        "Cesseras",
+        "Olargues",
+        "Colombiers",
+        "Olonzac",
+        "Colombières-sur-Orb",
+        "Oupia",
+        "Combes",
+        "Pailhès",
+        "Corneilhan",
+        "Pardailhan",
+        "Coulobres",
+        "Pierrerue",
+        "Courniou",
+        "Pinet",
+        "Creissan",
+        "Poilhes",
+        "Cruzy",
+        "Pomérols",
+        "Cébazan",
+        "Portiragnes",
+        "Le Poujol-sur-Orb",
+        "Pouzolles",
+        "Le Pradal",
+        "Prades-sur-Vernazobre",
+        "Prémian",
+        "Puimisson",
+        "Puissalicon",
+        "Puisserguier",
+        "Péret",
+        "Pézenas",
+        "Pézènes-les-Mines",
+        "Quarante",
+        "Rieussec",
+        "Riols",
+        "Roquebrun",
+        "Roquessels",
+        "Rosis",
+        "Roujan",
+        "Saint-Chinian",
+        "Saint-Geniès-de-Fontedit",
+        "Saint-Geniès-de-Varensal",
+        "Saint-Gervais-sur-Mare",
+        "Saint-Jean-de-Minervois",
+        "Saint-Julien",
+        "Saint-Martin-de-l'Arçon",
+        "Saint-Nazaire-de-Ladarez",
+        "Saint-Pons-de-Mauchiens",
+        "Saint-Pons-de-Thomières",
+        "Saint-Thibéry",
+        "Saint-Vincent-d'Olargues",
+        "Saint-Étienne-Estréchoux",
+        "Saint-Étienne-d'Albagnan",
+        "La Salvetat-sur-Agout",
+        "Sauvian",
+        "Servian",
+        "Siran",
+        "Le Soulié",
+        "Sérignan",
+        "Taussac-la-Billière",
+        "Thézan-lès-Béziers",
+        "La Tour-sur-Orb",
+        "Tourbes",
+        "Usclas-d'Hérault",
+        "Vailhan",
+        "Valras-Plage",
+        "Valros",
+        "Vendres",
+        "Verreries-de-Moussans",
+        "Vias",
+        "Vieussan",
+        "Villemagne-l'Argentière",
+        "Villeneuve-lès-Béziers",
+        "Villespassans",
+        "Vélieux"
+    ],
+    "Montpellier": [
+        "BAILLARGUES",
+        "MONTBAZIN",
+        "BALARUC-LES-BAINS",
+        "MONTFERRIER-SUR-LEZ",
+        "BALARUC-LE-VIEUX",
+        "MONTPELLIER",
+        "BEAULIEU",
+        "MUDAISON",
+        "BOISSERON",
+        "MURVIEL-LES-MONTPELLIER",
+        "BOUZIGUES",
+        "PALAVAS-LES-FLOTS",
+        "CAMPAGNE",
+        "PEROLS",
+        "CANDILLARGUES",
+        "PIGNAN",
+        "CASTELNAU-LE-LEZ",
+        "POUSSAN",
+        "CASTRIES",
+        "PRADES-LE-LEZ",
+        "CLAPIERS",
+        "RESTINCLIERES",
+        "COURNONSEC",
+        "SAINT-AUNES",
+        "COURNONTERRAL",
+        "SAINT-BRES",
+        "LE CRES",
+        "SAINT-CHRISTOL",
+        "FABREGUES",
+        "SAINT-DREZERY",
+        "FRONTIGNAN",
+        "SAINT-GENIES-DES-MOURGUES",
+        "GALARGUES",
+        "SAINT-GEORGES-D'ORQUES",
+        "GARRIGUES",
+        "SAINT-JEAN-DE-VEDAS",
+        "GIGEAN",
+        "SAINT-JUST",
+        "GRABELS",
+        "SAINT-NAZAIRE-DE-PEZAN",
+        "JACOU",
+        "SAINT-SERIES",
+        "JUVIGNAC",
+        "SATURARGUES",
+        "LANSARGUES",
+        "SAUSSAN",
+        "LATTES",
+        "SAUSSINES",
+        "LAVERUNE",
+        "SETE",
+        "LOUPIAN",
+        "SUSSARGUES",
+        "LUNEL",
+        "VALERGUES",
+        "LUNEL-VIEL",
+        "VENDARGUES",
+        "VERARGUES",
+        "MARSILLARGUES",
+        "VIC-LA-GARDIOLE",
+        "MAUGUIO",
+        "VILLENEUVE-LES-MAGUELONE",
+        "MEZE",
+        "VILLETELLE",
+        "MIREVAL",
+        "VILLEVEYRAC",
+        "MONTAUD",
+        "LA GRANDE-MOTTE"
+    ],
+    "Lodève": [
+        "Agonès",
+        "Paulhan",
+        "Aniane",
+        "Pégairolles-de-Buèges",
+        "Arboras",
+        "Pégairolles-de-l'Escalette",
+        "Argelliers",
+        "Plaissan",
+        "Aspiran",
+        "Les Plans",
+        "Aumelas",
+        "Popian",
+        "Avène",
+        "Le Pouget",
+        "Bélarga",
+        "Poujols",
+        "La Boissière",
+        "Pouzols",
+        "Le Bosc",
+        "Le Puech",
+        "Le Bousquet-d'Orb",
+        "Puilacher",
+        "Brenas",
+        "Puéchabon",
+        "Brignac",
+        "Les Rives",
+        "Brissac",
+        "Romiguières",
+        "Campagnan",
+        "Roqueredonde",
+        "Canet",
+        "Rouet",
+        "Causse-de-la-Selle",
+        "Saint-André-de-Buèges",
+        "Le Caylar",
+        "Saint-André-de-Sangonis",
+        "Cazilhac",
+        "Saint-Bauzille-de-la-Sylve",
+        "Ceilhes-et-Rocozels",
+        "Saint-Bauzille-de-Putois",
+        "Celles",
+        "Saint-Étienne-de-Gourgas",
+        "Ceyras",
+        "Saint-Félix-de-Lodez",
+        "Clermont-l'Hérault",
+        "Saint-Félix-de-l'Héras",
+        "Le Cros",
+        "Saint-Guilhem-le-Désert",
+        "Dio-et-Valquières",
+        "Saint-Guiraud",
+        "Fozières",
+        "Saint-Jean-de-Buèges",
+        "Ganges",
+        "Saint-Jean-de-Fos",
+        "Gignac",
+        "Saint-Jean-de-la-Blaquière",
+        "Gorniès",
+        "Saint-Martin-de-Londres",
+        "Joncels",
+        "Saint-Maurice-Navacelles",
+        "Jonquières",
+        "Saint-Michel",
+        "Lacoste",
+        "Saint-Pargoire",
+        "Lagamas",
+        "Saint-Paul-et-Valmalle",
+        "Laroque",
+        "Saint-Pierre-de-la-Fage",
+        "Lauroux",
+        "Saint-Privat",
+        "Lavalette",
+        "Saint-Saturnin-de-Lucian",
+        "Liausson",
+        "Salasc",
+        "Lodève",
+        "Sorbs",
+        "Lunas",
+        "Soubès",
+        "Mas-de-Londres",
+        "Soumont",
+        "Mérifons",
+        "Tressan",
+        "Montarnaud",
+        "Usclas-du-Bosc",
+        "Montoulieu",
+        "La Vacquerie-et-Saint-Martin-de-Castries",
+        "Montpeyroux",
+        "Valmascle",
+        "Moulès-et-Baucels",
+        "Vendémian",
+        "Mourèze",
+        "Villeneuvette",
+        "Nébian",
+        "Viols-en-Laval",
+        "Notre-Dame-de-Londres",
+        "Viols-le-Fort",
+        "Octon",
+        "Olmet-et-Villecun"
+    ]
+};
+  // Cle de comparaison commune : insensible a la casse, aux accents, aux espaces,
+  // aux apostrophes, aux tirets et aux signes de ponctuation. Les codes postaux
+  // eventuels et les mentions CEDEX sont ignores, sans rapprochement approximatif.
+  function froCommuneKey(value){
+    let name=String(value??'').normalize('NFKD')
+      .replace(/[\u0300-\u036f]/g,'')
+      .replace(/œ/gi,'oe').replace(/æ/gi,'ae').replace(/ß/g,'ss')
+      .toLowerCase().replace(/\u00a0|\u202f/g,' ')
+      .replace(/\b(?:cedex|bp)\b.*$/i,'')
+      .replace(/\b\d{5}\b/g,' ')
+      .replace(/[^a-z0-9]/g,'');
+    return name;
+  }
+  const froArrondissementByCity = new Map(Object.entries(froArrondissementCommunes).flatMap(([name,cities])=>cities.map(city=>[froCommuneKey(city),name])));
+  function froArrondissementOf(e){return froArrondissementByCity.get(froCommuneKey(getEtabCity(e)))||'';}
+  function froIsArrondissement(value){return String(value||'').startsWith('ARRONDISSEMENT::');}
+  function froTerritoryName(value){return froIsArrondissement(value)?'Arrondissement de '+value.slice('ARRONDISSEMENT::'.length):'Réseau pédagogique de '+value;}
+  function froMatchesTerritory(e,value){return froIsArrondissement(value)?froArrondissementOf(e)===value.slice('ARRONDISSEMENT::'.length):froNorm(froBassin(e))===froNorm(value);}
   function froDegree(e){const c=getEtabCategory(e);return c==='first'?'1er':c==='college'||c==='lycee'?'2nd':'';}
   function froPrivate(e){const s=froNorm([e.Secteur,e.secteur,e.Statut,e.statut,e.Public_prive,e.Type_etablissement].filter(Boolean).join(' '));return s.includes('prive');}
   function froEstab(r){const v=r[FIELD.UAI];if(v!=null&&/^\d+$/.test(String(v).trim())){const e=etabByRowId.get(Number(v));if(e)return e;}const u=extractUai(v);return u?etabByUai.get(u)||null:null;}
@@ -8188,30 +8534,31 @@ function nraSplitStructuredFactPaths(value, schoolYear){
   }
   async function froInit(){
     if(!froReady){
-      froMsg('Chargement des établissements et des réseaux pédagogiques…');
+      froMsg('Chargement des établissements et des territoires…');
       try{
         if(etabLoadState==='idle'||etabLoadState==='error')await loadEtabTableForWeeklyStats();
         froEstabs=etabRecords.slice();
         const grouped=new Map();for(const e of froEstabs){if(isEtabClosed(e))continue;const raw=froBassin(e),key=froNorm(raw);if(!key)continue;const g=grouped.get(key)||new Map();g.set(raw,(g.get(raw)||0)+1);grouped.set(key,g);}
         froNetworkCanonical=new Map([...grouped].map(([key,variants])=>[key,[...variants].sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0],'fr'))[0][0]]));
         const networks=[...froNetworkCanonical.values()].sort((a,b)=>a.localeCompare(b,'fr',{sensitivity:'base'}));
-        froEl('network').innerHTML=networks.map(x=>'<option value="'+froSafe(x)+'">'+froSafe(x)+'</option>').join('');
+        const arrondissements=Object.keys(froArrondissementCommunes).map(x=>'ARRONDISSEMENT::'+x);
+        froEl('network').innerHTML='<optgroup label="Réseaux pédagogiques">'+networks.map(x=>'<option value="'+froSafe(x)+'">'+froSafe(x)+'</option>').join('')+'</optgroup><optgroup label="Arrondissements">'+arrondissements.map(x=>'<option value="'+froSafe(x)+'">'+froSafe(froTerritoryName(x))+'</option>').join('')+'</optgroup>'; 
         froReady=true;froAnchors();
       }catch(e){froMsg('Impossible de charger ETABLISSEMENTS : '+e.message);return;}
     }
-    await froRefresh();froMsg('Choisissez un réseau et une période, puis cliquez sur « Calculer les tableaux ».');
+    await froRefresh();froMsg('Choisissez un territoire et une période, puis cliquez sur « Calculer les tableaux ».');
   }
-  async function froRefresh(){try{froRows=tableDataToRows(await grist.docApi.fetchTable(froTable));froEl('drafts').innerHTML='<option value="">Nouveau brouillon</option>'+froRows.slice().sort((a,b)=>Number(b.Date_modification||0)-Number(a.Date_modification||0)).map(r=>'<option value="'+r.id+'">'+froSafe(r.Titre||'Sans titre')+' — '+froSafe(r.Reseau||'')+'</option>').join('');if(froId)froEl('drafts').value=String(froId);froMsg('Brouillons Grist disponibles.');}catch(e){froMsg('Table FRO_BROUILLONS inaccessible : importez le modèle Excel dans Grist. '+e.message);}}
+  async function froRefresh(){try{froRows=tableDataToRows(await grist.docApi.fetchTable(froTable));froEl('drafts').innerHTML='<option value="">Nouveau brouillon</option>'+froRows.slice().sort((a,b)=>Number(b.Date_modification||0)-Number(a.Date_modification||0)).map(r=>'<option value="'+r.id+'">'+froSafe(r.Titre||'Sans titre')+' — '+froSafe(froTerritoryName(r.Reseau||''))+'</option>').join('');if(froId)froEl('drafts').value=String(froId);froMsg('Brouillons Grist disponibles.');}catch(e){froMsg('Table FRO_BROUILLONS inaccessible : importez le modèle Excel dans Grist. '+e.message);}}
   function froSnapshot(){return JSON.stringify({title:froEl('title').value,network:froEl('network').value,year:froEl('year').value,period:froEl('period').value,start:froEl('start').value,end:froEl('end').value,html:froEl('editor').innerHTML});}
   function froNew(){if(froDirty&&!confirm('Abandonner les modifications non enregistrées ?'))return;froId=null;froEl('drafts').value='';froEl('title').value='Fiche de renseignement d’ambiance';froEl('editor').innerHTML='<p></p>';froDirty=false;froOriginal=froSnapshot();froChanged();froDirty=false;froMsg('Nouvelle FRO : calcul à lancer manuellement.');}
-  function froLoadDraft(){const id=Number(froEl('drafts').value);if(froDirty&&!confirm('Abandonner les modifications non enregistrées ?')){froEl('drafts').value=froId||'';return;}const r=froRows.find(x=>x.id===id);if(!r){froId=null;froDirty=false;return;}froId=r.id;froEl('title').value=r.Titre||'';froEl('network').value=froCanonicalNetwork(r.Reseau||'');froEl('year').value=r.Annee_scolaire||'FE26_27_2';froEl('period').value=r.Type_periode||'custom';froAnchors();froEl('start').value=r.Date_debut||'';froEl('end').value=r.Date_fin||'';froEl('editor').innerHTML=froClean(r.Contenu_HTML||'');froDirty=false;froOriginal=froSnapshot();froChanged();froDirty=false;froMsg('Brouillon chargé : cliquez sur « Calculer les tableaux ».');}
+  function froLoadDraft(){const id=Number(froEl('drafts').value);if(froDirty&&!confirm('Abandonner les modifications non enregistrées ?')){froEl('drafts').value=froId||'';return;}const r=froRows.find(x=>x.id===id);if(!r){froId=null;froDirty=false;return;}froId=r.id;froEl('title').value=r.Titre||'';froEl('network').value=froIsArrondissement(r.Reseau)?r.Reseau:froCanonicalNetwork(r.Reseau||'');froEl('year').value=r.Annee_scolaire||'FE26_27_2';froEl('period').value=r.Type_periode||'custom';froAnchors();froEl('start').value=r.Date_debut||'';froEl('end').value=r.Date_fin||'';froEl('editor').innerHTML=froClean(r.Contenu_HTML||'');froDirty=false;froOriginal=froSnapshot();froChanged();froDirty=false;froMsg('Brouillon chargé : cliquez sur « Calculer les tableaux ».');}
   function froClean(html){const t=document.createElement('template');t.innerHTML=String(html||'');const allowed=new Set(['P','DIV','BR','B','STRONG','I','EM','U']);function visit(root){for(const n of [...root.childNodes]){if(n.nodeType===8){n.remove();continue;}if(n.nodeType!==1)continue;if(['SCRIPT','STYLE','IFRAME','OBJECT','SVG','IMG'].includes(n.tagName)){n.remove();continue;}visit(n);if(!allowed.has(n.tagName)){n.replaceWith(...n.childNodes);continue;}for(const a of [...n.attributes])n.removeAttribute(a.name);}}visit(t.content);return t.innerHTML;}
   function froKeepSelection(ev){if(!ev.target.closest('button'))return;const s=window.getSelection(),ed=froEl('editor');if(s&&s.rangeCount&&ed.contains(s.anchorNode)&&ed.contains(s.focusNode))froSelection=s.getRangeAt(0).cloneRange();ev.preventDefault();}
   function froFormat(cmd){const ed=froEl('editor'),s=window.getSelection();ed.focus();if(froSelection&&ed.contains(froSelection.startContainer)){s.removeAllRanges();s.addRange(froSelection);}document.execCommand(cmd,false,null);froSelection=null;froDirty=true;}
-  async function froSave(){if(froBusy)return;const network=froEl('network').value,from=froEl('start').value,to=froEl('end').value;if(!network||!from||!to||from>to){froMsg('Choisissez un réseau et des dates valides.');return;}froBusy=true;try{const now=Math.floor(Date.now()/1000),row=froRows.find(r=>r.id===froId);if(row&&froOriginal!==froSnapshot()&&Number(row.Date_modification||0)>0){const latest=tableDataToRows(await grist.docApi.fetchTable(froTable)).find(r=>r.id===froId);if(latest&&Number(latest.Date_modification||0)!==Number(row.Date_modification||0))throw Error('Le brouillon a été modifié ailleurs. Rechargez-le.');}const fields={Titre:froEl('title').value.trim()||'FRO',Reseau:network,Annee_scolaire:froEl('year').value,Type_periode:froEl('period').value,Date_debut:from,Date_fin:to,Contenu_HTML:froClean(froEl('editor').innerHTML),Date_modification:now};if(!row)fields.Date_creation=now;const result=await grist.docApi.applyUserActions([[row?'UpdateRecord':'AddRecord',froTable,row?row.id:null,fields]]);froDirty=false;const oldId=froId;await froRefresh();froId=oldId||(Array.isArray(result)&&Number.isInteger(result[0])?result[0]:null);if(!froId){const match=froRows.filter(r=>r.Titre===fields.Titre&&r.Reseau===fields.Reseau&&r.Date_modification===now).sort((a,b)=>b.id-a.id)[0];if(match)froId=match.id;}froEl('drafts').value=froId||'';froOriginal=froSnapshot();froMsg('Brouillon FRO enregistré.');}catch(e){froMsg('Erreur d’enregistrement : '+e.message);}finally{froBusy=false;}}
+  async function froSave(){if(froBusy)return;const network=froEl('network').value,from=froEl('start').value,to=froEl('end').value;if(!network||!from||!to||from>to){froMsg('Choisissez un territoire et des dates valides.');return;}froBusy=true;try{const now=Math.floor(Date.now()/1000),row=froRows.find(r=>r.id===froId);if(row&&froOriginal!==froSnapshot()&&Number(row.Date_modification||0)>0){const latest=tableDataToRows(await grist.docApi.fetchTable(froTable)).find(r=>r.id===froId);if(latest&&Number(latest.Date_modification||0)!==Number(row.Date_modification||0))throw Error('Le brouillon a été modifié ailleurs. Rechargez-le.');}const fields={Titre:froEl('title').value.trim()||'FRO',Reseau:network,Annee_scolaire:froEl('year').value,Type_periode:froEl('period').value,Date_debut:from,Date_fin:to,Contenu_HTML:froClean(froEl('editor').innerHTML),Date_modification:now};if(!row)fields.Date_creation=now;const result=await grist.docApi.applyUserActions([[row?'UpdateRecord':'AddRecord',froTable,row?row.id:null,fields]]);froDirty=false;const oldId=froId;await froRefresh();froId=oldId||(Array.isArray(result)&&Number.isInteger(result[0])?result[0]:null);if(!froId){const match=froRows.filter(r=>r.Titre===fields.Titre&&r.Reseau===fields.Reseau&&r.Date_modification===now).sort((a,b)=>b.id-a.id)[0];if(match)froId=match.id;}froEl('drafts').value=froId||'';froOriginal=froSnapshot();froMsg('Brouillon FRO enregistré.');}catch(e){froMsg('Erreur d’enregistrement : '+e.message);}finally{froBusy=false;}}
   function froStats(){
     const network=froEl('network').value,from=froEl('start').value,to=froEl('end').value;
-    const es=froEstabs.filter(e=>froNorm(froBassin(e))===froNorm(network)&&froDegree(e));
+    const es=froEstabs.filter(e=>froMatchesTerritory(e,network)&&froDegree(e));
     const unique=new Map();es.forEach(e=>unique.set(String(getEtabUai(e)||e.id),e));
     const allEtabs=[...unique.values()];
     const etabs=allEtabs.filter(e=>!isEtabClosed(e));
@@ -8225,7 +8572,7 @@ function nraSplitStructuredFactPaths(value, schoolYear){
     return {groups,top,totals,privates,declarants,att,all:facts.length,from,to,network};
   }
   function froTableHtml(title,headers,rows){return '<h3>'+froSafe(title)+'</h3><table><thead><tr>'+headers.map(h=>'<th>'+froSafe(h)+'</th>').join('')+'</tr></thead><tbody>'+rows.map(row=>'<tr>'+row.map((v,i)=>'<td'+(i?' class="fro-right"':'')+'>'+froSafe(v)+'</td>').join('')+'</tr>').join('')+'</tbody></table>';}
-  function froTables(s){const n=s.groups.map(x=>x.length),np=s.groups.map(x=>x.filter(froPrivate).length),fmt=(a,b)=>a+' dont '+b+' privés';let h=froTableHtml('Tableau 1 : Nombre d’établissements/écoles du réseau de '+s.network,['Établissements / Écoles','Nombre'],[['1er degré',fmt(n[0],np[0])],['2nd degré',fmt(n[1],np[1])],['Total',fmt(n[0]+n[1],np[0]+np[1])]]);h+=froTableHtml('Tableau 2 : Nombre de FE par établissements/écoles',['Établissements / Écoles','Nombre de faits'],[['Total 1er degré',fmt(s.totals[0],s.privates[0])],['Total 2nd degré',fmt(s.totals[1],s.privates[1])],['Total général',fmt(s.all,s.privates[0]+s.privates[1])]]);h+='<p class="fro-note">'+s.declarants[0].size+' écoles sur '+n[0]+' ('+(n[0]?(100*s.declarants[0].size/n[0]).toFixed(2):'0')+' %) et '+s.declarants[1].size+' établissements sur '+n[1]+' ('+(n[1]?(100*s.declarants[1].size/n[1]).toFixed(2):'0')+' %) du 2nd degré ont établi au moins un FE.</p>';h+=froTableHtml('Tableau 3 : Établissements les plus représentés — 1er degré',['1er degré','Nombre de faits'],s.top[0].length?s.top[0]:[['Aucun établissement déclarant',0]]);h+=froTableHtml('Tableau 3 (suite) : Établissements les plus représentés — 2nd degré',['2nd degré','Nombre de faits'],s.top[1].length?s.top[1]:[['Aucun établissement déclarant',0]]);h+=froTableHtml('Tableau 4 : Nombre d’atteintes/violences par établissements/écoles',['Établissements / Écoles','AP','AB','ACS','VP','VV','VS','Harcèlement'],[['1er degré',...s.att[0]],['2nd degré',...s.att[1]],['Total général',...s.att[0].map((x,i)=>x+s.att[1][i])]]);h+='<p class="fro-note">AP : atteintes aux personnes ; AB : atteintes aux biens ; ACS : atteintes à la sécurité ; VP : violences physiques ; VV : violences verbales ; VS : violences sexuelles. Un même FE peut relever de plusieurs catégories.</p>';return h;}
+  function froTables(s){const n=s.groups.map(x=>x.length),np=s.groups.map(x=>x.filter(froPrivate).length),fmt=(a,b)=>a+' dont '+b+' privés';let h=froTableHtml('Tableau 1 : Nombre d’établissements/écoles — '+froTerritoryName(s.network),['Établissements / Écoles','Nombre'],[['1er degré',fmt(n[0],np[0])],['2nd degré',fmt(n[1],np[1])],['Total',fmt(n[0]+n[1],np[0]+np[1])]]);h+=froTableHtml('Tableau 2 : Nombre de FE par établissements/écoles',['Établissements / Écoles','Nombre de faits'],[['Total 1er degré',fmt(s.totals[0],s.privates[0])],['Total 2nd degré',fmt(s.totals[1],s.privates[1])],['Total général',fmt(s.all,s.privates[0]+s.privates[1])]]);h+='<p class="fro-note">'+s.declarants[0].size+' écoles sur '+n[0]+' ('+(n[0]?(100*s.declarants[0].size/n[0]).toFixed(2):'0')+' %) et '+s.declarants[1].size+' établissements sur '+n[1]+' ('+(n[1]?(100*s.declarants[1].size/n[1]).toFixed(2):'0')+' %) du 2nd degré ont établi au moins un FE.</p>';h+=froTableHtml('Tableau 3 : Établissements les plus représentés — 1er degré',['1er degré','Nombre de faits'],s.top[0].length?s.top[0]:[['Aucun établissement déclarant',0]]);h+=froTableHtml('Tableau 3 (suite) : Établissements les plus représentés — 2nd degré',['2nd degré','Nombre de faits'],s.top[1].length?s.top[1]:[['Aucun établissement déclarant',0]]);h+=froTableHtml('Tableau 4 : Nombre d’atteintes/violences par établissements/écoles',['Établissements / Écoles','AP','AB','ACS','VP','VV','VS','Harcèlement'],[['1er degré',...s.att[0]],['2nd degré',...s.att[1]],['Total général',...s.att[0].map((x,i)=>x+s.att[1][i])]]);h+='<p class="fro-note">AP : atteintes aux personnes ; AB : atteintes aux biens ; ACS : atteintes à la sécurité ; VP : violences physiques ; VV : violences verbales ; VS : violences sexuelles. Un même FE peut relever de plusieurs catégories.</p>';return h;}
   /* Comparaison FRO : même décalage depuis la rentrée de chaque année, catégories structurées. */
   const froYears=['FE24_25','FE25_26','FE26_27_2'];
   const froYearNames=['2024-2025','2025-2026','2026-2027'];
@@ -8273,7 +8620,7 @@ function nraSplitStructuredFactPaths(value, schoolYear){
     return froPeriodCache.get(key);
   }
   async function froComparison(network,from,to){
-    const permitted=new Set(froEstabs.filter(e=>froNorm(froBassin(e))===froNorm(network)).map(e=>String(getEtabUai(e))));
+    const permitted=new Set(froEstabs.filter(e=>froMatchesTerritory(e,network)).map(e=>String(getEtabUai(e))));
     const results=await Promise.all(froYears.map(async year=>{
       const a=froShiftDate(from,year),b=froShiftDate(to,year);
       const rows=await froFetchPeriod(year,a,b),cats=Array(7).fill(0);let count=0;
@@ -8438,7 +8785,7 @@ function nraSplitStructuredFactPaths(value, schoolYear){
     };
     try{
       write(froEl('title').value||'Fiche de renseignement opérationnel',16,true,2,ink);
-      write(('Réseau pédagogique de '+s.network+'.').toLocaleUpperCase('fr-FR'),9,false,1);
+      write((froTerritoryName(s.network)+'.').toLocaleUpperCase('fr-FR'),9,false,1);
       write(('La période étudiée s’étend du '+dateFR(s.from)+' au '+dateFR(s.to)+'.').toLocaleUpperCase('fr-FR'),8.5,false,5);
       const holder=document.createElement('div');
       holder.innerHTML=froClean(froEl('editor').innerHTML);
@@ -8448,7 +8795,7 @@ function nraSplitStructuredFactPaths(value, schoolYear){
       }
       const n=s.groups.map(a=>a.length),np=s.groups.map(a=>a.filter(froPrivate).length);
       const fmt=(a,b)=>a+' dont '+b+' privés';
-      heading('Nombre d’établissements du réseau de '+s.network);
+      heading('Nombre d’établissements — '+froTerritoryName(s.network));
       table(['Établissements','Nombre'],[
         ['1er degré',fmt(n[0],np[0])],['2nd degré',fmt(n[1],np[1])],
         ['Total',fmt(n[0]+n[1],np[0]+np[1])]
