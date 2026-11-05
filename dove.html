@@ -8746,7 +8746,7 @@ function nraSplitStructuredFactPaths(value, schoolYear){
     };
     // Même logique visuelle que les tableaux « Opérations cartables » du NRA :
     // en-têtes colorés, filets discrets, nombres centrés, lignes de total mises en valeur.
-    const table=(headers,rows)=>{
+    const table=(headers,rows,{highlightCurrentYear=false}={})=>{
       const n=headers.length;
       const widths=n===2?[CW-43,43]:[n===8?47:51,...Array(n-1).fill((CW-(n===8?47:51))/(n-1))];
       const numeric=(value,i)=>i>0 && /^[-+]?[\d\s.,]+(?:\s*%|\s+dont\s+\d+\s+privés)?$/.test(String(value??'').trim());
@@ -8766,7 +8766,7 @@ function nraSplitStructuredFactPaths(value, schoolYear){
           if(header||shade)pdf.rect(x,y,widths[i],h,'FD');
           else pdf.rect(x,y,widths[i],h,'S');
           const size=n>=8?7:8;
-          font(size,header);
+          font(size,header||(highlightCurrentYear&&i>0&&headers[i]==='2026-2027'));
           const centered=header||numeric(value,i)||(i>0&&n>=4);
           const xx=centered?x+widths[i]/2:x+2;
           lines.forEach((part,k)=>pdf.text(part,xx,y+3.8+k*3.4,centered?{align:'center'}:undefined));
@@ -8806,8 +8806,10 @@ function nraSplitStructuredFactPaths(value, schoolYear){
         ['Total 2nd degré',fmt(s.totals[1],s.privates[1])],
         ['Total général',fmt(s.all,s.privates[0]+s.privates[1])]
       ]);
-      write(s.declarants[0].size+' écoles sur '+n[0]+' et '+s.declarants[1].size+
-        ' établissements sur '+n[1]+' du 2nd degré ont déclaré au moins un FE.',8,false,3);
+      const declarantPct=(count,total)=>total?((count/total)*100).toLocaleString('fr-FR',{maximumFractionDigits:1})+' %':'0 %';
+      write(s.declarants[0].size+' écoles sur '+n[0]+' ('+declarantPct(s.declarants[0].size,n[0])+') et '+
+        s.declarants[1].size+' établissements du second degré sur '+n[1]+' ('+
+        declarantPct(s.declarants[1].size,n[1])+') ont déclaré au moins un FE.',8,true,3);
       heading('Établissements les plus représentés — 1er degré');
       table(['1er degré','Nombre de faits'],s.top[0].length?s.top[0]:[['Aucun',0]]);
       heading('Établissements les plus représentés — 2nd degré');
@@ -8824,12 +8826,12 @@ function nraSplitStructuredFactPaths(value, schoolYear){
           ['Nombre de FE',...froCompareData.map(x=>x.count)],
           ['Variation','—',...froCompareData.slice(1).map((x,i)=>froCompareData[i].count?
             (((x.count-froCompareData[i].count)/froCompareData[i].count)*100).toFixed(1)+' %':'n.c.')]
-        ]);
+        ],{highlightCurrentYear:true});
         write('Périodes alignées depuis la rentrée : '+froCompareData.map((x,i)=>
           froYearNames[i]+' ('+dateFR(x.from)+' au '+dateFR(x.to)+')').join(' ; '),7,false,3);
         heading('Comparaison des atteintes sur trois années');
         table(['Atteinte',...froYearNames],froCategories.map((label,i)=>
-          [label,...froCompareData.map(x=>x.cats[i])]));
+          [label,...froCompareData.map(x=>x.cats[i])]),{highlightCurrentYear:true});
       }
       // FRO : pied de page historique, sans séparateur ni filigrane.
       // Même mention discrète en haut à droite, sur chaque page.
