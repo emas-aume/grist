@@ -8161,11 +8161,10 @@ function nraSplitStructuredFactPaths(value, schoolYear){
   function froBassin(e){for(const k of ['Bassin','bassin','BASSIN'])if(e[k]!=null&&String(e[k]).trim())return String(e[k]).trim();return '';}
 
   // Communes extraites des trois listes d’arrondissements fournies.
-  // Marseillan est affectée uniquement à l’arrondissement de Béziers.
+  // Marseillan est affectée uniquement à l’arrondissement de Montpellier.
   const froArrondissementCommunes = {
     "Béziers": [
         "Abeilhan",
-        "Marseillan",
         "Espondeilhan",
         "Adissan",
         "Faugères",
@@ -8318,6 +8317,7 @@ function nraSplitStructuredFactPaths(value, schoolYear){
         "Vélieux"
     ],
     "Montpellier": [
+        "Marseillan",
         "BAILLARGUES",
         "MONTBAZIN",
         "BALARUC-LES-BAINS",
