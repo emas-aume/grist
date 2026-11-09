@@ -1112,6 +1112,15 @@
 #fro-section .fro-filters :is(select,input):focus,#fro-section .fro-actions select:focus,#fro-section #fro-editor:focus{outline:2px solid #9cbbf8;outline-offset:1px}
 @media(max-width:720px){#fro-section .fro-document{padding:14px}#fro-section .fro-filters label{flex:1 1 180px}}
 
+
+.fro-pdf-options{border:1px solid #cbd5e1;border-radius:6px;padding:12px 16px;margin:12px 0;color:#263c60}
+.fro-pdf-options legend{font-size:13px;font-weight:700;padding:0 6px}
+.fro-pdf-options p{font-size:12px;margin:2px 0 10px}
+.fro-pdf-options-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:9px 16px}
+.fro-pdf-options-grid label{font-size:12px;display:flex;align-items:center;gap:7px;cursor:pointer}
+.fro-pdf-options-grid input{accent-color:#203f70}
+.fro-top-count{display:flex;align-items:center;gap:12px;flex-wrap:wrap;font-size:12px;font-weight:600;margin-top:13px}
+.fro-top-count select{padding:6px;border:1px solid #cbd5e1;border-radius:4px;background:white}
 </style>
 
 </head>
@@ -1438,6 +1447,21 @@
       <label>Au<input id="fro-end" type="date" onchange="froDateChanged()"></label>
     </div>
     <div class="fro-actions nra-controls"><label>Brouillons<select id="fro-drafts" onchange="froLoadDraft()"><option value="">Nouveau brouillon</option></select></label><button type="button" onclick="froNew()">Nouvelle FRO</button><button type="button" onclick="froSave()">Enregistrer brouillon FRO</button><button type="button" onclick="froExportPdf()">Exporter PDF</button><button type="button" id="fro-generate" onclick="froRender()">Calculer les tableaux</button></div>
+    <fieldset class="fro-pdf-options"><legend>Tableaux à inclure dans le PDF</legend>
+      <p>Décochez les tableaux inutiles pour une FRO synthétique. Les calculs restent disponibles.</p>
+      <div class="fro-pdf-options-grid">
+        <label><input type="checkbox" data-fro-table="estabs" checked onchange="froOptionsChanged()"> Nombre d’établissements</label>
+        <label><input type="checkbox" data-fro-table="facts" checked onchange="froOptionsChanged()"> Nombre de FE par degré et établissements déclarants</label>
+        <label><input type="checkbox" data-fro-table="top1" checked onchange="froOptionsChanged()"> Établissements les plus représentés — 1er degré</label>
+        <label><input type="checkbox" data-fro-table="top2" checked onchange="froOptionsChanged()"> Établissements les plus représentés — 2nd degré</label>
+        <label><input type="checkbox" data-fro-table="att" checked onchange="froOptionsChanged()"> Nombre d’atteintes et violences</label>
+        <label><input type="checkbox" data-fro-table="compareFacts" checked onchange="froOptionsChanged()"> Comparaison des FE sur trois années</label>
+        <label><input type="checkbox" data-fro-table="compareAtt" checked onchange="froOptionsChanged()"> Comparaison des atteintes sur trois années</label>
+      </div>
+      <label class="fro-top-count">Nombre maximal d’établissements affichés dans chaque classement (1er et 2nd degré)
+        <select id="fro-top-count" onchange="froOptionsChanged()"><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="10" selected>10</option></select>
+      </label>
+    </fieldset>
     <div class="fro-document nra-document"><label class="fro-title">Titre<input id="fro-title" value="Fiche de renseignement opérationnel" oninput="froDirty=true"></label>
     <div class="fro-toolbar" onmousedown="froKeepSelection(event)"><button type="button" onclick="froFormat('bold')"><b>G</b></button><button type="button" onclick="froFormat('italic')"><i>I</i></button><button type="button" onclick="froFormat('underline')"><u>S</u></button></div>
     <div id="fro-editor" class="redaction-editor" contenteditable="true" spellcheck="true" oninput="froDirty=true" role="textbox" aria-multiline="true"><p></p></div>
@@ -2180,7 +2204,7 @@ function nraSplitStructuredFactPaths(value, schoolYear){
     const period=document.getElementById("nra-period").textContent;
     const iso=String(getISOWeekInfo(nraMonday(nraWeek)).week).padStart(2,"0");
     // Page 1 — contenu éditorial, sans coupure ni marqueur « […] ».
-    let y=title("Synthèse – État des signalements et mobilisation des EMAS",19,12);
+    let y=title("NRA S°"+iso+" – Année 2026/2027",19,12);
     y=write("Semaine "+iso+" — "+period,margin,y+2,9);
     y=title("Contexte général :",y+6);
     const example="Exemple de mise en page (à remplacer) : La semaine considérée fait apparaître des situations contrastées dans les établissements de l'académie. Les signalements nécessitent une lecture différenciée selon les territoires, les degrés d'enseignement et la nature des atteintes. Les EMAS assurent quotidiennement le renseignement et l'appui sur le terrain, en lien avec les services compétents.";
@@ -8572,6 +8596,50 @@ function nraSplitStructuredFactPaths(value, schoolYear){
     return {groups,top,totals,privates,declarants,att,all:facts.length,from,to,network};
   }
   function froTableHtml(title,headers,rows){return '<h3>'+froSafe(title)+'</h3><table><thead><tr>'+headers.map(h=>'<th>'+froSafe(h)+'</th>').join('')+'</tr></thead><tbody>'+rows.map(row=>'<tr>'+row.map((v,i)=>'<td'+(i?' class="fro-right"':'')+'>'+froSafe(v)+'</td>').join('')+'</tr>').join('')+'</tbody></table>';}
+  const froPdfTableKeys=['estabs','facts','top1','top2','att','compareFacts','compareAtt'];
+  function froPdfSelected(key){
+    const box=document.querySelector('#fro-section [data-fro-table="'+key+'"]');
+    return !box||box.checked;
+  }
+  function froPdfTopCount(){
+    const v=Number(document.getElementById('fro-top-count')?.value||10);
+    return Number.isInteger(v)?Math.max(3,Math.min(10,v)):10;
+  }
+  function froOptionsChanged(){
+    froDirty=true;
+    froApplyPreviewSelection();
+  }
+  function froApplyPreviewSelection(){
+    const root=froEl('preview');
+    if(!root)return;
+    const headings=[...root.querySelectorAll('h3')];
+    const sections=[
+      ['estabs',/^Tableau 1 :/],['facts',/^Tableau 2 :/],
+      ['top1',/^Tableau 3 :/],['top2',/^Tableau 3 \(suite\) :/],
+      ['att',/^Tableau 4 :/],['compareFacts',/^Tableau 5 :/],
+      ['compareAtt',/^Tableau 6 :/]
+    ];
+    for(const h of headings){
+      const entry=sections.find(([key,re])=>re.test(h.textContent.trim()));
+      if(!entry)continue;
+      const show=froPdfSelected(entry[0]);
+      let node=h;
+      while(node&&(!node.nextElementSibling||node===h||node.tagName!=='H3')){
+        const next=node.nextElementSibling;
+        node.style.display=show?'':'none';
+        if(!next||next.tagName==='H3')break;
+        node=next;
+      }
+    }
+    const count=froPdfTopCount();
+    for(const [key,re] of [['top1',/^Tableau 3 :/],['top2',/^Tableau 3 \(suite\) :/]]){
+      const h=headings.find(e=>re.test(e.textContent.trim()));
+      const table=h?.nextElementSibling;
+      if(table?.tagName==='TABLE'){
+        [...table.querySelectorAll('tbody tr')].forEach((tr,i)=>{tr.style.display=i<count?'':'none';});
+      }
+    }
+  }
   function froTables(s){const n=s.groups.map(x=>x.length),np=s.groups.map(x=>x.filter(froPrivate).length),fmt=(a,b)=>a+' dont '+b+' privés';let h=froTableHtml('Tableau 1 : Nombre d’établissements/écoles — '+froTerritoryName(s.network),['Établissements / Écoles','Nombre'],[['1er degré',fmt(n[0],np[0])],['2nd degré',fmt(n[1],np[1])],['Total',fmt(n[0]+n[1],np[0]+np[1])]]);h+=froTableHtml('Tableau 2 : Nombre de FE par établissements/écoles',['Établissements / Écoles','Nombre de faits'],[['Total 1er degré',fmt(s.totals[0],s.privates[0])],['Total 2nd degré',fmt(s.totals[1],s.privates[1])],['Total général',fmt(s.all,s.privates[0]+s.privates[1])]]);h+='<p class="fro-note">'+s.declarants[0].size+' écoles sur '+n[0]+' ('+(n[0]?(100*s.declarants[0].size/n[0]).toFixed(2):'0')+' %) et '+s.declarants[1].size+' établissements sur '+n[1]+' ('+(n[1]?(100*s.declarants[1].size/n[1]).toFixed(2):'0')+' %) du 2nd degré ont établi au moins un FE.</p>';h+=froTableHtml('Tableau 3 : Établissements les plus représentés — 1er degré',['1er degré','Nombre de faits'],s.top[0].length?s.top[0]:[['Aucun établissement déclarant',0]]);h+=froTableHtml('Tableau 3 (suite) : Établissements les plus représentés — 2nd degré',['2nd degré','Nombre de faits'],s.top[1].length?s.top[1]:[['Aucun établissement déclarant',0]]);h+=froTableHtml('Tableau 4 : Nombre d’atteintes/violences par établissements/écoles',['Établissements / Écoles','AP','AB','ACS','VP','VV','VS','Harcèlement'],[['1er degré',...s.att[0]],['2nd degré',...s.att[1]],['Total général',...s.att[0].map((x,i)=>x+s.att[1][i])]]);h+='<p class="fro-note">AP : atteintes aux personnes ; AB : atteintes aux biens ; ACS : atteintes à la sécurité ; VP : violences physiques ; VV : violences verbales ; VS : violences sexuelles. Un même FE peut relever de plusieurs catégories.</p>';return h;}
   /* Comparaison FRO : même décalage depuis la rentrée de chaque année, catégories structurées. */
   const froYears=['FE24_25','FE25_26','FE26_27_2'];
@@ -8655,6 +8723,7 @@ function nraSplitStructuredFactPaths(value, schoolYear){
       if(token!==froRenderToken)return false;
       froCompareData=comparison;
       froEl('preview').innerHTML='<h2>Aperçu des tableaux — '+froSafe(network)+'</h2><p>Du '+froSafe(from)+' au '+froSafe(to)+' — '+s.all+' FE</p>'+froTables(s)+froComparisonHtml(comparison);
+      froApplyPreviewSelection();
       froLastComputed=JSON.stringify([network,year,from,to]);
       froMsg('Tableaux calculés : '+s.all+' FE sur la période. Périodes consultées conservées en cache jusqu’à l’actualisation de la page.');
       return true;
@@ -8795,42 +8864,42 @@ function nraSplitStructuredFactPaths(value, schoolYear){
       }
       const n=s.groups.map(a=>a.length),np=s.groups.map(a=>a.filter(froPrivate).length);
       const fmt=(a,b)=>a+' dont '+b+' privés';
-      heading('Nombre d’établissements — '+froTerritoryName(s.network));
+      if(froPdfSelected('estabs'))heading('Nombre d’établissements — '+froTerritoryName(s.network));
       table(['Établissements','Nombre'],[
         ['1er degré',fmt(n[0],np[0])],['2nd degré',fmt(n[1],np[1])],
         ['Total',fmt(n[0]+n[1],np[0]+np[1])]
       ]);
-      heading('Nombre de FE par établissements');
-      table(['Établissements','Nombre de faits'],[
+      if(froPdfSelected('facts'))heading('Nombre de FE par établissements');
+      if(froPdfSelected('facts'))table(['Établissements','Nombre de faits'],[
         ['Total 1er degré',fmt(s.totals[0],s.privates[0])],
         ['Total 2nd degré',fmt(s.totals[1],s.privates[1])],
         ['Total général',fmt(s.all,s.privates[0]+s.privates[1])]
       ]);
       const declarantPct=(count,total)=>total?((count/total)*100).toLocaleString('fr-FR',{maximumFractionDigits:1})+' %':'0 %';
-      write(s.declarants[0].size+' écoles sur '+n[0]+' ('+declarantPct(s.declarants[0].size,n[0])+') et '+
+      if(froPdfSelected('facts'))write(s.declarants[0].size+' écoles sur '+n[0]+' ('+declarantPct(s.declarants[0].size,n[0])+') et '+
         s.declarants[1].size+' établissements du second degré sur '+n[1]+' ('+
         declarantPct(s.declarants[1].size,n[1])+') ont déclaré au moins un FE.',8,true,3);
-      heading('Établissements les plus représentés — 1er degré');
-      table(['1er degré','Nombre de faits'],s.top[0].length?s.top[0]:[['Aucun',0]]);
-      heading('Établissements les plus représentés — 2nd degré');
-      table(['2nd degré','Nombre de faits'],s.top[1].length?s.top[1]:[['Aucun',0]]);
-      heading('Nombre d’atteintes/violences par établissements');
-      table(['Établissements','AP','AB','ACS','VP','VV','VS','Harcèl.'],[
+      if(froPdfSelected('top1'))heading('Établissements les plus représentés — 1er degré');
+      if(froPdfSelected('top1'))table(['1er degré','Nombre de faits'],s.top[0].length?s.top[0].slice(0,froPdfTopCount()):[['Aucun',0]]);
+      if(froPdfSelected('top2'))heading('Établissements les plus représentés — 2nd degré');
+      if(froPdfSelected('top2'))table(['2nd degré','Nombre de faits'],s.top[1].length?s.top[1].slice(0,froPdfTopCount()):[['Aucun',0]]);
+      if(froPdfSelected('att'))heading('Nombre d’atteintes/violences par établissements');
+      if(froPdfSelected('att'))table(['Établissements','AP','AB','ACS','VP','VV','VS','Harcèl.'],[
         ['1er degré',...s.att[0]],['2nd degré',...s.att[1]],
         ['Total général',...s.att[0].map((v,i)=>v+s.att[1][i])]
       ]);
-      write('AP : atteintes aux personnes ; AB : atteintes aux biens ; ACS : atteintes à la sécurité ; VP : violences physiques ; VV : violences verbales ; VS : violences sexuelles.',7,false,3);
+      if(froPdfSelected('att'))write('AP : atteintes aux personnes ; AB : atteintes aux biens ; ACS : atteintes à la sécurité ; VP : violences physiques ; VV : violences verbales ; VS : violences sexuelles.',7,false,3);
       if(froCompareData){
-        heading('Comparaison des FE sur trois années');
-        table(['Année scolaire',...froYearNames],[
+        if(froPdfSelected('compareFacts'))heading('Comparaison des FE sur trois années');
+        if(froPdfSelected('compareFacts'))table(['Année scolaire',...froYearNames],[
           ['Nombre de FE',...froCompareData.map(x=>x.count)],
           ['Variation','—',...froCompareData.slice(1).map((x,i)=>froCompareData[i].count?
             (((x.count-froCompareData[i].count)/froCompareData[i].count)*100).toFixed(1)+' %':'n.c.')]
         ],{highlightCurrentYear:true});
-        write('Périodes alignées depuis la rentrée : '+froCompareData.map((x,i)=>
+        if(froPdfSelected('compareFacts'))write('Périodes alignées depuis la rentrée : '+froCompareData.map((x,i)=>
           froYearNames[i]+' ('+dateFR(x.from)+' au '+dateFR(x.to)+')').join(' ; '),7,false,3);
-        heading('Comparaison des atteintes sur trois années');
-        table(['Atteinte',...froYearNames],froCategories.map((label,i)=>
+        if(froPdfSelected('compareAtt'))heading('Comparaison des atteintes sur trois années');
+        if(froPdfSelected('compareAtt'))table(['Atteinte',...froYearNames],froCategories.map((label,i)=>
           [label,...froCompareData.map(x=>x.cats[i])]),{highlightCurrentYear:true});
       }
       // FRO : pied de page historique, sans séparateur ni filigrane.
