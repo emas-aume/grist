@@ -2804,18 +2804,13 @@ function nraSplitStructuredFactPaths(value, schoolYear){
     if (!value) return [];
 
     if (value.startsWith("D:")) {
-      const brqDate = parseGristDate(value.slice(2));
-      if (!brqDate) return [];
-
-      /* Un BRQ daté du lundi reprend vendredi + samedi + dimanche.
-         Du mardi au vendredi, il reprend uniquement la veille. */
-      const day = brqDate.getUTCDay();
-      if (day === 1) {
-        return [-3, -2, -1].map(function(delta) {
-          return formatDateKey(addDaysUTC(brqDate, delta));
-        });
+      const range = getBrqDailySourceRange(value.slice(2));
+      if (!range) return [];
+      const keys = [];
+      for (let d = new Date(range.startDate); d <= range.endDate; d = addDaysUTC(d, 1)) {
+        keys.push(formatDateKey(d));
       }
-      return [formatDateKey(addDaysUTC(brqDate, -1))];
+      return keys;
     }
 
     if (value.startsWith("W:")) {
@@ -3755,58 +3750,52 @@ function nraSplitStructuredFactPaths(value, schoolYear){
     });
   }
 
+  /* Les BRQ journaliers suivent les jours ouvrés, comme les Notes Blanches.
+     Les vacances conservent leur traitement distinct par BRQ VacX. */
+  function isBrqOperationalDay(date) {
+    if (!date) return false;
+    const key = formatDateKey(date);
+    const day = date.getUTCDay();
+    return key >= BRQ_START_DATE &&
+      day !== 0 && day !== 6 &&
+      !WHITE_NOTE_PUBLIC_HOLIDAYS.has(key) &&
+      !WHITE_NOTE_EXTRA_CLOSED_DAYS.has(key) &&
+      !isBrqSchoolBreakDateKey(key);
+  }
+
   function getBrqEffectiveDailyDate(recordDate) {
     if (!recordDate) return null;
-
-    /*
-      Un BRQ porte la date du JOUR D'ENVOI et reprend les faits saisis
-      depuis le BRQ précédent :
-      - lundi -> mardi ;
-      - mardi -> mercredi ;
-      - mercredi -> jeudi ;
-      - jeudi -> vendredi ;
-      - vendredi + samedi + dimanche -> lundi.
-
-      Exemples 2026 :
-      faits du 02/09 -> BRQ du 03/09 ;
-      faits du 04, 05 et 06/09 -> BRQ du 07/09 ;
-      faits du 11, 12 et 13/09 -> BRQ du 14/09.
-    */
-    const day = recordDate.getUTCDay();
-
-    if (day === 5) return addDaysUTC(recordDate, 3); // vendredi -> lundi
-    if (day === 6) return addDaysUTC(recordDate, 2); // samedi -> lundi
-    if (day === 0) return addDaysUTC(recordDate, 1); // dimanche -> lundi
-
-    return addDaysUTC(recordDate, 1); // lundi à jeudi -> lendemain
+    let candidate = addDaysUTC(recordDate, 1);
+    while (formatDateKey(candidate) <= WHITE_NOTE_SCHOOL_YEAR_END_KEY) {
+      if (isBrqOperationalDay(candidate)) return candidate;
+      /* Les vacances sont traitées par un BRQ dédié : ne pas transférer
+         artificiellement les FE de vacances dans un BRQ journalier. */
+      if (isBrqSchoolBreakDateKey(formatDateKey(candidate))) return null;
+      candidate = addDaysUTC(candidate, 1);
+    }
+    return null;
   }
 
   function getBrqDailySourceRange(dateKey) {
     const brqDate = parseGristDate(dateKey);
-    if (!brqDate) return null;
-
-    /* Un BRQ daté du lundi reprend vendredi, samedi et dimanche. */
-    if (brqDate.getUTCDay() === 1) {
-      const startDate = addDaysUTC(brqDate, -3);
-      const endDate = addDaysUTC(brqDate, -1);
-      return {
-        brqDate: brqDate,
-        startDate: startDate,
-        endDate: endDate,
-        startKey: formatDateKey(startDate),
-        endKey: formatDateKey(endDate),
-        weekendGroup: true
-      };
+    if (!brqDate || !isBrqOperationalDay(brqDate)) return null;
+    let startDate = addDaysUTC(brqDate, -1);
+    while (formatDateKey(startDate) >= BRQ_START_DATE && !isBrqOperationalDay(startDate)) {
+      if (isBrqSchoolBreakDateKey(formatDateKey(startDate))) break;
+      startDate = addDaysUTC(startDate, -1);
     }
-
-    const sourceDate = addDaysUTC(brqDate, -1);
+    /* Le début d'une période de vacances reste réservé au BRQ VacX. */
+    if (isBrqSchoolBreakDateKey(formatDateKey(startDate))) {
+      startDate = addDaysUTC(startDate, 1);
+    }
+    const endDate = addDaysUTC(brqDate, -1);
     return {
       brqDate: brqDate,
-      startDate: sourceDate,
-      endDate: sourceDate,
-      startKey: formatDateKey(sourceDate),
-      endKey: formatDateKey(sourceDate),
-      weekendGroup: false
+      startDate: startDate,
+      endDate: endDate,
+      startKey: formatDateKey(startDate),
+      endKey: formatDateKey(endDate),
+      weekendGroup: formatDateKey(startDate) !== formatDateKey(endDate)
     };
   }
 
