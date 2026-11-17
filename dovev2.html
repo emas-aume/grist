@@ -981,6 +981,21 @@
   .analytics-kpi{padding:14px}.analytics-kpi-label{font-size:11px;color:#64748b;font-weight:600}.analytics-kpi-value{font-size:25px;font-weight:700;margin:5px 0;color:#172033}.analytics-kpi-sub{font-size:10px;color:#7b8798}
   .analytics-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}.analytics-card{padding:16px;min-width:0}.analytics-card h3{margin:0 0 14px;font-size:14px}.analytics-wide{grid-column:1/-1}
   .analytics-empty{padding:22px;text-align:center;color:#718096;font-size:12px}
+
+  /* Diagrammes en anneau des typologies et des départements */
+  .analytics-donut-layout{display:flex;align-items:center;gap:18px;min-height:220px}
+  .analytics-donut-figure{flex:0 0 205px;max-width:44%}
+  .analytics-donut-figure svg{width:100%;height:auto;display:block}
+  .analytics-donut-total{font-size:25px;font-weight:750;fill:#172033}
+  .analytics-donut-caption{font-size:11px;fill:#64748b}
+  .analytics-donut-legend{flex:1;min-width:0;display:grid;gap:7px}
+  .analytics-donut-legend-row{display:grid;grid-template-columns:10px minmax(0,1fr) auto;gap:7px;align-items:center;font-size:11px}
+  .analytics-donut-swatch{width:10px;height:10px;border-radius:3px}
+  .analytics-donut-label{overflow-wrap:anywhere}
+  .analytics-donut-legend-row strong{font-variant-numeric:tabular-nums;white-space:nowrap;font-size:11px}
+  .analytics-donut-percent{color:#64748b;font-weight:500}
+  .analytics-donut-note{margin-top:8px;color:#64748b;font-size:10px;line-height:1.5}
+  @media(max-width:900px){.analytics-donut-layout{flex-direction:column;align-items:stretch}.analytics-donut-figure{width:190px;max-width:100%;align-self:center}.analytics-donut-legend{width:100%}}
   .analytics-bars{display:grid;gap:9px}.analytics-bar-row{display:grid;grid-template-columns:minmax(130px,1.1fr) 2fr 42px;gap:9px;align-items:center;font-size:11px}.analytics-bar-track{height:9px;background:#eef2f7;border-radius:999px;overflow:hidden}.analytics-bar-fill{height:100%;background:#2f6fed;border-radius:999px}.analytics-bar-value{text-align:right;font-weight:700}
   .analytics-line-wrap{width:100%;overflow:hidden}.analytics-line-svg{width:100%;height:210px}.analytics-line-grid{stroke:#dbe2ea;stroke-width:1}.analytics-line-path{fill:none;stroke:#2f6fed;stroke-width:3;vector-effect:non-scaling-stroke}.analytics-line-dot{fill:#2f6fed}.analytics-line-label{font-size:10px;fill:#64748b}.analytics-line-value{font-size:10px;fill:#172033;font-weight:700}.analytics-card.is-hidden{display:none}.analytics-card.analytics-full{grid-column:1/-1}.analytics-threshold{display:flex;align-items:center;gap:8px;margin:-4px 0 12px;justify-content:flex-end}.analytics-threshold label{font-size:11px;color:#64748b;font-weight:600}.analytics-threshold select{padding:6px 8px;border:1px solid #dbe2ea;border-radius:7px;background:#fff;color:#172033;font-size:11px}.analytics-legend{display:flex;gap:12px;flex-wrap:wrap;margin:2px 0 8px;font-size:10px;color:#64748b}.analytics-legend span{display:inline-flex;align-items:center;gap:4px}.analytics-legend i{width:14px;height:3px;border-radius:2px;display:inline-block}.analytics-chart-head{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;flex-wrap:wrap}.analytics-chart-head h3{margin-right:auto}.analytics-chart-controls{display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap}.analytics-chart-controls>label{font-size:11px;color:#64748b;font-weight:600;display:flex;flex-direction:column;gap:4px}.analytics-chart-controls select{padding:6px 8px;border:1px solid #dbe2ea;border-radius:7px;background:#fff;color:#172033;font-size:11px}.analytics-dept-checks{display:flex;align-items:center;gap:7px;font-size:11px;color:#475569;flex-wrap:wrap}.analytics-dept-checks>span{font-weight:600;color:#64748b}.analytics-dept-checks label{display:inline-flex;align-items:center;gap:3px;cursor:pointer}.analytics-dept-checks input{margin:0}
   .analytics-table{width:100%;border-collapse:collapse;font-size:11px}.analytics-table th,.analytics-table td{padding:9px 10px;border-bottom:1px solid #e7ebf0;text-align:left}.analytics-table th{background:#f8fafc;color:#475569}.analytics-table .num{text-align:right}
@@ -1145,6 +1160,7 @@
   .analytics-comparison-table tbody tr:hover{background:#f7faff}
   .analytics-comparison-table .analytics-current{font-weight:750;color:#173f86}
   .analytics-comparison-table .analytics-total{background:#f3f6fb;font-weight:700}
+  #analytics-levels-card.analytics-full{grid-column:1 / -1}
   .analytics-volume{font-weight:650}.analytics-comparison-table .analytics-delta-up,.analytics-comparison-table .analytics-delta-down,.analytics-comparison-table .analytics-delta-neutral{font-size:11px;white-space:nowrap}.analytics-delta-up{color:#b42318;font-weight:700}.analytics-delta-down{color:#087443;font-weight:700}.analytics-delta-neutral{color:#667085}
   .analytics-comparison-foot{margin:10px 0 0;font-size:11px;color:#667085;line-height:1.5}
 </style>
@@ -1541,7 +1557,7 @@
     <div id="analytics-kpis" class="analytics-kpis"></div>
     <div id="analytics-insight" class="analytics-insight" aria-live="polite"></div>
     <div class="analytics-card analytics-comparison" id="analytics-comparison-card">
-      <div class="analytics-chart-head"><div><h3>Comparaison N / N-1 / N-2</h3><p class="analytics-comparison-note">Même nombre de jours depuis chaque rentrée scolaire ; filtres département et degré appliqués.</p></div></div>
+      <div class="analytics-chart-head"><div><h3>Comparaison des années scolaires</h3><p class="analytics-comparison-note">Même nombre de jours depuis chaque rentrée scolaire ; filtres département et degré appliqués.</p></div></div>
       <div id="analytics-year-comparison" aria-live="polite"><div class="analytics-empty">Chargement des années de référence…</div></div>
     </div>
     <div class="analytics-card analytics-comparison" id="analytics-department-comparison-card">
@@ -1551,7 +1567,7 @@
     </div>
     <div class="analytics-grid">
       <div class="analytics-card" id="analytics-degrees-card"><h3>Répartition par degré</h3><div id="analytics-degrees"></div></div>
-      <div class="analytics-card" id="analytics-levels-card"><h3>Niveaux de gravité</h3><div id="analytics-levels"></div></div>
+      <div class="analytics-card" id="analytics-levels-card"><h3>Évolution des niveaux 2 et 3</h3><p class="analytics-comparison-note">Volumes, évolutions annuelles et part du niveau 3 parmi les FE de niveaux 2 et 3, sur des périodes équivalentes.</p><div id="analytics-levels"></div></div>
       <div class="analytics-card analytics-wide"><h3>Évolution des FE par date du fait</h3><div id="analytics-trend"></div></div>
       <div class="analytics-card" id="analytics-types-card"><h3>Typologies principales</h3><div id="analytics-types"></div></div>
       <div class="analytics-card" id="analytics-territories-card"><h3>Répartition territoriale</h3><div id="analytics-territories"></div></div>
@@ -7431,7 +7447,7 @@ function nraSplitStructuredFactPaths(value, schoolYear){
     tables.forEach((t,i)=>{if(t&&!Array.isArray(analyticsComparisons[t]))counts[i]=null;});
     const yearEl=document.getElementById('analytics-year-comparison');
     if(yearEl){
-      yearEl.innerHTML=`<div class="analytics-comparison-scroll"><table class="analytics-comparison-table"><thead><tr><th>Indicateur</th><th>N-2 (${ANALYTICS_HISTORY_LABELS[tables[2]]||'indisponible'})</th><th>N-1 (${ANALYTICS_HISTORY_LABELS[tables[1]]||'indisponible'})</th><th>N (${ANALYTICS_HISTORY_LABELS[tables[0]]||'—'})</th></tr></thead><tbody><tr><th>Faits d’établissement</th>${analyticsHistoryCells(counts)}</tr></tbody></table></div><p class="analytics-comparison-foot">Lecture chronologique : N-2 = volume de référence ; N-1 = variation par rapport à N-2 ; N = variation par rapport à N-1. Même plage de jours depuis la rentrée, selon la date de transmission et les filtres sélectionnés. « n.c. » : pourcentage non calculable sur une base nulle ; « — » : année indisponible.</p>`;
+      yearEl.innerHTML=`<div class="analytics-comparison-scroll"><table class="analytics-comparison-table"><thead><tr><th>Indicateur</th><th>${ANALYTICS_HISTORY_LABELS[tables[2]]||'Année indisponible'}</th><th>${ANALYTICS_HISTORY_LABELS[tables[1]]||'Année indisponible'}</th><th>${ANALYTICS_HISTORY_LABELS[tables[0]]||'Année indisponible'}</th></tr></thead><tbody><tr><th>Faits d’établissement</th>${analyticsHistoryCells(counts)}</tr></tbody></table></div><p class="analytics-comparison-foot">Lecture chronologique : N-2 = volume de référence ; N-1 = variation par rapport à N-2 ; N = variation par rapport à N-1. Même plage de jours depuis la rentrée, selon la date de transmission et les filtres sélectionnés. « n.c. » : pourcentage non calculable sur une base nulle ; « — » : année indisponible.</p>`;
     }
     const deptEl=document.getElementById('analytics-department-comparison');
     if(deptEl){
@@ -7443,8 +7459,19 @@ function nraSplitStructuredFactPaths(value, schoolYear){
       }).join('');
       const totals=tables.map(t=>t?(analyticsHistoryRows(t,'all')||[]).length:null);
       tables.forEach((t,i)=>{if(t&&!Array.isArray(analyticsComparisons[t]))totals[i]=null;});
-      deptEl.innerHTML=`<div class="analytics-comparison-scroll"><table class="analytics-comparison-table"><thead><tr><th>Département</th><th>N-2</th><th>N-1</th><th>N</th></tr></thead><tbody>${tableRows}<tr class="analytics-total"><th>Académie</th>${analyticsHistoryCells(totals)}</tr></tbody></table></div><p class="analytics-comparison-foot">Les variations sont calculées par rapport à l'année immédiatement précédente. Les volumes bruts ne sont pas rapportés au nombre d’établissements. Les FE sans département identifiable restent comptés dans le total académique.</p>`;
+      deptEl.innerHTML=`<div class="analytics-comparison-scroll"><table class="analytics-comparison-table"><thead><tr><th>Département</th><th>${ANALYTICS_HISTORY_LABELS[tables[2]]||'Année indisponible'}</th><th>${ANALYTICS_HISTORY_LABELS[tables[1]]||'Année indisponible'}</th><th>${ANALYTICS_HISTORY_LABELS[tables[0]]||'Année indisponible'}</th></tr></thead><tbody>${tableRows}<tr class="analytics-total"><th>Académie</th>${analyticsHistoryCells(totals)}</tr></tbody></table></div><p class="analytics-comparison-foot">Les variations sont calculées par rapport à l'année immédiatement précédente. Les volumes bruts ne sont pas rapportés au nombre d’établissements. Les FE sans département identifiable restent comptés dans le total académique.</p>`;
     }
+  }
+  function renderAnalyticsSeverityHistory(){
+    const el=document.getElementById('analytics-levels');if(!el)return;
+    const index=ANALYTICS_HISTORY_ORDER.indexOf(analyticsTable);
+    const tables=[analyticsTable,ANALYTICS_HISTORY_ORDER[index+1],ANALYTICS_HISTORY_ORDER[index+2]];
+    const datasets=tables.map(t=>t?analyticsHistoryRows(t,analyticsDepartment):null);
+    const counts=level=>datasets.map(rows=>rows===null?null:rows.filter(r=>String(r._niveau)===level).length);
+    const c2=counts('2'),c3=counts('3');
+    const shares=c3.map((v,i)=>v===null||c2[i]===null||c2[i]+v===0?null:100*v/(c2[i]+v));
+    const shareCells=[2,1,0].map(i=>`<td class="${i===0?'analytics-current':''}">${shares[i]===null?'—':shares[i].toFixed(1).replace('.',',')+' %'}</td>`).join('');
+    el.innerHTML=`<div class="analytics-comparison-scroll"><table class="analytics-comparison-table"><thead><tr><th>Indicateur</th><th>${ANALYTICS_HISTORY_LABELS[tables[2]]||'—'}</th><th>${ANALYTICS_HISTORY_LABELS[tables[1]]||'—'}</th><th>${ANALYTICS_HISTORY_LABELS[tables[0]]||'—'}</th></tr></thead><tbody><tr><th>Niveau 2</th>${analyticsHistoryCells(c2)}</tr><tr><th>Niveau 3</th>${analyticsHistoryCells(c3)}</tr><tr class="analytics-total"><th>Part du niveau 3</th>${shareCells}</tr></tbody></table></div><p class="analytics-comparison-foot">Les variations entre parenthèses comparent les volumes à l'année précédente. La part du niveau 3 est calculée sur les FE classés en niveaux 2 et 3 uniquement ; les niveaux non renseignés en sont exclus.</p>`;
   }
   function analyticsFiltered(){return analyticsRecords.filter(r=>(analyticsDepartment==='all'||r._departement===analyticsDepartment)&&(analyticsDegree==='all'||r._degre===analyticsDegree));}
   function analyticsEtabKey(r){const u=r[FIELD.UAI];return u!==null&&u!==undefined&&u!==''?String(u):String(r[FIELD.ID_NOM]||'').trim();}
@@ -7475,12 +7502,26 @@ function nraSplitStructuredFactPaths(value, schoolYear){
   function setAnalyticsEtabSearch(v){analyticsEtabSearch=String(v||'');renderAnalyticsDashboard();}
   function renderAnalyticsShareBars(id,entries,total){
     const e=document.getElementById(id);if(!e)return;
-    if(!entries.length){e.innerHTML='<div class="analytics-empty">Aucune donnée sur la période.</div>';return;}
-    const max=Math.max(1,...entries.map(x=>x[1]));
-    e.innerHTML='<div class="analytics-bars">'+entries.map(([label,count])=>{
-      const pct=total?(100*count/total):0;
-      return `<div class="analytics-bar-row"><div>${escapeHtml(label)}</div><div class="analytics-bar-track"><div class="analytics-bar-fill" style="width:${count?Math.max(2,100*count/max).toFixed(1):0}%"></div></div><div class="analytics-bar-value">${count} · ${pct.toFixed(1).replace('.',',')} %</div></div>`;
-    }).join('')+'</div>';
+    const items=entries.filter(x=>Number(x[1])>0);
+    if(!items.length){e.innerHTML='<div class="analytics-empty">Aucune donnée sur la période.</div>';return;}
+    const isTypes=id==='analytics-types';
+    // Une FE peut relever de plusieurs typologies : le dénominateur du camembert
+    // est donc le nombre de mentions de typologies, pas le nombre de FE.
+    const denominator=isTypes?items.reduce((sum,x)=>sum+Number(x[1]),0):items.reduce((sum,x)=>sum+Number(x[1]),0);
+    const palette=['#2f6fed','#10a38b','#f59e0b','#8b5cf6','#e65c63','#0ea5e9','#64748b','#d97706','#db2777','#84a34a'];
+    const radius=72,circ=2*Math.PI*radius;
+    let offset=0;
+    const slices=items.map(([label,count],i)=>{
+      const fraction=Number(count)/denominator, length=fraction*circ;
+      const slice=`<circle cx="100" cy="100" r="${radius}" fill="none" stroke="${palette[i%palette.length]}" stroke-width="30" stroke-dasharray="${Math.max(0,length-0.8).toFixed(3)} ${circ.toFixed(3)}" stroke-dashoffset="${(-offset).toFixed(3)}" transform="rotate(-90 100 100)"><title>${escapeHtml(label)} : ${count} (${(100*fraction).toFixed(1).replace('.',',')} %)</title></circle>`;
+      offset+=length;
+      return slice;
+    }).join('');
+    const legend=items.map(([label,count],i)=>{
+      const pct=100*Number(count)/denominator;
+      return `<div class="analytics-donut-legend-row"><span class="analytics-donut-swatch" style="background:${palette[i%palette.length]}"></span><span class="analytics-donut-label">${escapeHtml(label)}</span><strong>${count} <span class="analytics-donut-percent">(${pct.toFixed(1).replace('.',',')} %)</span></strong></div>`;
+    }).join('');
+    e.innerHTML=`<div class="analytics-donut-layout"><div class="analytics-donut-figure"><svg viewBox="0 0 200 200" role="img" aria-label="Diagramme en anneau de ${isTypes?'répartition des typologies':'répartition territoriale'}"><circle cx="100" cy="100" r="${radius}" fill="none" stroke="#eef2f7" stroke-width="30"/>${slices}<text x="100" y="94" text-anchor="middle" class="analytics-donut-total">${denominator}</text><text x="100" y="114" text-anchor="middle" class="analytics-donut-caption">${isTypes?'mentions':'FE'}</text></svg></div><div class="analytics-donut-legend">${legend}</div></div>${isTypes?'<div class="analytics-donut-note">Une FE peut relever de plusieurs typologies. Les parts représentent les mentions de typologies affichées (total 100 %), et non la part des FE.</div>':''}`;
   }
   function renderAnalyticsBars(id,entries){const e=document.getElementById(id);if(!e)return;if(!entries.length){e.innerHTML='<div class="analytics-empty">Aucune donnée sur la période.</div>';return;}const max=Math.max(...entries.map(x=>x[1]))||1;e.innerHTML='<div class="analytics-bars">'+entries.map(x=>`<div class="analytics-bar-row"><div>${escapeHtml(x[0])}</div><div class="analytics-bar-track"><div class="analytics-bar-fill" style="width:${Math.max(2,x[1]/max*100).toFixed(1)}%"></div></div><div class="analytics-bar-value">${x[1]}</div></div>`).join('')+'</div>';}
   function analyticsCurveDayKey(r){
@@ -7553,8 +7594,10 @@ function nraSplitStructuredFactPaths(value, schoolYear){
     const curveRows=analyticsCurveRecords.filter(r=>(analyticsDepartment==='all'||analyticsResolveDepartment(r)===analyticsDepartment)&&(analyticsDegree==='all'||r._degre===analyticsDegree));
     const degreeCounts=[['1er degré',rows.filter(r=>r._degre==='1er').length],['2nd degré',rows.filter(r=>r._degre==='2nd').length],['Non déterminé',rows.filter(r=>r._degre!=='1er'&&r._degre!=='2nd').length]];
     renderAnalyticsShareBars('analytics-degrees',degreeCounts.filter(x=>x[1]||x[0]!=='Non déterminé'),rows.length);
-    const levels=[['Niveau 1',rows.filter(r=>r._niveau==='1').length],['Niveau 2',n2],['Niveau 3',n3],['Non renseigné',rows.filter(r=>!['1','2','3'].includes(String(r._niveau||''))).length]];
-    renderAnalyticsShareBars('analytics-levels',levels.filter(x=>x[1]||x[0]!=='Non renseigné'),rows.length);
+    const degreeCard=document.getElementById('analytics-degrees-card'),severityCard=document.getElementById('analytics-levels-card');
+    if(degreeCard)degreeCard.classList.toggle('is-hidden',analyticsDegree!=='all');
+    if(severityCard)severityCard.classList.toggle('analytics-full',analyticsDegree!=='all');
+    renderAnalyticsSeverityHistory();
     const insight=document.getElementById('analytics-insight');
     if(insight){
       const major=degreeCounts.slice(0,2).sort((a,b)=>b[1]-a[1])[0],share=rows.length?(major[1]*100/rows.length).toFixed(1).replace('.',','):'0';
