@@ -48,7 +48,7 @@
       width: 100%;
       max-width: none;
       margin: 0 auto;
-      padding: 24px;
+      padding: 0 24px 24px;
     }
 
     .hero,
@@ -959,7 +959,7 @@
 
   
     /* Bureau statistiques : navigation par onglets et chargement à la demande */
-    .bureau-tabs{position:sticky;top:0;z-index:20;display:flex;gap:8px;padding:12px 0 16px;background:var(--bg);border-bottom:1px solid var(--line);margin-bottom:18px}
+    .bureau-tabs{position:sticky;top:0;z-index:20;display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:12px 0 16px;background:var(--bg);border-bottom:1px solid var(--line);margin-bottom:18px}
     .bureau-tab{border:1px solid var(--line);background:#fff;color:var(--text);padding:10px 18px;border-radius:9px;font-weight:700;cursor:pointer;letter-spacing:.02em}
     .bureau-tab.active{background:var(--primary);border-color:var(--primary);color:#fff}
     .bureau-panel.hidden-panel{display:none!important}
@@ -1173,27 +1173,14 @@
 <div class="page">
 
 
-  <!-- EN-TÊTE -->
-
-  <section class="hero">
-
-    <h1>Bureau statistiques</h1>
-
-    <p>
-      Consultation des faits d’établissement, production des documents opérationnels et statistiques hebdomadaires.
-    </p>
-
-
-  </section>
-
-  <nav class="bureau-tabs" aria-label="Modules du Bureau statistiques">
-    <button id="tab-tableau" class="bureau-tab active" type="button" onclick="switchBureauTab('tableau')">TABLEAU</button>
+<nav class="bureau-tabs" aria-label="Modules du Bureau statistiques">
+    <button id="tab-tableau" class="bureau-tab active" type="button" onclick="switchBureauTab('tableau')">SUIVI DES FAITS</button>
     <button id="tab-documents" class="bureau-tab" type="button" onclick="switchBureauTab('documents')">DOCUMENTS</button>
+    <button id="tab-carte" class="bureau-tab" type="button" onclick="switchBureauTab('carte')">CARTOGRAPHIES</button>
     <button id="tab-nra" class="bureau-tab" type="button" onclick="switchBureauTab('nra')">NRA</button>
     <button id="tab-fro" class="bureau-tab" type="button" onclick="switchBureauTab('fro')">FRO</button>
-    <button id="tab-redaction" class="bureau-tab" type="button" onclick="switchBureauTab('redaction')">RÉDACTION</button>
-    <button id="tab-carte" class="bureau-tab" type="button" onclick="switchBureauTab('carte')">CARTE</button>
     <button id="tab-statistiques" class="bureau-tab" type="button" onclick="switchBureauTab('statistiques')">STATISTIQUES</button>
+    <button id="tab-redaction" class="bureau-tab" type="button" onclick="switchBureauTab('redaction')">RÉDACTION</button>
     <div class="data-year-control" id="data-year-control">
       <label for="data-year-select">Année consultée</label>
       <select id="data-year-select" class="data-year-select" onchange="setDataYear(this.value)">
@@ -1548,7 +1535,7 @@
     <div class="white-note-header"><div><h2 class="white-note-title">Cartographie des faits établissements</h2><p class="white-note-period">RGF93 / Lambert-93 — EPSG:2154</p></div><div class="white-note-controls">
     <div class="white-note-control"><label for="carte-dep">Département</label><select class="white-note-select" id="carte-dep" onchange="carteChangeDep(this.value)"><option value="11">11 — Aude</option><option value="30">30 — Gard</option><option value="34">34 — Hérault</option><option value="48" selected>48 — Lozère</option><option value="66">66 — Pyrénées-Orientales</option></select></div>
     <div class="white-note-control"><label for="carte-date">Jour de la carte</label><select class="white-note-select" id="carte-date" onchange="carteChangeDate(this.value)"></select></div>
-    <div class="white-note-date-row"><button class="white-note-download-btn" id="carte-pdf" disabled onclick="carteExport('pdf')">PDF</button><button class="white-note-download-btn" id="carte-png" disabled onclick="carteExport('png')">PNG</button><button class="white-note-download-btn" id="carte-svg" disabled onclick="carteExport('svg')">SVG</button></div></div></div>
+    <div class="white-note-control"><label>Degrés affichés</label><div style="display:flex;gap:14px;flex-wrap:wrap"><label style="display:flex;align-items:center;gap:5px"><input type="checkbox" id="carte-first" checked onchange="carteRefreshDegrees()"> FE 1er degré</label><label style="display:flex;align-items:center;gap:5px"><input type="checkbox" id="carte-second" checked onchange="carteRefreshDegrees()"> FE 2nd degré</label></div></div><div class="white-note-date-row"><button class="white-note-download-btn" id="carte-pdf" disabled onclick="carteExport('pdf')">PDF</button><button class="white-note-download-btn" id="carte-png" disabled onclick="carteExport('png')">PNG</button><button class="white-note-download-btn" id="carte-svg" disabled onclick="carteExport('svg')">SVG</button></div></div></div>
     <p id="carte-status" class="white-note-period" role="status"></p><div id="carte-preview" style="max-width:1100px;margin:16px auto;background:white;border:1px solid #ddd"></div>
   </section>
   <section class="section bureau-panel hidden-panel" id="analytics-stats-section">
@@ -9215,43 +9202,63 @@ function nraSplitStructuredFactPaths(value, schoolYear){
   function carteRefId(v){if(Array.isArray(v)&&v[0]==='R')v=v[v.length-1];if(v&&typeof v==='object')v=v.rowId??v.id;return /^\d+$/.test(String(v??'').trim())&&Number(v)>0?Number(v):null;}
   function carteUai(v,refs){const id=carteRefId(v);return id!==null?getEtabUai(refs.get(id)):extractUai(v);}
   function carteCoords(x){const num=v=>v===null||v===undefined||String(v).trim()===''?NaN:Number(String(v).replace(',','.'));const lon=num(x.Longitude),lat=num(x.Latitude);if(Number.isFinite(lon)&&Number.isFinite(lat)&&Math.abs(lon)<=180&&Math.abs(lat)<=90)return [lon,lat];return null;}
-  async function carteLoad(){if(carteData)return carteData;if(!carteLoading)carteLoading=Promise.all(['GEO_RESEAUX','GEO_COMMUNES','GEO_ETABLISSEMENTS','RESEAUX_PEDAGOGIQUES','ETABLISSEMENTS'].map(async t=>tableDataToRows(await grist.docApi.fetchTable(t)))).then(([r,c,e,p,base])=>{const refs=new Map(base.map(x=>[Number(x.id),x])),et=new Map();for(const x of [...p,...e]){const u=carteUai(x.UAI,refs),coords=carteCoords(x);if(u&&coords)et.set(u,{...x,UAI:u,Longitude:coords[0],Latitude:coords[1]});}return carteData={r:carteSegments(r,'ID_Reseau'),c:carteSegments(c,'Code_INSEE'),et,refs};}).finally(()=>carteLoading=null);return carteLoading;}
+  async function carteLoad(){if(carteData)return carteData;if(!carteLoading)carteLoading=Promise.all(['GEO_RESEAUX','GEO_COMMUNES','GEO_ETABLISSEMENTS','RESEAUX_PEDAGOGIQUES','ETABLISSEMENTS'].map(async t=>tableDataToRows(await grist.docApi.fetchTable(t)))).then(([r,c,e,p,base])=>{const refs=new Map(base.map(x=>[Number(x.id),x])),et=new Map();for(const x of [...p,...e]){const u=carteUai(x.UAI,refs),coords=carteCoords(x);if(u&&coords)et.set(u,{...x,UAI:u,Longitude:coords[0],Latitude:coords[1]});}const byUai=new Map(base.map(x=>[getEtabUai(x),x]));for(const [u,x] of et){const b=byUai.get(u);if(b)et.set(u,{...x,carteMeta:b});}return carteData={r:carteSegments(r,'ID_Reseau'),c:carteSegments(c,'Code_INSEE'),et,refs};}).finally(()=>carteLoading=null);return carteLoading;}
   // Lambert-93 (EPSG:2154), ellipsoïde GRS80, coordonnées en mètres.
   function carteProject(lon,lat){const rad=Math.PI/180,p=lat*rad,e=0.0818191910428158,n=0.725607765053267,c=11754255.426096;const l=Math.log(Math.tan(Math.PI/4+p/2)*Math.pow((1-e*Math.sin(p))/(1+e*Math.sin(p)),e/2));const r=c*Math.exp(-n*l),a=n*(lon-3)*rad;return [700000+r*Math.sin(a),12655612.049876-r*Math.cos(a)];}
   function carteRings(g){return g.type==='Polygon'?g.coordinates:g.coordinates.flat();}
   function carteNode(parent,tag,attrs={},text){const el=document.createElementNS('http://www.w3.org/2000/svg',tag);for(const [k,v] of Object.entries(attrs))el.setAttribute(k,String(v));if(text!==undefined)el.textContent=text;parent.appendChild(el);return el;}
+  function carteLabelName(e){
+    const b=e.carteMeta||{}, fold=v=>String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
+    let name=String(b.Etablissement||e.Nom||e.UAI).trim();const type=fold(b.Type_etablissement||e.Nature), all=fold(name), priv=/\bPRIVE(?:E)?\b/.test(fold(b.Secteur)+' '+type+' '+all);
+    let prefix='';const t=type+' '+all;
+    if(/\b(?:COLLEGE|CLG|SEGPA)\b/.test(t))prefix='CLG';
+    else if(/\b(?:LPO|LYCEE POLYVALENT)\b/.test(t))prefix='LPO';
+    else if(/\b(?:LP|LYCEE PROFESSIONNEL|LYCEE DES METIERS)\b/.test(t))prefix='LP';
+    else if(/\b(?:LYCEE|LYC|LGT)\b/.test(t))prefix='LYC';
+    else if(/\b(?:ECOLE ELEMENTAIRE|EE)\b/.test(t))prefix='EE';
+    else if(/\b(?:ECOLE MATERNELLE|EM)\b/.test(t))prefix='EM';
+    else if(/\b(?:ECOLE PRIMAIRE|EP)\b/.test(t))prefix='EP';
+    else if(/^ECOLE\b/.test(all))prefix='Ecole';
+    if(prefix){name=name.replace(/^(?:(?:segpa|section d[’']enseignement professionnel|section enseignement professionnel)\s+)?(?:coll[eè]ge|clg|lpo|lgt|lp|lyc(?:[eé]e)?|[eé]cole|ee|em|ep)\b\.?\s*/i,'');
+      let old;do{old=name;name=name.replace(/^(?:lyc[eé]e|g[eé]n[eé]ral(?:\s+et\s+technologique)?|technologique|polyvalent|professionnel|[eé]l[eé]mentaire|maternelle|primaire|priv[ée]e?|publique?|des m[eé]tiers|segpa)(?=\s|$)\s*/i,'');}while(old!==name);
+    }
+    const mixed=v=>v===v.toLocaleUpperCase('fr')?v.toLocaleLowerCase('fr').replace(/(^|[\s'’\-])\p{L}/gu,m=>m.toLocaleUpperCase('fr')):v;
+    name=mixed(name);const commune=mixed(String(b.Ville||e.Commune||''));
+    name=[prefix,priv?(['EE','EM','EP','Ecole'].includes(prefix)?'Privée':'Privé'):'',name].filter(Boolean).join(' ');if(commune&&!fold(name).includes(fold(commune)))name+=' – '+commune;return name;
+  }
+  let carteLast=null;
+  function carteRefreshDegrees(){if(carteLast)carteDraw(...carteLast);}
   function carteLabels(svg,markers,txt){
     const occupied=[{x:140,y:350,w:65,h:190},{x:720,y:210,w:280,h:250}];
     const overlaps=(a,b)=>a.x<b.x+b.w+2&&a.x+a.w+2>b.x&&a.y<b.y+b.h+2&&a.y+a.h+2>b.y;
     const dots=markers.map(m=>({x:m.x-m.r,y:m.y-m.r,w:2*m.r,h:2*m.r}));
-    const ctx=document.createElement('canvas').getContext('2d');ctx.font='italic bold 9px Arial';
+    const ctx=document.createElement('canvas').getContext('2d');ctx.font='italic bold 8px Arial';
     const layer=carteNode(svg,'g',{}), leaders=carteNode(layer,'g',{}), labels=carteNode(layer,'g',{});
     let omitted=0;
     for(const m of markers){
-      let name=String(m.e.Nom||m.e.UAI).replace(/lycée polyvalent/gi,'Lyc.').replace(/lycée professionnel/gi,'LP').replace(/lycée/gi,'Lyc.').replace(/collège/gi,'Coll.').replace(/école élémentaire/gi,'Élém.').replace(/école maternelle/gi,'Mat.').replace(/école primaire/gi,'Éc. prim.');
-      const commune=String(m.e.Commune||'');if(commune&&!name.toLowerCase().includes(commune.toLowerCase()))name+=' – '+commune;
-      const words=name.split(/\s+/), lines=[];let line='';for(const word of words){if(line&&ctx.measureText(line+' '+word).width>135){lines.push(line);line=word;}else line+=(line?' ':'')+word;}if(line)lines.push(line);
-      const w=Math.max(...lines.map(l=>ctx.measureText(l).width))+4,h=lines.length*11+2;let best=null;
+      const name=carteLabelName(m.e);
+      const words=name.split(/\s+/), lines=[];let line='';for(const word of words){if(line&&ctx.measureText(line+' '+word).width>250){lines.push(line);line=word;}else line+=(line?' ':'')+word;}if(line)lines.push(line);
+      const w=Math.max(...lines.map(l=>ctx.measureText(l).width))+4,h=lines.length*10+2;let best=null;
       for(const d of [4,12,24,40,60,85,115,150]){for(const [dx,dy] of [[1,0],[-1,0],[1,-1],[-1,-1],[1,1],[-1,1],[0,-1],[0,1]]){const x=dx>0?m.x+m.r+d:dx<0?m.x-m.r-d-w:m.x-w/2;const y=dy>0?m.y+m.r+d:dy<0?m.y-m.r-d-h:m.y-h/2;const b={x,y,w,h};if(x<12||x+w>988||y<75||y+h>635||occupied.some(o=>overlaps(b,o))||dots.some(o=>overlaps(b,o)))continue;best=b;break;}if(best)break;}
       if(!best){omitted++;continue;}occupied.push(best);
       const ex=Math.max(best.x,Math.min(m.x,best.x+w)),ey=Math.max(best.y,Math.min(m.y,best.y+h)),dist=Math.hypot(ex-m.x,ey-m.y);if(dist>m.r+7)carteNode(leaders,'line',{x1:m.x+(ex-m.x)*m.r/dist,y1:m.y+(ey-m.y)*m.r/dist,x2:ex,y2:ey,stroke:'#555','stroke-width':0.55});
-      lines.forEach((l,i)=>{const attrs={x:best.x+2,y:best.y+9+i*11,'font-size':9,'font-style':'italic','font-weight':'bold'};carteNode(labels,'text',{...attrs,fill:'#fff',stroke:'#fff','stroke-width':2,'stroke-linejoin':'round'},l);carteNode(labels,'text',{...attrs,fill:'#17174d'},l);});
+      lines.forEach((l,i)=>{const attrs={x:best.x+2,y:best.y+8+i*10,'font-size':8,'font-style':'italic','font-weight':'bold'};carteNode(labels,'text',{...attrs,fill:'#fff',stroke:'#fff','stroke-width':0.8,'stroke-linejoin':'round'},l);carteNode(labels,'text',{...attrs,fill:'#17174d'},l);});
     }
     if(omitted)txt(500,640,omitted+' libellé(s) non affiché(s) pour éviter les chevauchements',9,{'text-anchor':'middle'});
   }
-  function carteDraw(data,records,dep,date){const host=carteEl('preview');host.replaceChildren();const networks=data.r.filter(x=>String(x.Departement)===dep&&x.g).sort((a,b)=>String(a.Reseau_pedagogique).localeCompare(String(b.Reseau_pedagogique),'fr'));if(!networks.length)throw Error('Aucun polygone de réseau disponible pour ce département.');const communes=data.c.filter(x=>String(x.Departement)===dep&&x.g);const missing=data.c.filter(x=>String(x.Departement)===dep&&!x.g).length;let xmin=Infinity,ymin=Infinity,xmax=-Infinity,ymax=-Infinity;for(const r of networks)for(const ring of carteRings(r.g))for(const p of ring){const [x,y]=carteProject(...p);xmin=Math.min(xmin,x);xmax=Math.max(xmax,x);ymin=Math.min(ymin,y);ymax=Math.max(ymax,y);}const scale=Math.min(490/(xmax-xmin),515/(ymax-ymin));const xy=(x,y)=>[445+(x-(xmin+xmax)/2)*scale,350-(y-(ymin+ymax)/2)*scale];const path=g=>carteRings(g).map(r=>r.map((p,i)=>{const q=xy(...carteProject(...p));return (i?'L':'M')+q.map(v=>v.toFixed(2)).join(' ');}).join(' ')+' Z').join(' ');
+  function carteDraw(data,records,dep,date){carteLast=[data,records,dep,date];const first=carteEl('first').checked,second=carteEl('second').checked;records=records.filter(r=>r._degre==='1er'?first:r._degre==='2nd'?second:false);const host=carteEl('preview');host.replaceChildren();const networks=data.r.filter(x=>String(x.Departement)===dep&&x.g).sort((a,b)=>String(a.Reseau_pedagogique).localeCompare(String(b.Reseau_pedagogique),'fr'));if(!networks.length)throw Error('Aucun polygone de réseau disponible pour ce département.');const communes=data.c.filter(x=>String(x.Departement)===dep&&x.g);const missing=data.c.filter(x=>String(x.Departement)===dep&&!x.g).length;let xmin=Infinity,ymin=Infinity,xmax=-Infinity,ymax=-Infinity;for(const r of networks)for(const ring of carteRings(r.g))for(const p of ring){const [x,y]=carteProject(...p);xmin=Math.min(xmin,x);xmax=Math.max(xmax,x);ymin=Math.min(ymin,y);ymax=Math.max(ymax,y);}const scale=Math.min(490/(xmax-xmin),515/(ymax-ymin));const xy=(x,y)=>[445+(x-(xmin+xmax)/2)*scale,350-(y-(ymin+ymax)/2)*scale];const path=g=>carteRings(g).map(r=>r.map((p,i)=>{const q=xy(...carteProject(...p));return (i?'L':'M')+q.map(v=>v.toFixed(2)).join(' ');}).join(' ')+' Z').join(' ');
     const svg=carteNode(host,'svg',{xmlns:'http://www.w3.org/2000/svg',viewBox:'0 0 1000 707',width:1000,height:707,style:'width:100%;height:auto;display:block;background:white', 'font-family':'Arial, Helvetica, sans-serif'});carteNode(svg,'rect',{width:1000,height:707,fill:'#ffffff'});const txt=(x,y,s,size=10,extra={})=>carteNode(svg,'text',{x,y,'font-size':size,fill:'#17174d','font-weight':'bold',...extra},s);
     txt(500,36,'FAITS ÉTABLISSEMENTS — '+carteNames[dep].toUpperCase()+' ('+dep+')',20,{'text-anchor':'middle'});txt(500,58,date?'Carte du '+formatLongDate(parseGristDate(date)):'Aucune date disponible',14,{'text-anchor':'middle'});
     networks.forEach((r,i)=>carteNode(svg,'path',{d:path(r.g),fill:cartePalette[i%cartePalette.length],stroke:'#57545b','stroke-width':0.85,'fill-rule':'evenodd','stroke-linejoin':'round'}));
     communes.forEach(r=>carteNode(svg,'path',{d:path(r.g),fill:'none',stroke:'#59545e','stroke-opacity':0.72,'stroke-width':0.55,'stroke-linejoin':'round'}));
     txt(730,225,'Réseaux pédagogiques',11);networks.forEach((r,i)=>{const y=239+i*17;carteNode(svg,'rect',{x:730,y,width:18,height:11,fill:cartePalette[i%cartePalette.length],stroke:'#777','stroke-width':0.5});txt(754,y+9,String(r.Reseau_pedagogique),9);});
-    const colors={'1er':'#c16bc5','2nd':'#6054d5'},strokes={'1er':'#8b468e','2nd':'#39318c'},radius=n=>4*Math.sqrt(n);function legend(y,degree,title,label){txt(147,y,title,11);txt(147,y+16,label,9);const cx=160,cy=y+45;for(const n of [10,8,6,4,2]){const r=radius(n);carteNode(svg,'circle',{cx,cy:cy+radius(10)-r,r,fill:colors[degree],'fill-opacity':0.28,stroke:strokes[degree],'stroke-width':0.6});const yy=y+30+(10-n)*4.6;carteNode(svg,'line',{x1:cx+r*.65,y1:cy+radius(10)-r-r*.65,x2:180,y2:yy,stroke:'#444','stroke-width':0.55});txt(183,yy+3,String(n),8);}}legend(365,'2nd','2nd degré','FE 2nd degré');legend(475,'1er','1er degré','FE 1er degré');
-    const groups=new Map(),unmapped=[];for(const r of records){const u=carteUai(r[FIELD.UAI],data.refs);const e=data.et.get(u);if(!e||getEtabDepartment(e)!==dep){unmapped.push(String(r[FIELD.NUMERO_FE]||r.id)+" ("+(!u?"UAI non résolu : "+String(r[FIELD.UAI]??""):!e?"UAI absent de GEO : "+u:"département différent : "+u)+")");continue;}const k=u+'|'+r._degre;if(!groups.has(k))groups.set(k,{e,degree:r._degre,n:0});groups.get(k).n++;}const markers=[];for(const a of [...groups.values()].sort((a,b)=>b.n-a.n)){const [x,y]=xy(...carteProject(Number(a.e.Longitude),Number(a.e.Latitude)));if(x<195||x>695||y<85||y>615){unmapped.push(String(a.e.UAI)+' ('+a.n+' FE hors emprise)');continue;}const c=carteNode(svg,'circle',{cx:x,cy:y,r:radius(a.n),fill:colors[a.degree],stroke:strokes[a.degree],'stroke-width':0.8,'fill-opacity':0.85});carteNode(c,'title',{},String(a.e.Nom)+' — '+a.n+' FE');markers.push({...a,x,y,r:radius(a.n)});}
+    const colors={'1er':'#c16bc5','2nd':'#6054d5'},strokes={'1er':'#8b468e','2nd':'#39318c'},radius=n=>4*Math.sqrt(n);function legend(y,degree,title,label){txt(147,y,title,11);txt(147,y+16,label,9);const cx=160,cy=y+45;for(const n of [10,8,6,4,2]){const r=radius(n);carteNode(svg,'circle',{cx,cy:cy+radius(10)-r,r,fill:colors[degree],'fill-opacity':0.28,stroke:strokes[degree],'stroke-width':0.6});const yy=y+30+(10-n)*4.6;carteNode(svg,'line',{x1:cx+r*.65,y1:cy+radius(10)-r-r*.65,x2:180,y2:yy,stroke:'#444','stroke-width':0.55});txt(183,yy+3,String(n),8);}}if(second)legend(365,'2nd','2nd degré','FE 2nd degré');if(first)legend(475,'1er','1er degré','FE 1er degré');
+    const groups=new Map(),unmapped=[];for(const r of records){const u=carteUai(r[FIELD.UAI],data.refs);const e=data.et.get(u);if(!e||getEtabDepartment(e)!==dep){unmapped.push(String(r[FIELD.NUMERO_FE]||r.id)+" ("+(!u?"UAI non résolu : "+String(r[FIELD.UAI]??""):!e?"UAI absent de GEO : "+u:"département différent : "+u)+")");continue;}const k=u+'|'+r._degre;if(!groups.has(k))groups.set(k,{e,degree:r._degre,n:0});groups.get(k).n++;}const markers=[];for(const a of [...groups.values()].sort((a,b)=>b.n-a.n)){const [x,y]=xy(...carteProject(Number(a.e.Longitude),Number(a.e.Latitude)));if(x<195||x>695||y<85||y>615){unmapped.push(String(a.e.UAI)+' ('+a.n+' FE hors emprise)');continue;}const c=carteNode(svg,'circle',{cx:x,cy:y,r:radius(a.n),fill:colors[a.degree],stroke:strokes[a.degree],'stroke-width':0.8,'fill-opacity':0.85});carteNode(c,'title',{},String(a.e.carteMeta?.Etablissement||a.e.Nom)+' — '+a.n+' FE');markers.push({...a,x,y,r:radius(a.n)});}
     carteLabels(svg,markers,txt);
     const source=date?getWhiteNoteSourceDateLabel(parseGristDate(date)):'';txt(500,658,source?'Transmissions '+source:'Aucune transmission sélectionnée',11,{'text-anchor':'middle'});if(!communes.length||missing||unmapped.length)txt(500,678,[!communes.length?'Contours communaux indisponibles':missing?missing+' contour(s) communal(aux) manquant(s)':'',unmapped.length?'FE non positionnés : '+unmapped.join(', ').slice(0,100):''].filter(Boolean).join(' • '),9,{'text-anchor':'middle'});
     carteStatus(records.length+' FE • '+groups.size+' groupe(s) établissement/degré • '+networks.length+' réseaux • '+communes.length+' communes'+(missing?' • '+missing+' géométrie(s) manquante(s)':'')+(unmapped.length?' • Non positionnés : '+unmapped.join(', '):'')+(!communes.length?' • Contours communaux non fournis pour ce département.':''));carteEl('pdf').disabled=false;carteEl('svg').disabled=false;carteEl('png').disabled=false;
   }
-  async function carteInit(){const seq=++carteSeq;carteEl('pdf').disabled=carteEl('svg').disabled=carteEl('png').disabled=true;carteEl('preview').replaceChildren();carteStatus('Chargement des dates et données cartographiques…');try{const [data]=await Promise.all([carteLoad(),ensureDocumentAvailability()]);if(seq!==carteSeq)return;const dates=getWhiteNoteCalendarDates(carteDep).slice().reverse();if(!dates.some(x=>x[0]===carteDate))carteDate=dates[0]?.[0]||'';const sel=carteEl('date');sel.replaceChildren();for(const [key,d] of dates)sel.add(new Option(formatLongDate(d),key));if(!dates.length)sel.add(new Option('Aucune date disponible',''));sel.value=carteDate;sel.disabled=!dates.length;const dep=carteDep,date=carteDate;const keys=date?getWhiteNoteSourceDates(parseGristDate(date)).map(formatDateKey):[];const rows=keys.length?normalizeFactRecords(await fetchDocumentDateKeys(keys)).filter(r=>isWhiteNoteDisplayableRecord(r,dep)&&keys.includes(r._dateKey)):[];if(seq!==carteSeq)return;carteDraw(data,rows,dep,date);}catch(e){if(seq===carteSeq)carteStatus('Erreur carte : '+e.message);}}
+  async function carteInit(){const seq=++carteSeq;carteLast=null;carteEl('pdf').disabled=carteEl('svg').disabled=carteEl('png').disabled=true;carteEl('preview').replaceChildren();carteStatus('Chargement des dates et données cartographiques…');try{const [data]=await Promise.all([carteLoad(),ensureDocumentAvailability()]);if(seq!==carteSeq)return;const dates=getWhiteNoteCalendarDates(carteDep).slice().reverse();if(!dates.some(x=>x[0]===carteDate))carteDate=dates[0]?.[0]||'';const sel=carteEl('date');sel.replaceChildren();for(const [key,d] of dates)sel.add(new Option(formatLongDate(d),key));if(!dates.length)sel.add(new Option('Aucune date disponible',''));sel.value=carteDate;sel.disabled=!dates.length;const dep=carteDep,date=carteDate;const keys=date?getWhiteNoteSourceDates(parseGristDate(date)).map(formatDateKey):[];const rows=keys.length?normalizeFactRecords(await fetchDocumentDateKeys(keys)).filter(r=>isWhiteNoteDisplayableRecord(r,dep)&&keys.includes(r._dateKey)):[];if(seq!==carteSeq)return;carteDraw(data,rows,dep,date);}catch(e){if(seq===carteSeq)carteStatus('Erreur carte : '+e.message);}}
   function carteChangeDep(v){carteDep=v;carteInit();}function carteChangeDate(v){carteDate=v;carteInit();}
   async function carteExport(type){const svg=carteEl('preview').querySelector('svg');if(!svg)return;const name='CARTE_'+carteDep+'_'+(carteDate||'sans_date');try{if(type==='pdf'){const doc=new window.jspdf.jsPDF({orientation:'landscape',unit:'mm',format:'a4'});if(typeof doc.svg!=='function')throw Error('Bibliothèque SVG2PDF indisponible');await doc.svg(svg,{x:0,y:0,width:297,height:210});doc.save(name+'.pdf');return;}const blob=new Blob([new XMLSerializer().serializeToString(svg)],{type:'image/svg+xml;charset=utf-8'});let url=URL.createObjectURL(blob);try{if(type==='png'){const img=new Image();img.src=url;await img.decode();const c=document.createElement('canvas');c.width=3000;c.height=2121;c.getContext('2d').drawImage(img,0,0,c.width,c.height);const png=await new Promise(resolve=>c.toBlob(resolve,'image/png'));if(!png)throw Error('Export PNG impossible');URL.revokeObjectURL(url);url=URL.createObjectURL(png);}const a=document.createElement('a');a.href=url;a.download=name+'.'+type;a.click();}finally{setTimeout(()=>URL.revokeObjectURL(url),1000);}}catch(e){carteStatus('Erreur export : '+e.message);}}
 
