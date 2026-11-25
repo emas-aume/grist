@@ -328,7 +328,7 @@ select{background-color:#fff!important;color-scheme:light!important;}
 <div class="field span2"><label>Représentation / Partenariat</label><div class="choicebox" id="representationChoices"></div></div>
 </div>
 <div class="treatment-date" id="treatmentDate"></div>
-<div class="ops-actions"><div class="actions"><button aria-label="Réinitialiser le suivi" class="btn" id="resetFollowup" style="padding:7px 9px;min-width:auto;font-size:15px" title="Réinitialiser le suivi" type="button">🗑️</button></div><div class="actions"><button class="btn primary" id="save">Enregistrer</button><button class="btn finish" id="toggleDone">Terminé</button></div></div>
+<div class="ops-actions"><div class="actions"><button class="btn primary" id="save">Enregistrer</button><button class="btn finish" id="toggleDone">Terminé</button></div></div>
 </div>
 </section>
 <section class="hidden" id="etabView">
@@ -507,17 +507,6 @@ async function getTokenInfo(force=false){
 function restRecordsToRows(payload,source){
   const records=Array.isArray(payload?.records)?payload.records:[];
   return records.map(r=>({id:r.id,_source:source,...(r.fields||{})}));
-}
-// SQL Grist peut renvoyer des lignes plates ou des champs imbriqués (id dans fields).
-function sqlFERows(payload){
-  let records=Array.isArray(payload)?payload:payload?.records;
-  if(!Array.isArray(records))throw new Error("Format SQL Grist inattendu : clés "+Object.keys(payload||{}).join(", "));
-  return records.map(r=>{
-    const fields=r?.fields??r;
-    const id=Number(r?.id??fields?.id);
-    if(!fields||!Number.isSafeInteger(id)||id<=0||!("Date_de_transmission" in fields))throw new Error("Format SQL Grist inattendu : champs "+Object.keys(fields||{}).join(", "));
-    return {...fields,id,_source:T.CUR};
-  });
 }
 async function gristGet(path,params=null,retry=true){
   const t=await getTokenInfo(false);
@@ -1328,13 +1317,36 @@ function queueFeToast(item){
 }
 // Les FE transmis récemment sont la source commune de toutes les boîtes.
 // Aucun accès au registre NOTIFICATIONS_FE n'est nécessaire.
+// Lecture REST ciblée sur les jours civils de Paris couvrant les dernières 72 h.
+const feDayFormat=new Intl.DateTimeFormat('fr-FR',{timeZone:'Europe/Paris',year:'numeric',month:'2-digit',day:'2-digit'});
+function feRecentDays(now=Date.now()){
+  const parts=Object.fromEntries(feDayFormat.formatToParts(new Date(now-72*3600000)).map(p=>[p.type,p.value]));
+  const last=Object.fromEntries(feDayFormat.formatToParts(new Date(now)).map(p=>[p.type,p.value]));
+  const end=Date.UTC(+last.year,+last.month-1,+last.day), days=[];
+  for(let d=Date.UTC(+parts.year,+parts.month-1,+parts.day);d<=end;d+=86400000){
+    const x=new Date(d);days.push(`${String(x.getUTCDate()).padStart(2,'0')}/${String(x.getUTCMonth()+1).padStart(2,'0')}/${x.getUTCFullYear()}`);
+  }
+  return days;
+}
+let feAclSnapshot={at:0,key:'',rows:null,promise:null};
+async function readNotificationFacts(){
+  const days=feRecentDays(),key=days.join(',');
+  if(feAclSnapshot.key===key&&feAclSnapshot.rows&&Date.now()-feAclSnapshot.at<12000)return feAclSnapshot.rows;
+  if(feAclSnapshot.promise)return feAclSnapshot.promise;
+  feAclSnapshot.promise=(async()=>{
+    const rows=await apiAllPaged(T.CUR,{filter:{Jour_de_transmission:days},sort:'-id',pageSize:1000,maxRows:10000});
+    if(rows.length>=10000)throw new Error('Notifications : lecture des transmissions récentes incomplète.');
+    if(rows.some(f=>!days.includes(String(f.Jour_de_transmission??''))))throw new Error('Notifications : filtre Jour_de_transmission non respecté.');
+    feAclSnapshot.rows=rows;feAclSnapshot.key=key;feAclSnapshot.at=Date.now();return rows;
+  })();
+  try{return await feAclSnapshot.promise}finally{feAclSnapshot.promise=null}
+}
 async function pollNewFE(){
   if(feNoticeBusy)return;
   feNoticeBusy=true;
   try{
     if(!feNoticeReady){if(!currentEquipier||!identityVerified)await detectCurrentEquipier();if(!identityVerified||!currentEquipier)return;await feNoticeInitialize()}
-    const payload=await gristGet("/sql",{q:liveFEQuery(null,null)});
-    const facts=sqlFERows(payload);
+    const facts=await readNotificationFacts();
     const now=Date.now(),start=feNoticeWindowStart(),active=new Map();
     for(const f of facts){
       if(!isCurrentOperationalFact(f))continue;
@@ -1455,7 +1467,7 @@ async function refreshLiveFEList(snapshot,periodRows){
       }
     }
     // L'historique d'un établissement doit également suivre les ajouts hors de la semaine affichée.
-    if(snapshot.length&&selectedEtab&&!$("etabView").classList.contains("hidden")){
+    if(Array.isArray(snapshot)&&selectedEtab&&!$("etabView").classList.contains("hidden")){
       const uai=Number(selectedEtab.id);
       if(Number.isFinite(uai)){
         const facts=snapshot.filter(f=>Number(f.UAI)===uai);
@@ -1468,43 +1480,16 @@ async function refreshLiveFEList(snapshot,periodRows){
           else{liveEtabPending=false;await openEstablishment(selectedEtab,uai)}
         }
       }
-    }else{liveEtabFingerprint="";liveEtabPending=false}
+    }else if(!selectedEtab||$("etabView").classList.contains("hidden")){liveEtabFingerprint="";liveEtabPending=false}
   }catch(e){console.warn("Actualisation FE en arrière-plan indisponible",e)}
   finally{feListLiveBusy=false}
 }
-// Lecture ciblée côté Grist : période visible, transmissions récentes et UAI ouvert.
-// Le filtre de transmission ne dépend ni de l'identifiant de ligne ni de la date de saisie.
-let liveSqlUnavailableUntil=0;
-function liveFEQuery(spec,uai,now=Date.now()){
-  const dates=(spec?.dates||[]).map(Number).filter(Number.isFinite);
-  const start=now-72*3600000;
-  const days=new Set();
-  // Marge civile pour couvrir les changements d'heure et les deux extrémités.
-  for(let t=start-86400000;t<=now+86400000;t+=86400000){
-    const parts=Object.fromEntries(feTransmissionFormat.formatToParts(new Date(t)).map(p=>[p.type,p.value]));
-    days.add(`${parts.day}/${parts.month}/${parts.year}`);
-    days.add(`${parts.year}-${parts.month}-${parts.day}`);
-  }
-  const transmission=`(substr(trim(CAST("Date_de_transmission" AS TEXT)),1,10) IN (${[...days].map(d=>"'"+d+"'").join(",")}) OR (typeof("Date_de_transmission") IN ('integer','real') AND ("Date_de_transmission" BETWEEN ${Math.floor(start/1000)} AND ${Math.ceil(now/1000)} OR "Date_de_transmission" BETWEEN ${start} AND ${now})))`;
-  const conditions=[transmission];
-  // La période visible est récupérée séparément par le filtre REST exact.
-  if(Number.isSafeInteger(uai)&&uai>0)conditions.push(`"UAI" = ${uai}`);
-  return `SELECT * FROM "${T.CUR}" WHERE ${conditions.join(" OR ")} ORDER BY id`;
-}
+// Historique courant : uniquement l'établissement ouvert, sans lecture annuelle globale.
 async function readLiveFESnapshot(){
-  const spec=periodSpec();
-  const uai=selectedEtab&&!$("etabView").classList.contains("hidden")?Number(selectedEtab.id):null;
-  if(Date.now()>=liveSqlUnavailableUntil){
-    try{
-      const payload=await gristGet("/sql",{q:liveFEQuery(spec,uai)});
-      return sqlFERows(payload);
-    }catch(e){
-      // Ne jamais substituer un échantillon incomplet aux notifications.
-      liveSqlUnavailableUntil=Date.now()+300000;
-      console.warn("Lecture SQL ciblée indisponible : repli REST complet temporaire",e);
-    }
-  }
-  return apiAllPaged(T.CUR,{sort:'id',pageSize:1000,maxRows:50000});
+  if(!selectedEtab||$("etabView").classList.contains("hidden"))return null;
+  const uai=Number(selectedEtab.id);
+  if(!Number.isFinite(uai)||uai<=0)return null;
+  return apiAllPaged(T.CUR,{filter:{UAI:[uai]},sort:'-id',pageSize:1000,maxRows:10000});
 }
 // Une seule cadence : le tableau est rafraîchi en premier, puis les notifications.
 // Le second passage utilise les mêmes données Grist récentes, sans temporisation séparée.
@@ -1543,11 +1528,11 @@ async function refreshFEAndNotifications(){
     const periodPromise=spec?apiAllPaged(T.CUR,{filter:{Date_de_saisie:spec.dates},sort:"-id",pageSize:1000,maxRows:10000}):Promise.resolve(null);
     const snapshotPromise=readLiveFESnapshot().then(value=>({status:"fulfilled",value}),reason=>({status:"rejected",reason}));
     const periodResult=await Promise.resolve(periodPromise).then(value=>({status:"fulfilled",value}),reason=>({status:"rejected",reason}));
-    if(periodResult.status==="fulfilled"&&generation===loadCurrentGeneration&&etabGeneration===establishmentLoadGeneration){await refreshLiveFEList([],periodResult.value);lastPeriodSuccess=Date.now();render();}
+    if(periodResult.status==="fulfilled"&&generation===loadCurrentGeneration&&etabGeneration===establishmentLoadGeneration){await refreshLiveFEList(null,periodResult.value);lastPeriodSuccess=Date.now();render();}
     const snapshotResult=await snapshotPromise;
     const snapshot=snapshotResult.status==="fulfilled"?snapshotResult.value:null;
     await Promise.allSettled([(async()=>{
-      if(periodResult.status==="fulfilled"&&generation===loadCurrentGeneration&&etabGeneration===establishmentLoadGeneration){await refreshLiveFEList(snapshot||[],periodResult.value);lastPeriodSuccess=Date.now();render();}
+      if(periodResult.status==="fulfilled"&&generation===loadCurrentGeneration&&etabGeneration===establishmentLoadGeneration){await refreshLiveFEList(snapshot,periodResult.value);lastPeriodSuccess=Date.now();render();}
       await refreshLiveSuivi();
     })()]);
   }catch(e){console.warn("Actualisation commune FE indisponible",e);
@@ -2101,7 +2086,7 @@ function renderOps(){if(!document.getElementById("save")){location.reload();retu
   choiceValues(selectedSuivi.Accompagnement).length||choiceValues(selectedSuivi.Formation).length||
   choiceValues(selectedSuivi.Representation_Partenariat).length||
   !["","non attribue"].includes(norm(selectedSuivi.Statut))
-);$("saveMeta").textContent=s.Derniere_modification?`Dernière modification : ${dateTimeFR(s.Derniere_modification)}${s.Modifie_par?" — "+s.Modifie_par:""}`:(hasRealSuivi?"Suivi existant":(!selectedSuivi&&hasSourceFollowup(selected)?"Suivi existant — issu des données FE":"Aucun suivi enregistré"));let done=(s.Statut||"Non attribué")==="Terminé";const lockedByOther=!!cl&&!claimOwnedByMe(cl);renderInlineTextFields(s,done||lockedByOther);$("toggleDone").textContent=done?"Réouvrir — En cours":"Terminé";$("toggleDone").classList.toggle("finish",!done);["equipier","suivi","emas","notes","eleveSuivi"].forEach(id=>$(id).disabled=done||lockedByOther);document.querySelectorAll("[data-choice-field]").forEach(cb=>cb.disabled=done||lockedByOther);$("save").classList.toggle("hidden",done||lockedByOther);$("resetFollowup").classList.toggle("hidden",done||lockedByOther);if(lockedByOther)$("saveMeta").textContent=`Prise en charge temporaire par ${claimOwnerName(cl)} — réservation active`;markOpsClean()}
+);$("saveMeta").textContent=s.Derniere_modification?`Dernière modification : ${dateTimeFR(s.Derniere_modification)}${s.Modifie_par?" — "+s.Modifie_par:""}`:(hasRealSuivi?"Suivi existant":(!selectedSuivi&&hasSourceFollowup(selected)?"Suivi existant — issu des données FE":"Aucun suivi enregistré"));let done=(s.Statut||"Non attribué")==="Terminé";const lockedByOther=!!cl&&!claimOwnedByMe(cl);renderInlineTextFields(s,done||lockedByOther);$("toggleDone").textContent=done?"Réouvrir — En cours":"Terminé";$("toggleDone").classList.toggle("finish",!done);["equipier","suivi","emas","notes","eleveSuivi"].forEach(id=>$(id).disabled=done||lockedByOther);document.querySelectorAll("[data-choice-field]").forEach(cb=>cb.disabled=done||lockedByOther);$("save").classList.toggle("hidden",done||lockedByOther);if(lockedByOther)$("saveMeta").textContent=`Prise en charge temporaire par ${claimOwnerName(cl)} — réservation active`;markOpsClean()}
 function pdfTextValue(v){
   if(v===null||v===undefined)return "";
   return String(v).replace(/\r/g,"").trim();
@@ -2583,93 +2568,6 @@ async function retryDeferredActivity(){
 function feContextToken(f){return f?`${f._source||T.CUR}:${Number(f.id)}:${String(f.Numero_FE||"")}`:""}
 function assertFeContext(token){if(!token||feContextToken(selected)!==token)throw new Error("Vous avez changé de fiche pendant l’opération. Écriture interrompue.")}
 function assertEtabContext(uai){if(String(selectedEtab?.UAI||"").trim()!==uai)throw new Error("Vous avez changé d’établissement pendant l’opération. Écriture interrompue.")}
-async function resetFollowup(){
-  if(!selected||isArchivedFact(selected))return;
-  const target=selected,context=feContextToken(target);
-  let numero;try{numero=requireFeNumericKey(selected.Numero_FE)}catch(e){await showModal({title:"Réinitialisation impossible",message:e.message,type:"error"});return}
-  const numeroAffiche=feDisplayNumber(selected.Numero_FE);
-  const liveFact=await api(T.CUR,{filter:{id:[Number(selected.id)]},limit:1});
-  if(!liveFact.length||!isActiveFact(liveFact[0])){await showModal({title:"Réinitialisation impossible",message:"Ce FE est désactivé ou n’existe plus dans la base courante.",type:"error"});return}
-  const ok=await showModal({title:"Réinitialiser entièrement ce suivi ?",message:`Le suivi EMAS, l’attribution, les qualifications d’activité et les données de traitement enregistrées pour le FE ${numeroAffiche} seront supprimés. Cette action est irréversible.`,type:"error",confirmText:"Réinitialiser",cancelText:"Annuler"});
-  if(!ok)return;
-  try{assertFeContext(context)}catch(e){toast(e.message,"error","Réinitialisation annulée");return}
-  // La poubelle doit pouvoir renouveler une réservation expirée, mais ne doit
-  // jamais contourner une réservation active appartenant à un autre équipier.
-  // Reprendre la réservation AVANT de désactiver les boutons / supprimer l'activité.
-  try{
-    const activeClaims=(await api(T.CLAIM,{filter:{Numero_FE:[numero]},limit:30})).filter(claimIsActive);
-    if(activeClaims.some(c=>!claimOwnedByMe(c))){
-      await showModal({title:"Réinitialisation impossible",message:"Ce FE est actuellement pris en charge dans une autre session. Réinitialisation bloquée pour éviter un conflit.",type:"error"});
-      return;
-    }
-    if(!activeClaims.length){
-      const resumed=await ensureTemporaryClaim();
-      if(!resumed)return;
-      assertFeContext(context);
-    }
-    await requireOwnedActiveClaim(numero);
-  }catch(e){await showModal({title:"Réinitialisation impossible",message:e.message,type:"error"});return}
-  const btn=$("resetFollowup");btn.disabled=true;$("save").disabled=true;$("toggleDone").disabled=true;
-  try{
-    const suivis=await api(T.SUIVI,{filter:{Numero_FE:[numero]},limit:50});
-    if(suivis.length>1)throw new Error(`Doublon SUIVI détecté pour le FE ${numeroAffiche}. Réinitialisation bloquée.`);
-    const resetFields={Equipier:null,Statut:"Non attribué",Suivi_etablissement:"",Accompagnement_EMAS:"",Notes_informations:"",Eleve_suivi:"",Securisation:gristChoiceList([]),Prevention:gristChoiceList([]),Accompagnement:gristChoiceList([]),Formation:gristChoiceList([]),Representation_Partenariat:gristChoiceList([]),Date_traitement_EMS:null,Derniere_modification:null,Modifie_par:null};
-    // Ne jamais supprimer un suivi qui a changé depuis l'ouverture de la fiche.
-    await requireOwnedActiveClaim(numero);
-    if(suivis.length){
-      if(!selectedSuivi||Number(selectedSuivi.id)!==Number(suivis[0].id))throw new Error("Suivi différent de celui ouvert : réinitialisation bloquée.");
-      if(Number(selectedSuivi.Derniere_modification||0)!==Number(suivis[0].Derniere_modification||0))throw new Error("Suivi modifié depuis son ouverture : réinitialisation bloquée.");
-    }else if(selectedSuivi)throw new Error("Le suivi a été supprimé par une autre session : réinitialisation bloquée.");
-    const finalResetRows=await api(T.SUIVI,{filter:{Numero_FE:[numero]},limit:3});
-    if(finalResetRows.length!==suivis.length||finalResetRows.some((r,i)=>Number(r.id)!==Number(suivis[i].id)||Number(r.Derniere_modification||0)!==Number(suivis[i].Derniere_modification||0)))throw new Error("Le suivi a changé avant la suppression : réinitialisation bloquée.");
-    await requireOwnedActiveClaim(numero);
-    assertFeContext(context);
-    // Supprimer d'abord l'activité : si cette étape échoue, le suivi demeure
-    // intact et la réinitialisation peut être retentée sans perdre ses données.
-    let activityRemoved=false;
-    try{
-      await removeActivityForFact(target);
-      activityRemoved=true;
-      await requireOwnedActiveClaim(numero);
-      assertFeContext(context);
-      const beforeDelete=await api(T.SUIVI,{filter:{Numero_FE:[numero]},limit:3});
-      if(beforeDelete.length!==suivis.length||beforeDelete.some((r,i)=>Number(r.id)!==Number(suivis[i].id)||Number(r.Derniere_modification||0)!==Number(suivis[i].Derniere_modification||0)))throw new Error("Le suivi a changé pendant la réinitialisation : suppression interrompue.");
-      // Le suivi peut aussi être présent dans la table FE source : sans vider
-      // ces champs, sourceSuivi() le réaffiche après suppression de SUIVI.
-      const clearSource={Equipier:null,Statut:"Non attribué",Suivi_etablissement:"",Accompagnement_EMAS:"",Notes_informations:"",Date_traitement_EMS:null};
-      await grist.docApi.applyUserActions([["UpdateRecord",T.CUR,Number(target.id),clearSource]]);
-      const verifiedSource=await api(T.CUR,{filter:{id:[Number(target.id)]},limit:1});
-      if(verifiedSource.length!==1||String(verifiedSource[0].Equipier??"").trim()||
-         String(verifiedSource[0].Suivi_etablissement??"").trim()||
-         String(verifiedSource[0].Accompagnement_EMAS??"").trim()||
-         String(verifiedSource[0].Notes_informations??"").trim()||
-         sourceStatus(verifiedSource[0])!=="Non attribué")
-        throw new Error("Remise à zéro des champs de la base FE non confirmée : suppression du suivi interrompue.");
-      if(suivis.length)await grist.docApi.applyUserActions([["RemoveRecord",T.SUIVI,suivis[0].id]]);
-      const afterDelete=await api(T.SUIVI,{filter:{Numero_FE:[numero]},limit:3});
-      if(afterDelete.length)throw new Error("Suppression du suivi non confirmée dans Grist.");
-      assertFeContext(context);
-      Object.assign(target,verifiedSource[0]);
-      const localFact=currentRows.find(f=>f._source===T.CUR&&Number(f.id)===Number(target.id));
-      if(localFact&&localFact!==target)Object.assign(localFact,verifiedSource[0]);
-      selectedSuivi=null;suiviMap.delete(numero);
-      // La suppression du suivi efface aussi son auteur et sa date de modification.
-      // Nettoyer les éventuelles copies locales pour ne pas afficher un ancien « modifié par ».
-      for(const fact of [target,localFact])if(fact){fact.Modifie_par=null;fact.Derniere_modification=null;}
-      // La réservation temporaire affiche artificiellement En cours / Equipier.
-      // Il faut la libérer AVANT de redessiner la fiche.
-      await releaseMyTemporaryClaim();
-      renderOps();$("saveMeta").textContent="Aucun suivi enregistré";render();
-      toast(`Le FE ${numeroAffiche} est de nouveau non attribué.`,"success","Suivi remis à zéro",5000);
-    }catch(e){
-      if(activityRemoved){
-        toast("L'activité a été supprimée, mais la suppression du suivi n'a pas été confirmée. Vérifiez la fiche avant toute nouvelle opération.","error","Réinitialisation partielle",10000);
-      }
-      throw e;
-    }
-  }catch(e){await showModal({title:"Réinitialisation impossible",message:e.message,type:"error"})}
-  finally{btn.disabled=false;$("save").disabled=false;$("toggleDone").disabled=false}
-}
 async function persistOps(forcedStatus=null){
   if(!selected||isArchivedFact(selected)||!isActiveFact(selected))return false;
   const target=selected,context=feContextToken(target);
@@ -2806,7 +2704,7 @@ function updateFeLockUI(){
   const cl=activeClaimFor(selected),other=!!cl&&!claimOwnedByMe(cl),done=(selectedSuivi||sourceSuivi(selected)).Statut==="Terminé";
   ["equipier","suivi","emas","notes","eleveSuivi"].forEach(id=>$(id).disabled=done||other);
   document.querySelectorAll("[data-choice-field]").forEach(cb=>cb.disabled=done||other);
-  $("save").classList.toggle("hidden",done||other);$("resetFollowup").classList.toggle("hidden",done||other);
+  $("save").classList.toggle("hidden",done||other);
   if(other)$("saveMeta").textContent=`Prise en charge temporaire par ${claimOwnerName(cl)} — brouillon conservé`;
 }
 function requestClaimOnEdit(){
@@ -2942,7 +2840,7 @@ if(opsSaveButton&&opsSaveButton.parentElement&&!$("copyOpsDraftButton")){
   draftButton.title="Copier les champs en cours de rédaction avant un éventuel conflit";
   draftButton.onclick=copyOpsDraft;
   opsSaveButton.parentElement.insertBefore(draftButton,opsSaveButton);
-}$("toggleDone").onclick=toggleDone;$("resetFollowup").onclick=resetFollowup;
+}$("toggleDone").onclick=toggleDone;
 (async()=>{try{initIssueJournal();initActivityFields();
 // Chargements indépendants en parallèle : référentiels, identifiants et index des périodes.
 await loadSmallTables();
