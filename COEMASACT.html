@@ -39,8 +39,10 @@ select{background-color:#fff!important;color-scheme:light!important;}
 
 /* V21 — notifications discrètes */
 #toastStack{position:fixed;top:16px;right:16px;z-index:10000;display:flex;flex-direction:column;gap:8px;width:min(360px,calc(100vw - 32px));pointer-events:none}
-.toast{pointer-events:auto;padding:10px 12px;border:1px solid;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.10);font-size:13px;line-height:1.35;background:#fff;opacity:0;transform:translateY(-6px);transition:opacity .18s ease,transform .18s ease}
+.toast{pointer-events:auto;padding:10px 12px;border:1px solid;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.10);font-size:13px;line-height:1.35;background:#fff;opacity:0;transform:translateY(-12px);transition:opacity .4s ease,transform .4s cubic-bezier(.22,.61,.36,1)}
 .toast.show{opacity:1;transform:translateY(0)}
+.toast[data-fe-key]{font-size:12px;padding:8px 10px}
+.toast[data-fe-key].leaving{pointer-events:none}
 .toast-success{background:#f2f7ff;border-color:#c9d9ee;color:#294b73}
 .toast-error{background:#fff2f2;border-color:#edbcbc;color:#8b2929}
 .toast-warning{background:#fff2f2;border-color:#edbcbc;color:#8b2929}
@@ -201,7 +203,11 @@ select{background-color:#fff!important;color-scheme:light!important;}
 #emasMainTabs #notificationHub{margin-left:0}
 #emasMainTabs #bellButton{box-shadow:none;border:1px solid #d4ddea;width:43px;height:43px}
 /* Cloche neutre par défaut, bleue seulement si des notifications non lues existent. */
-#emasMainTabs #bellButton{background:#fff;color:#294b73}
+#emasMainTabs #bellButton{background:#fff;color:#294b73;transition:background-color .4s ease,border-color .4s ease,color .4s ease,box-shadow .2s ease,transform .2s ease}
+#bellButton .bellGlyph{display:inline-block;transform-origin:50% 20%}
+@keyframes emasBellRing{0%,100%{transform:rotate(0)}15%,45%,75%{transform:rotate(-9deg)}30%,60%{transform:rotate(9deg)}90%{transform:rotate(4deg)}}
+#bellButton .bellGlyph.bellRinging{animation:emasBellRing .65s ease-in-out}
+@media(prefers-reduced-motion:reduce){#bellButton .bellGlyph.bellRinging{animation:none}#emasMainTabs #bellButton{transition:none}}
 #emasMainTabs #bellButton.has-unread{background:#2563eb;border-color:#2563eb;color:#fff}
 #emasMainTabs #bellButton.has-unread:hover{background:#1d4ed8}
 #emasMainTabs #bellButton:focus-visible{outline:3px solid #93c5fd;outline-offset:2px}
@@ -251,7 +257,8 @@ select{background-color:#fff!important;color-scheme:light!important;}
 @media(max-width:650px){#activityApp #activityBottomBar{padding:12px 12px 18px}#activityApp #activityBottomBar .actions{gap:6px}#activityApp #activityBottomBar .btn{padding:9px 10px}}
 </style>
 <style>
-#activityApp .event .activity-type-badge,#activityApp #activityRows .activity-type-badge{display:table;margin-top:3px;border-radius:999px;padding:2px 6px;font-size:10px;font-weight:700;line-height:1.3;max-width:100%;white-space:normal;}
+#activityApp .event .activity-type-badge{display:table;margin-top:3px;border-radius:999px;padding:2px 6px;font-size:10px;font-weight:700;line-height:1.3;max-width:100%;white-space:normal;}
+#activityApp #activityRows .activity-type-badge{display:inline-flex;align-items:center;justify-content:center;text-align:center;border-radius:999px;padding:6px 9px;font-size:12px;font-weight:700;line-height:1.3;max-width:100%;white-space:normal;}
 #activityApp .activity-type-0{background:#e0ecff;color:#175cd3;}
 #activityApp .activity-type-1{background:#f0e7ff;color:#6941c6;}
 #activityApp .activity-type-2{background:#dcfae6;color:#067647;}
@@ -278,7 +285,7 @@ select{background-color:#fff!important;color-scheme:light!important;}
 
 
 </style>
-</head><body><nav aria-label="Sections du centre opérationnel" id="emasMainTabs"><button aria-pressed="true" class="emasMainTab selected" data-section="operational" type="button">SUIVI OPÉRATIONNEL</button><button aria-pressed="false" class="emasMainTab" data-section="activities" type="button">SUIVI DES ACTIVITÉS</button><div class="emasTabsSpacer" aria-hidden="true"></div><span id="headerConnection" class="connection-badge" role="status" title="Vérification de la connexion Grist">Vérification…</span><span id="headerEquipier" class="equipier-badge" title="Équipier identifié par Grist">Identification…</span><div id="notificationHub"><button aria-label="Centre d’information" id="bellButton" title="Nouveaux FE" type="button">🔔<span hidden="" id="bellCount">0</span></button><div hidden="" id="notificationPanel"><div class="bellHead"><strong>Nouveaux FE</strong><span><button class="bellClear" id="bellClear" type="button">Tout supprimer</button></span></div><div id="bellItems"></div></div></div></nav><div id="operationalApp"><div aria-atomic="false" aria-live="polite" id="toastStack"></div><main class="page">
+</head><body><nav aria-label="Sections du centre opérationnel" id="emasMainTabs"><button aria-pressed="true" class="emasMainTab selected" data-section="operational" type="button">SUIVI OPÉRATIONNEL</button><button aria-pressed="false" class="emasMainTab" data-section="activities" type="button">SUIVI DES ACTIVITÉS</button><div class="emasTabsSpacer" aria-hidden="true"></div><span id="headerConnection" class="connection-badge" role="status" title="Vérification de la connexion Grist">Vérification…</span><span id="headerEquipier" class="equipier-badge" title="Équipier identifié par Grist">Identification…</span><div id="notificationHub"><button aria-label="Centre d’information" id="bellButton" title="Mes notifications" type="button"><span class="bellGlyph" aria-hidden="true">🔔</span><span hidden="" id="bellCount">0</span></button><div hidden="" id="notificationPanel"><div class="bellHead"><strong>Mes notifications</strong><span><button class="bellClear" id="bellClear" type="button">Tout supprimer</button></span></div><div id="bellItems"></div></div></div></nav><div id="operationalApp"><div aria-atomic="false" aria-live="polite" id="toastStack"></div><main class="page">
 <section class="card" id="listView">
 <div class="top"><div><h1>Bureau des légendes</h1><div class="muted">Car vous êtes des légendes — Consultation et suivi des faits d’établissement — 34 et 48</div></div></div>
 <div class="periodbar">
@@ -463,9 +470,13 @@ function toast(message,type="info",title="",duration=10000,onOpen=null){
   if(title){const h=document.createElement("div");h.className="toast-title";h.textContent=title;el.appendChild(h)}
   const msg=document.createElement("div");msg.className="toast-message";msg.textContent=String(message||"");el.appendChild(msg);
   const progress=document.createElement("div");progress.className="toast-progress";progress.style.setProperty("--toast-duration",`${duration}ms`);el.appendChild(progress);
-  stack.appendChild(el);requestAnimationFrame(()=>el.classList.add("show"));
+  stack.appendChild(el);void el.offsetWidth;requestAnimationFrame(()=>{if(!closed)el.classList.add("show")});
   let remaining=duration,started=Date.now(),timer=null,closed=false;
-  const close=()=>{if(closed)return;closed=true;clearTimeout(timer);el.classList.remove("show");setTimeout(()=>el.remove(),220)};
+  const close=()=>{if(closed)return;closed=true;clearTimeout(timer);el.classList.remove("show");el.classList.add("leaving");setTimeout(()=>{
+    const others=[...stack.children].filter(n=>n!==el),before=others.map(n=>n.getBoundingClientRect().top);
+    el.remove();
+    others.forEach((n,i)=>{const dy=before[i]-n.getBoundingClientRect().top;if(dy&&n.animate&&!matchMedia('(prefers-reduced-motion: reduce)').matches)n.animate([{translate:`0 ${dy}px`},{translate:'0 0'}],{duration:300,easing:'ease-out'})});
+  },420)};
   const start=()=>{started=Date.now();timer=setTimeout(close,remaining)};
   el.addEventListener("mouseenter",()=>{clearTimeout(timer);remaining=Math.max(0,remaining-(Date.now()-started))});
   el.addEventListener("mouseleave",()=>{if(!closed)start()});
@@ -1053,7 +1064,7 @@ function renderFeBell(){
   $("bellCount").textContent=String(feNoticeUnread);$("bellCount").hidden=feNoticeUnread===0;
   $("bellClear").disabled=!visible.length;
   $("bellItems").replaceChildren();
-  if(!visible.length){const p=document.createElement("div");p.className="bellEmpty";p.textContent="Aucun nouveau FE enregistré.";$("bellItems").appendChild(p);return}
+  if(!visible.length){const p=document.createElement("div");p.className="bellEmpty";p.textContent="Aucune nouvelle notification.";$("bellItems").appendChild(p);return}
   for(const item of visible){
     const row=document.createElement("div");row.className="bellRow";
     const btn=document.createElement("button");btn.type="button";btn.className="bellItem";
@@ -1289,17 +1300,31 @@ async function feNoticeFanout(recent){
 }
 function feNoticeRowSignature(f){return isCurrentOperationalFact(f)?String(f.Numero_FE||"").trim():""}
 // Lecture indépendante, registre collectif et file de toasts individuelle.
-let feToastQueue=Promise.resolve(),feNoticeLastError='',feNoticeLastErrorAt=0;
+const feToastQueue=[];let feToastActive=0,feNoticeLastError='',feNoticeLastErrorAt=0;
 function feNoticeError(e){
   const message=String(e?.message||e);console.warn('Notifications',e);
   if(message!==feNoticeLastError||Date.now()-feNoticeLastErrorAt>300000){issueAdd('Notifications FE',message);feNoticeLastError=message;feNoticeLastErrorAt=Date.now()}
 }
-function queueFeToast(item){
-  feToastQueue=feToastQueue.catch(()=>{}).then(()=>{
+function ringFeBell(){
+  const glyph=$("bellButton").querySelector(".bellGlyph");
+  if(!glyph)return;
+  glyph.classList.remove("bellRinging");
+  void glyph.offsetWidth;
+  glyph.classList.add("bellRinging");
+}
+function drainFeToasts(){
+  while(feToastActive<3&&feToastQueue.length){
+    const item=feToastQueue.shift();
     const local=feNoticeHistory.find(x=>feNoticeKey(x)===item.numero);
-    if(!local||local.deleted||local.read)return;
-    return toast(`${item.etab} — ${item.ville} · ${item.numero} · Transmis le ${feNoticeTime(item.arrived)}`,'info',`Nouveau FE · Niveau ${item.niveau}`,10000,()=>openNotifiedFE(item));
-  });
+    if(!local||local.deleted||local.read)continue;
+    feToastActive++;
+    Promise.resolve().then(()=>toast(`${item.etab} — ${item.ville} · ${item.numero} · Transmis le ${feNoticeTime(item.arrived)}`,'info',`Nouveau FE · Niveau ${item.niveau}`,10000,()=>openNotifiedFE(item))).catch(e=>console.warn('Affichage notification',e)).finally(()=>{feToastActive--;drainFeToasts()});
+  }
+}
+function queueFeToast(item){
+  ringFeBell();
+  feToastQueue.push(item);
+  drainFeToasts();
 }
 // Les FE transmis récemment sont la source commune de toutes les boîtes.
 // Aucun accès au registre NOTIFICATIONS_FE n'est nécessaire.
