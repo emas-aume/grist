@@ -497,12 +497,14 @@ function notice(s,type=""){
   }
   let n=$("notice");if(!n)return;n.textContent=s;n.className="notice"+(type?" "+type:"");
 }
+let tokenRequestPending=null;
 async function getTokenInfo(force=false){
   const now=Date.now();
   if(!force && tokenInfo && tokenInfo._expiresAt && now < tokenInfo._expiresAt-30000)return tokenInfo;
-  const t=await grist.docApi.getAccessToken({readOnly:false});
-  tokenInfo={...t,_expiresAt:now+(t.ttlMsecs||240000)};
-  return tokenInfo;
+  if(tokenRequestPending)return tokenRequestPending;
+  tokenRequestPending=(async()=>{const t=await grist.docApi.getAccessToken({readOnly:false});
+    tokenInfo={...t,_expiresAt:Date.now()+(t.ttlMsecs||240000)};return tokenInfo;})();
+  try{return await tokenRequestPending}finally{tokenRequestPending=null}
 }
 function restRecordsToRows(payload,source){
   const records=Array.isArray(payload?.records)?payload.records:[];
@@ -516,7 +518,9 @@ async function gristGet(path,params=null,retry=true){
   const response=await fetch(url,{method:"GET",credentials:"omit",signal:AbortSignal.timeout(20000)});
   if(response.status===401&&retry){tokenInfo=null;await getTokenInfo(true);return gristGet(path,params,false)}
   if(!response.ok){const detail=await response.text().catch(()=>response.statusText);throw new Error("HTTP "+response.status+" — "+detail.slice(0,240))}
-  return response.json();
+  const payload=await response.json();
+  if(navigator.onLine){lastSuccessfulGristRead=Date.now();setHeaderConnection(true,"Grist accessible");}
+  return payload;
 }
 async function api(table,{filter=null,sort=null,limit=null,offset=null}={}){
   try{
@@ -1342,7 +1346,7 @@ async function readNotificationFacts(){
   try{return await feAclSnapshot.promise}finally{feAclSnapshot.promise=null}
 }
 async function pollNewFE(){
-  if(feNoticeBusy)return;
+  if(feNoticeBusy||document.hidden||!navigator.onLine)return;
   feNoticeBusy=true;
   try{
     if(!feNoticeReady){if(!currentEquipier||!identityVerified)await detectCurrentEquipier();if(!identityVerified||!currentEquipier)return;await feNoticeInitialize()}
@@ -1493,6 +1497,7 @@ async function readLiveFESnapshot(){
 }
 // Une seule cadence : le tableau est rafraîchi en premier, puis les notifications.
 // Le second passage utilise les mêmes données Grist récentes, sans temporisation séparée.
+let lastSuccessfulGristRead=0;
 let feAndNoticeBusy=false, lastPeriodSuccess=0, lastResumeAttempt=0, resumePending=false, connectionProbeBusy=false, connectionProbeGeneration=0;
 function updateHeaderEquipier(){
   const el=$("headerEquipier");if(!el)return;
@@ -1505,7 +1510,7 @@ function setHeaderConnection(ok,detail){
 }
 async function probeHeaderConnection(){
   if(!navigator.onLine){setHeaderConnection(false,"Connexion réseau indisponible");return;}
-  if(connectionProbeBusy)return;
+  if(connectionProbeBusy||Date.now()-lastSuccessfulGristRead<15000)return;
   connectionProbeBusy=true;const generation=connectionProbeGeneration;
   try{await api(T.CUR,{limit:1});if(generation===connectionProbeGeneration&&navigator.onLine)setHeaderConnection(true,"Grist accessible");}
   catch(e){if(generation===connectionProbeGeneration)setHeaderConnection(false,"Grist inaccessible : "+String(e.message||e));}
@@ -1532,30 +1537,37 @@ async function refreshFEAndNotifications(){
     const snapshotResult=await snapshotPromise;
     const snapshot=snapshotResult.status==="fulfilled"?snapshotResult.value:null;
     await Promise.allSettled([(async()=>{
-      if(periodResult.status==="fulfilled"&&generation===loadCurrentGeneration&&etabGeneration===establishmentLoadGeneration){await refreshLiveFEList(snapshot,periodResult.value);lastPeriodSuccess=Date.now();render();}
-      await refreshLiveSuivi();
+      if(snapshot&&periodResult.status==="fulfilled"&&generation===loadCurrentGeneration&&etabGeneration===establishmentLoadGeneration){await refreshLiveFEList(snapshot,periodResult.value);}
+      if(Date.now()-lastLiveRefreshAt>=LIVE_SUIVI_REFRESH_MS)await refreshLiveSuivi();
     })()]);
   }catch(e){console.warn("Actualisation commune FE indisponible",e);
   }finally{feAndNoticeBusy=false;if(resumePending){resumePending=false;if(!document.hidden&&navigator.onLine)void refreshFEAndNotifications();}}
 }
+function staggeredInterval(fn,ms){
+  // Décalage fixe par poste, sans allonger la cadence nominale.
+  const handle={timer:null,stopped:false};
+  handle.timer=setTimeout(()=>{if(handle.stopped)return;fn();handle.timer=setInterval(fn,ms);},Math.floor(Math.random()*ms));
+  return handle;
+}
+function stopStaggeredInterval(handle){if(handle){handle.stopped=true;clearTimeout(handle.timer);clearInterval(handle.timer);}}
 function startLiveRefresh(){
   updateHeaderEquipier();void probeHeaderConnection();
-  if(liveRefreshTimer)clearInterval(liveRefreshTimer);
+  if(liveRefreshTimer)stopStaggeredInterval(liveRefreshTimer);
   // Synchronisation légère indépendante de la lecture des FE et des notifications.
-  liveRefreshTimer=setInterval(()=>void refreshLiveSuivi(),LIVE_SUIVI_REFRESH_MS);
+  liveRefreshTimer=staggeredInterval(()=>void refreshLiveSuivi(),LIVE_SUIVI_REFRESH_MS);
   void refreshLiveSuivi();
-  if(feListLiveTimer)clearInterval(feListLiveTimer);
-  feListLiveTimer=setInterval(()=>void refreshFEAndNotifications(),15000);
+  if(feListLiveTimer)stopStaggeredInterval(feListLiveTimer);
+  feListLiveTimer=staggeredInterval(()=>void refreshFEAndNotifications(),15000);
   // Premier passage après chargement initial, puis toutes les 15 secondes.
   void refreshFEAndNotifications();
-  if(feNoticeTimer)clearInterval(feNoticeTimer);
-  feNoticeTimer=setInterval(()=>void pollNewFE(),FE_NOTIFY_POLL_MS);
+  if(feNoticeTimer)stopStaggeredInterval(feNoticeTimer);
+  feNoticeTimer=staggeredInterval(()=>void pollNewFE(),FE_NOTIFY_POLL_MS);
   void pollNewFE();
 }
 document.addEventListener("visibilitychange",async()=>{
   if(document.hidden)return;
   resumeLiveRefresh(true);
-  await refreshFEAndNotifications();
+  // Le rattrapage FE a déjà été déclenché par resumeLiveRefresh.
   // Au retour d'un onglet en veille, ne jamais considérer un ancien verrou local comme encore acquis.
   if(selectedEtab&&currentEtabLock){
     const key=String(selectedEtab.UAI||"").trim();
@@ -1565,8 +1577,8 @@ document.addEventListener("visibilitychange",async()=>{
 });
 window.addEventListener("focus",()=>resumeLiveRefresh(true));
 window.addEventListener("pageshow",()=>resumeLiveRefresh(true));
-window.addEventListener("online",()=>{connectionProbeGeneration++;resumeLiveRefresh(true);void probeHeaderConnection();});
-window.addEventListener("offline",()=>{connectionProbeGeneration++;setHeaderConnection(false,"Connexion réseau indisponible");});
+window.addEventListener("online",()=>{connectionProbeGeneration++;lastSuccessfulGristRead=0;resumeLiveRefresh(true);});
+window.addEventListener("offline",()=>{connectionProbeGeneration++;lastSuccessfulGristRead=0;setHeaderConnection(false,"Connexion réseau indisponible");});
 for(const event of ["pointermove","pointerdown","keydown"])document.addEventListener(event,()=>resumeLiveRefresh(),{passive:true});
 let lastWakeTick=Date.now();
 setInterval(()=>{const now=Date.now(),gap=now-lastWakeTick;lastWakeTick=now;if(!document.hidden){resumeLiveRefresh(gap>30000);void probeHeaderConnection();}},15000);
