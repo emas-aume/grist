@@ -1101,7 +1101,7 @@ function feNoticeAllowedDepartment(item){
 }
 function feNoticeTrim(items){
   const min=feNoticeWindowStart();
-  return items.filter(x=>Number(x.detected??x.arrived)>=min&&Number(x.detected??x.arrived)<=Date.now()&&feNoticeAllowedDepartment(x));
+  return items.filter(x=>Number(x.arrived)>=min&&Number(x.arrived)<=Date.now()&&feNoticeAllowedDepartment(x));
 }
 function feNoticeRestore(row){
   feNoticeState=row;feNoticeLastId=Number(row.Dernier_FE_ID)||0;
@@ -1284,36 +1284,22 @@ function queueFeToast(item){
     return toast(`${item.etab} — ${item.ville} · ${item.numero} · Transmis le ${feNoticeTime(item.arrived)}`,'info',`Nouveau FE · Niveau ${item.niveau}`,10000,()=>openNotifiedFE(item));
   });
 }
-const FE_REGISTRY_BASELINE='__EMAS_BASELINE_V1__';
+// Les FE transmis récemment sont la source commune de toutes les boîtes.
+// Aucun accès au registre NOTIFICATIONS_FE n'est nécessaire.
 async function pollNewFE(){
   if(feNoticeBusy)return;
   feNoticeBusy=true;
   try{
     if(!feNoticeReady){if(!currentEquipier||!identityVerified)await detectCurrentEquipier();await feNoticeInitialize()}
-    const [facts,registry]=await Promise.all([apiAllPaged(T.CUR,{sort:'id',pageSize:1000,maxRows:50000}),apiAllPaged(T.NOTIF_FE,{sort:'id',pageSize:1000,maxRows:50000})]);
-    if(facts.length>=50000||registry.length>=50000)throw new Error('Registre ou base FE trop volumineux : lecture incomplète.');
-    const now=Date.now(),start=feNoticeWindowStart(),index=new Map(),known=new Set(registry.map(r=>String(r.Numero_FE??'').trim()));
-    const baseline=known.has(FE_REGISTRY_BASELINE),actions=[];
+    const facts=await apiAllPaged(T.CUR,{sort:'id',pageSize:1000,maxRows:50000});
+    if(facts.length>=50000)throw new Error('Base FE trop volumineuse : lecture incomplète.');
+    const now=Date.now(),start=feNoticeWindowStart(),active=new Map();
     for(const f of facts){
-      if(!isActiveFact(f)||!isOperationalDepartmentFact(f))continue;
+      if(!isCurrentOperationalFact(f))continue;
       const numero=String(f.Numero_FE??'').trim(),arrived=feTransmissionTime(f.Date_de_transmission);
-      if(!numero||!Number.isFinite(arrived)||arrived>now)continue;
-      const item={id:Number(f.id),occurrence:numero,numero,niveau:displayLevel(f.Niveau),etab:String(f.Etablissement||'Établissement non renseigné'),ville:String(f.Ville||''),departement:factDept(f),arrived};
-      index.set(numero,item);
-      if(known.has(numero))continue;
-      known.add(numero);
-      const detected=baseline||arrived>=start?now:0;
-      actions.push(['AddRecord',T.NOTIF_FE,null,{FE_Row_ID:item.id,Numero_FE:numero,Occurrence:numero,Niveau:item.niveau,Etablissement:item.etab,Ville:item.ville,Departement:item.departement,Arrivee:detected}]);
-    }
-    // Le marqueur n'est écrit qu'après le recensement initial complet.
-    for(let i=0;i<actions.length;i+=200)await grist.docApi.applyUserActions(actions.slice(i,i+200));
-    if(!baseline)await grist.docApi.applyUserActions([['AddRecord',T.NOTIF_FE,null,{Numero_FE:FE_REGISTRY_BASELINE,Occurrence:FE_REGISTRY_BASELINE,Arrivee:0}]]);
-    const events=actions.length||!baseline?await apiAllPaged(T.NOTIF_FE,{sort:'id',pageSize:1000,maxRows:50000}):registry;
-    const active=new Map();
-    for(const r of events){
-      const numero=String(r.Numero_FE??'').trim(),fact=index.get(numero),detected=Number(r.Arrivee);
-      if(!fact||!Number.isFinite(detected)||detected<start||detected> Date.now())continue;
-      const prev=active.get(numero);if(!prev||detected<prev.detected)active.set(numero,{...fact,detected,source:'registry'});
+      if(!numero||!Number.isFinite(arrived)||arrived<start||arrived>now)continue;
+      const item={id:Number(f.id),occurrence:numero,numero,niveau:displayLevel(f.Niveau),etab:String(f.Etablissement||'Établissement non renseigné'),ville:String(f.Ville||''),departement:factDept(f),arrived,detected:arrived,source:'transmission'};
+      active.set(numero,item);
     }
     feTransmissionIndex=active;
     const mine=await api(T.NOTIF,{filter:{Email:[feNoticeEmail]},limit:10});
@@ -1322,12 +1308,12 @@ async function pollNewFE(){
     if(!Array.isArray(remote))throw new Error('Historique de notifications invalide.');
     const seen=new Set(remote.map(feNoticeKey));
     const added=[...active.values()].filter(item=>!seen.has(item.numero));
-    const merged=feNoticeMergeHistory([...feNoticeHistory,...added],remote);
+    const merged=feNoticeMergeHistory([...feNoticeHistory,...active.values()],remote);
     feNoticeState=mine[0];
     feNoticeHistory.splice(0,feNoticeHistory.length,...merged);
-    if(JSON.stringify(merged)!==JSON.stringify(remote))await feNoticePersist();
     renderFeBell();
-    for(const item of added.sort((a,b)=>a.detected-b.detected||a.arrived-b.arrived||a.id-b.id))queueFeToast(item);
+    if(JSON.stringify(merged)!==JSON.stringify(remote))await feNoticePersist();
+    for(const item of added.sort((a,b)=>a.arrived-b.arrived||a.id-b.id))queueFeToast(item);
     feNoticeLastError='';
   }catch(e){feNoticeError(e)}finally{feNoticeBusy=false}
 }
