@@ -467,6 +467,7 @@ function toast(message,type="info",title="",duration=10000,onOpen=null){
   el.addEventListener("mouseleave",()=>{if(!closed)start()});
   el.addEventListener("click",()=>{close();if(onOpen)onOpen()});
   start();
+  return new Promise(resolve=>{const observer=new MutationObserver(()=>{if(!el.isConnected){observer.disconnect();resolve()}});observer.observe(stack,{childList:true});if(!el.isConnected){observer.disconnect();resolve()}});
 }
 function esc(v){return String(v??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;")}
 function norm(v){return String(v??"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/\s+/g," ").trim()}
@@ -976,7 +977,7 @@ function periodSpec(){
 }
 let loadCurrentGeneration=0;
 function feOrderDescending(a,b){const x=Number(a.manualSort),y=Number(b.manualSort);if(Number.isFinite(x)&&Number.isFinite(y)&&x!==y)return y-x;return (Number(b.id)||0)-(Number(a.id)||0)}
-async function loadCurrent(){const generation=++loadCurrentGeneration;let spec=periodSpec();if(!spec){notice("Choisissez une période valide.","error");return}notice(`Chargement des faits ${spec.label} — départements 34 et 48…`);let loaded=await apiAllPaged(T.CUR,{filter:{Date_de_saisie:spec.dates},sort:"-id",pageSize:1000,maxRows:10000});if(generation!==loadCurrentGeneration)return;const nextRows=loaded.filter(isCurrentOperationalFact).sort(feOrderDescending);await Promise.all([loadSuiviFor(nextRows),loadClaimsFor(nextRows)]);if(generation!==loadCurrentGeneration)return;currentRows=nextRows;rows=[...nextRows];notice(`${currentRows.length} fait(s) des départements 34 et 48 chargé(s) pour ${spec.label}.`,"ok");page=1;render()}
+async function loadCurrent(){const generation=++loadCurrentGeneration;let spec=periodSpec();if(!spec){notice("Choisissez une période valide.","error");return}notice(`Chargement des faits ${spec.label} — départements 34 et 48…`);let loaded=await apiAllPaged(T.CUR,{filter:{Date_de_saisie:spec.dates},sort:"-id",pageSize:1000,maxRows:10000});if(generation!==loadCurrentGeneration)return;const nextRows=loaded.filter(isCurrentOperationalFact).sort(feOrderDescending);await Promise.all([loadSuiviFor(nextRows),loadClaimsFor(nextRows)]);if(generation!==loadCurrentGeneration)return;currentRows=nextRows;rows=[...nextRows];livePeriodKey=spec.dates.join(",");livePeriodFingerprint=feListSignature(nextRows);notice(`${currentRows.length} fait(s) des départements 34 et 48 chargé(s) pour ${spec.label}.`,"ok");page=1;render()}
 async function loadSuiviFor(facts){
   // Une requête par groupe de FE distincts évite les filtres REST démesurés.
   const ids=[...new Set(facts.filter(f=>!isArchivedFact(f)).map(f=>feNumericKey(f.Numero_FE)).filter(Boolean))];
@@ -1007,7 +1008,7 @@ const feTransmissionFormat=new Intl.DateTimeFormat('fr-FR',{timeZone:'Europe/Par
 function feTransmissionTime(v){
   if(typeof v==='number')return Number.isFinite(v)&&v>0?(v<1e12?v*1000:v):NaN;
   const m=/^(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2})(?::(\d{2}))?$/.exec(String(v??'').trim());
-  if(!m)return NaN;
+  if(!m){const raw=String(v??'').trim();if(/^\d{10,13}(?:\.\d+)?$/.test(raw))return feTransmissionTime(Number(raw));if(/^\d{4}-\d{2}-\d{2}T.*(?:Z|[+-]\d{2}:?\d{2})$/i.test(raw))return Date.parse(raw);return NaN;}
   const [,d,mo,y,h,mi,se='0']=m, target=Date.UTC(+y,+mo-1,+d,+h,+mi,+se);
   let ts=target;
   for(let i=0;i<3;i++){
@@ -1060,7 +1061,7 @@ async function openNotifiedFE(item){
   try{
     const found=await api(T.CUR,{filter:{id:[item.id]},limit:1});
     const f=found[0];
-    if(!f||!isCurrentOperationalFact(f)){toast("Ce FE n’est plus disponible.","error","Ouverture impossible");return}
+    if(!f||!isCurrentOperationalFact(f)||String(f.Numero_FE??'').trim()!==feNoticeKey(item)){toast("Ce FE n’est plus disponible.","error","Ouverture impossible");return}
     $("notificationPanel").hidden=true;await openFact(`${T.CUR}:${item.id}`);
     // La consultation du FE marque cette notification comme lue, sans la supprimer.
     const local=feNoticeHistory.find(x=>String(x.occurrence||`${x.id}:${x.numero}`)===String(item.occurrence||`${item.id}:${item.numero}`));
@@ -1095,12 +1096,12 @@ function feNoticeAllowedDepartment(item){
 }
 function feNoticeTrim(items){
   const min=feNoticeWindowStart();
-  return items.filter(x=>Number(x.arrived)>=min&&Number(x.arrived)<=Date.now()&&feNoticeAllowedDepartment(x));
+  return items.filter(x=>Number(x.detected??x.arrived)>=min&&Number(x.detected??x.arrived)<=Date.now()&&feNoticeAllowedDepartment(x));
 }
 function feNoticeRestore(row){
   feNoticeState=row;feNoticeLastId=Number(row.Dernier_FE_ID)||0;
   let history=[];try{history=JSON.parse(String(row.Historique_JSON||"[]"))}catch(e){console.warn("Historique de notifications illisible",e)}
-  feNoticeHistory.splice(0,feNoticeHistory.length,...(Array.isArray(history)?history:[]).filter(x=>x&&Number.isFinite(Number(x.id))).filter(x=>Number(x.arrived)>=feNoticeWindowStart()&&Number(x.arrived)<=Date.now()&&feNoticeAllowedDepartment(x)));
+  feNoticeHistory.splice(0,feNoticeHistory.length,...(Array.isArray(history)?history:[]).filter(x=>x&&Number.isFinite(Number(x.id))).filter(x=>feNoticeTrim([x]).length));
   const viewed=Number(row.Derniere_consultation)||0;
   feNoticeUnread=feNoticeHistory.filter(x=>!x.deleted&&!x.read).length;
   renderFeBell();
@@ -1113,7 +1114,7 @@ function feNoticeMergeHistory(local,remote){
     if(!item||!Number.isFinite(Number(item.id)))continue;
     const key=feNoticeKey(item);if(!key)continue;
     const fact=feTransmissionIndex?.get(key);
-    if(feTransmissionIndex&&!fact)continue;
+    // Une lecture partielle ou un FE ancien ne doit pas effacer un état individuel.
     const prev=byNumber.get(key);
     const merged={...prev,...item,...(fact||{}),read:Boolean(prev?.read||item.read),deleted:Boolean(prev?.deleted||item.deleted)};
     byNumber.set(key,merged);
@@ -1138,7 +1139,7 @@ function feNoticePersist(viewedAt=null){
     const saved=confirmed[0];
     let savedHistory=[];
     try{savedHistory=JSON.parse(String(saved.Historique_JSON||"[]"))}catch(e){throw new Error("Historique des notifications illisible après sauvegarde.")}
-    if(!Array.isArray(savedHistory)||merged.some(item=>!savedHistory.some(x=>Number(x.id)===Number(item.id)&&(!item.deleted||x.deleted)))||Number(saved.Dernier_FE_ID||0)<cursor||Number(saved.Derniere_consultation||0)<viewed){
+    if(!Array.isArray(savedHistory)||merged.some(item=>!savedHistory.some(x=>feNoticeKey(x)===feNoticeKey(item)&&(!item.deleted||x.deleted)&&(!item.read||x.read)))||Number(saved.Dernier_FE_ID||0)<cursor||Number(saved.Derniere_consultation||0)<viewed){
       throw new Error("Une autre session a modifié les notifications pendant la sauvegarde. Actualisez la cloche.");
     }
     feNoticeState=saved;feNoticeLastId=Math.max(cursor,Number(saved.Dernier_FE_ID)||0);
@@ -1265,37 +1266,65 @@ async function feNoticeFanout(recent){
   finally{feFanoutBusy=false}
 }
 function feNoticeRowSignature(f){return isCurrentOperationalFact(f)?String(f.Numero_FE||"").trim():""}
-// Notifications calculées directement depuis la transmission des FE.
-async function pollNewFE(facts){
-  if(feNoticeBusy||document.hidden)return;
-  if(!feNoticeReady){
-    try{if(!currentEquipier||!identityVerified)await detectCurrentEquipier();await feNoticeInitialize()}
-    catch(e){console.warn('Notifications : identification en attente',e);return}
-  }
+// Lecture indépendante, registre collectif et file de toasts individuelle.
+let feToastQueue=Promise.resolve(),feNoticeLastError='',feNoticeLastErrorAt=0;
+function feNoticeError(e){
+  const message=String(e?.message||e);console.warn('Notifications',e);
+  if(message!==feNoticeLastError||Date.now()-feNoticeLastErrorAt>300000){issueAdd('Notifications FE',message);feNoticeLastError=message;feNoticeLastErrorAt=Date.now()}
+}
+function queueFeToast(item){
+  feToastQueue=feToastQueue.catch(()=>{}).then(()=>{
+    const local=feNoticeHistory.find(x=>feNoticeKey(x)===item.numero);
+    if(!local||local.deleted||local.read)return;
+    return toast(`${item.etab} — ${item.ville} · ${item.numero} · Transmis le ${feNoticeTime(item.arrived)}`,'info',`Nouveau FE · Niveau ${item.niveau}`,10000,()=>openNotifiedFE(item));
+  });
+}
+const FE_REGISTRY_BASELINE='__EMAS_BASELINE_V1__';
+async function pollNewFE(){
+  if(feNoticeBusy)return;
   feNoticeBusy=true;
   try{
-    const index=new Map(),now=Date.now(),start=feNoticeWindowStart();
+    if(!feNoticeReady){if(!currentEquipier||!identityVerified)await detectCurrentEquipier();await feNoticeInitialize()}
+    const [facts,registry]=await Promise.all([apiAllPaged(T.CUR,{sort:'id',pageSize:1000,maxRows:50000}),apiAllPaged(T.NOTIF_FE,{sort:'id',pageSize:1000,maxRows:50000})]);
+    if(facts.length>=50000||registry.length>=50000)throw new Error('Registre ou base FE trop volumineux : lecture incomplète.');
+    const now=Date.now(),start=feNoticeWindowStart(),index=new Map(),known=new Set(registry.map(r=>String(r.Numero_FE??'').trim()));
+    const baseline=known.has(FE_REGISTRY_BASELINE),actions=[];
     for(const f of facts){
-      if(!isCurrentOperationalFact(f))continue;
+      if(!isActiveFact(f)||!isOperationalDepartmentFact(f))continue;
       const numero=String(f.Numero_FE??'').trim(),arrived=feTransmissionTime(f.Date_de_transmission);
-      if(!numero||!Number.isFinite(arrived)||arrived<start||arrived>now)continue;
-      index.set(numero,{id:Number(f.id),occurrence:`${Number(f.id)}:${numero}`,numero,niveau:String(f.Niveau||'—'),etab:String(f.Etablissement||'Établissement non renseigné'),ville:String(f.Ville||''),departement:factDept(f),arrived,source:'transmission'});
+      if(!numero||!Number.isFinite(arrived)||arrived>now)continue;
+      const item={id:Number(f.id),occurrence:numero,numero,niveau:displayLevel(f.Niveau),etab:String(f.Etablissement||'Établissement non renseigné'),ville:String(f.Ville||''),departement:factDept(f),arrived};
+      index.set(numero,item);
+      if(known.has(numero))continue;
+      known.add(numero);
+      const detected=baseline||arrived>=start?now:0;
+      actions.push(['AddRecord',T.NOTIF_FE,null,{FE_Row_ID:item.id,Numero_FE:numero,Occurrence:numero,Niveau:item.niveau,Etablissement:item.etab,Ville:item.ville,Departement:item.departement,Arrivee:detected}]);
     }
-    feTransmissionIndex=index;
+    // Le marqueur n'est écrit qu'après le recensement initial complet.
+    for(let i=0;i<actions.length;i+=200)await grist.docApi.applyUserActions(actions.slice(i,i+200));
+    if(!baseline)await grist.docApi.applyUserActions([['AddRecord',T.NOTIF_FE,null,{Numero_FE:FE_REGISTRY_BASELINE,Occurrence:FE_REGISTRY_BASELINE,Arrivee:0}]]);
+    const events=actions.length||!baseline?await apiAllPaged(T.NOTIF_FE,{sort:'id',pageSize:1000,maxRows:50000}):registry;
+    const active=new Map();
+    for(const r of events){
+      const numero=String(r.Numero_FE??'').trim(),fact=index.get(numero),detected=Number(r.Arrivee);
+      if(!fact||!Number.isFinite(detected)||detected<start||detected> Date.now())continue;
+      const prev=active.get(numero);if(!prev||detected<prev.detected)active.set(numero,{...fact,detected,source:'registry'});
+    }
+    feTransmissionIndex=active;
     const mine=await api(T.NOTIF,{filter:{Email:[feNoticeEmail]},limit:10});
     if(mine.length!==1)throw new Error('Boîte de notifications ambiguë ou absente.');
     const remote=JSON.parse(String(mine[0].Historique_JSON||'[]'));
     if(!Array.isArray(remote))throw new Error('Historique de notifications invalide.');
-    const known=new Set([...remote,...feNoticeHistory].map(feNoticeKey));
-    const added=[...index.values()].filter(item=>!known.has(item.numero));
+    const seen=new Set(remote.map(feNoticeKey));
+    const added=[...active.values()].filter(item=>!seen.has(item.numero));
     const merged=feNoticeMergeHistory([...feNoticeHistory,...added],remote);
     feNoticeState=mine[0];
     feNoticeHistory.splice(0,feNoticeHistory.length,...merged);
     if(JSON.stringify(merged)!==JSON.stringify(remote))await feNoticePersist();
     renderFeBell();
-    for(const item of added)toast(`${item.etab} — ${item.ville} · ${item.numero} · Transmis le ${feNoticeTime(item.arrived)}`,'info',`Nouveau FE · Niveau ${item.niveau}`,10000,()=>openNotifiedFE(item));
-  }catch(e){console.warn('Actualisation des notifications indisponible',e)}
-  finally{feNoticeBusy=false}
+    for(const item of added.sort((a,b)=>a.detected-b.detected||a.arrived-b.arrived||a.id-b.id))queueFeToast(item);
+    feNoticeLastError='';
+  }catch(e){feNoticeError(e)}finally{feNoticeBusy=false}
 }
 
 async function feNoticeMarkViewed(){
@@ -1329,6 +1358,7 @@ const LIVE_REFRESH_MS=15000; const CLAIM_TTL_SECONDS=60,CLAIM_HEARTBEAT_MS=15000
 let claimMap=new Map(),currentEquipier=null,currentUserProfile=null,currentClaimSession=(crypto.randomUUID?crypto.randomUUID():String(Date.now())+"-"+Math.random().toString(36).slice(2)),claimHeartbeatTimer=null,claimBusy=false,editLockHeartbeatTimer=null,currentEtabLock=null;
 let liveRefreshBusy=false,liveRefreshTimer=null,lastLiveRefreshAt=0;
 const LIVE_REFRESH_MIN_GAP_MS=4000;
+const LIVE_SUIVI_REFRESH_MS=5000;
 async function refreshLiveSuivi(){
   if(liveRefreshBusy||document.hidden)return;
   const facts=[...rows,...(selected?[selected]:[])].filter(f=>!isArchivedFact(f)&&isActiveFact(f));
@@ -1337,12 +1367,13 @@ async function refreshLiveSuivi(){
   liveRefreshBusy=true;
   const refreshedFactKey=selected?`${selected._source}:${selected.id}`:null;
   try{
-    const [ss]=await Promise.all([api(T.SUIVI,{filter:{Numero_FE:ids},limit:Math.max(ids.length*2,200)}),loadClaimsFor(facts)]);
-    const fresh=new Map(ss.map(s=>[Number(s.Numero_FE),s]));
+    const [suiviResult]=await Promise.allSettled([api(T.SUIVI,{filter:{Numero_FE:ids},limit:Math.max(ids.length*2,200)}),loadClaimsFor(facts)]);
+    if(suiviResult.status!=="fulfilled"){render();if(selected)updateFeLockUI();throw suiviResult.reason;}
+    const fresh=new Map(suiviResult.value.map(s=>[Number(s.Numero_FE),s]));
     for(const id of ids){if(fresh.has(id))suiviMap.set(id,fresh.get(id));else suiviMap.delete(id)}
-    // Une réponse ancienne ne doit pas réafficher la liste ni modifier la fiche ouverte.
-    if((selected?`${selected._source}:${selected.id}`:null)!==refreshedFactKey)return;
+    // Le tableau doit refléter les verrous même si la fiche ouverte a changé.
     render();
+    if((selected?`${selected._source}:${selected.id}`:null)!==refreshedFactKey)return;
     if(selected&&!isArchivedFact(selected)&&`${selected._source}:${selected.id}`===refreshedFactKey){
       const live=fresh.get(feNumericKey(selected.Numero_FE))||null;
       const opened=Number(selectedSuivi?.Derniere_modification||0),current=Number(live?.Derniere_modification||0);
@@ -1362,15 +1393,15 @@ let liveRecentMax=0,liveLastFullCheck=0,liveLastEtabCheck=0;
 function feListSignature(facts){
   return facts.map(f=>JSON.stringify(Object.keys(f).sort().map(k=>[k,f[k]]))).sort().join("|");
 }
-async function refreshLiveFEList(snapshot){
+async function refreshLiveFEList(snapshot,periodRows){
   if(feListLiveBusy||document.hidden)return;
   feListLiveBusy=true;
   try{
     const spec=periodSpec();if(!spec)return;
     const key=spec.dates.join(",");
     const generation=loadCurrentGeneration;
-    const dates=new Set(spec.dates.map(String));
-    const fetched=snapshot.filter(f=>dates.has(String(f.Date_de_saisie)));
+    const fetched=periodRows;
+    if(!Array.isArray(fetched))return;
     if(generation!==loadCurrentGeneration||periodSpec()?.dates.join(",")!==key)return;
     const fresh=fetched.filter(isCurrentOperationalFact).sort(feOrderDescending);
     const fingerprint=feListSignature(fresh);
@@ -1379,6 +1410,7 @@ async function refreshLiveFEList(snapshot){
       const previous=new Set(currentRows.map(f=>Number(f.id)));
       livePeriodFingerprint=fingerprint;
       currentRows=fresh;
+      if(!$("q").value.trim())notice(`${fresh.length} fait(s) des départements 34 et 48 chargé(s) pour ${spec.label}.`,"ok");
       // Conserver les FE historiques et les résultats de recherche déjà ouverts.
       const inPeriod=new Set(fresh.map(f=>`${T.CUR}:${f.id}`));
       rows=[...fresh,...rows.filter(f=>f._source!==T.CUR||!previous.has(Number(f.id))&&!inPeriod.has(`${T.CUR}:${f.id}`))];
@@ -1390,7 +1422,7 @@ async function refreshLiveFEList(snapshot){
       }
     }
     // L'historique d'un établissement doit également suivre les ajouts hors de la semaine affichée.
-    if(selectedEtab&&!$("etabView").classList.contains("hidden")){
+    if(snapshot.length&&selectedEtab&&!$("etabView").classList.contains("hidden")){
       const uai=Number(selectedEtab.id);
       if(Number.isFinite(uai)){
         const facts=snapshot.filter(f=>Number(f.UAI)===uai);
@@ -1421,7 +1453,7 @@ function liveFEQuery(spec,uai,now=Date.now()){
   }
   const transmission=`(substr(trim(CAST("Date_de_transmission" AS TEXT)),1,10) IN (${[...days].map(d=>"'"+d+"'").join(",")}) OR (typeof("Date_de_transmission") IN ('integer','real') AND ("Date_de_transmission" BETWEEN ${Math.floor(start/1000)} AND ${Math.ceil(now/1000)} OR "Date_de_transmission" BETWEEN ${start} AND ${now})))`;
   const conditions=[transmission];
-  if(dates.length)conditions.push(`"Date_de_saisie" IN (${dates.join(",")})`);
+  // La période visible est récupérée séparément par le filtre REST exact.
   if(Number.isSafeInteger(uai)&&uai>0)conditions.push(`"UAI" = ${uai}`);
   return `SELECT * FROM "${T.CUR}" WHERE ${conditions.join(" OR ")} ORDER BY id`;
 }
@@ -1449,9 +1481,13 @@ async function refreshFEAndNotifications(){
   feAndNoticeBusy=true;
   try{
     const generation=loadCurrentGeneration, etabGeneration=establishmentLoadGeneration;
-    const snapshot=await readLiveFESnapshot();
-    await Promise.allSettled([pollNewFE(snapshot),(async()=>{
-      if(generation===loadCurrentGeneration&&etabGeneration===establishmentLoadGeneration)await refreshLiveFEList(snapshot);
+    const spec=periodSpec();
+    const periodPromise=spec?apiAllPaged(T.CUR,{filter:{Date_de_saisie:spec.dates},sort:"-id",pageSize:1000,maxRows:10000}):Promise.resolve(null);
+    const snapshotPromise=readLiveFESnapshot();
+    const [periodResult,snapshotResult]=await Promise.allSettled([periodPromise,snapshotPromise]);
+    const snapshot=snapshotResult.status==="fulfilled"?snapshotResult.value:null;
+    await Promise.allSettled([(async()=>{
+      if(periodResult.status==="fulfilled"&&generation===loadCurrentGeneration&&etabGeneration===establishmentLoadGeneration)await refreshLiveFEList(snapshot||[],periodResult.value);
       await refreshLiveSuivi();
     })()]);
   }catch(e){console.warn("Actualisation commune FE indisponible",e);
@@ -1459,14 +1495,21 @@ async function refreshFEAndNotifications(){
 }
 function startLiveRefresh(){
   if(liveRefreshTimer)clearInterval(liveRefreshTimer);
-  liveRefreshTimer=null;
+  // Synchronisation légère indépendante de la lecture des FE et des notifications.
+  liveRefreshTimer=setInterval(()=>void refreshLiveSuivi(),LIVE_SUIVI_REFRESH_MS);
+  void refreshLiveSuivi();
   if(feListLiveTimer)clearInterval(feListLiveTimer);
   feListLiveTimer=setInterval(()=>void refreshFEAndNotifications(),15000);
   // Premier passage après chargement initial, puis toutes les 15 secondes.
   void refreshFEAndNotifications();
+  if(feNoticeTimer)clearInterval(feNoticeTimer);
+  feNoticeTimer=setInterval(()=>void pollNewFE(),FE_NOTIFY_POLL_MS);
+  void pollNewFE();
 }
 document.addEventListener("visibilitychange",async()=>{
   if(document.hidden)return;
+  void pollNewFE();
+  void refreshLiveSuivi();
   await refreshFEAndNotifications();
   // Au retour d'un onglet en veille, ne jamais considérer un ancien verrou local comme encore acquis.
   if(selectedEtab&&currentEtabLock){
@@ -1475,7 +1518,7 @@ document.addEventListener("visibilitychange",async()=>{
     currentEtabLock=(active[0]&&editLockMine(active[0]))?active[0]:null;
   }
 });
-window.addEventListener("focus",()=>{if(Date.now()-lastLiveRefreshAt>=LIVE_REFRESH_MS)void refreshFEAndNotifications()});
+window.addEventListener("focus",()=>{void refreshLiveSuivi();void refreshFEAndNotifications()});
 
 function editLockActive(l){if(!l)return false;const t=Number(l.Derniere_activite||0);return !!t&&(Math.floor(Date.now()/1000)-t)<CLAIM_TTL_SECONDS}
 function editLockMine(l){return !!l&&!!currentEquipier&&Number(l.Equipier)===Number(currentEquipier.id)&&String(l.Session||"")===String(currentClaimSession)}
@@ -2887,117 +2930,7 @@ setInterval(()=>{if(!document.hidden)void issueSync()},60000);wireTemporaryClaim
 <div class="field full"><label for="Observations">Observations</label><textarea id="Observations" rows="3"></textarea></div>
 </div><div class="sticky layoutline" id="activityBottomBar"><div class="actions"><button class="btn" id="cancelBottom" type="button">Annuler</button><button class="btn danger" id="deleteActivity" type="button" hidden>Supprimer</button><button class="btn primary" id="saveBtn" type="submit">Enregistrer</button></div></div></form></section>
 </div>
-<script>
-'use strict';
-const TABLE='ACTIVITES_EMAS';
-const COLS=['ID_Activite','Type_activite','Intitule','Thematique','Objet_demande','Date_debut','Date_fin','Heure_debut','Heure_fin','Annee_scolaire','Statut','Departement','Degre','Structure_concernee','Lieu','UAI','Equipe_EMAS','Intervenants','Participants_prevus','Participants_reels','Compte_rendu','Observations','Date_modification'];
-const TYPES=['Formation','Sensibilisation','Accompagnement','Diagnostic de sécurité','Sécurisation','Conseil de discipline','Exercice de crise','Conseil et expertise','Réunion et coordination','Autre'];
-const STATUSES=['Programmée','Reportée','Terminée'];
-const DEPTS=['11','30','34','48','66'];const DEGREES=['1er degré','2nd degré'];
-const $=id=>document.getElementById(id);let establishments=[],etabSelectedIndex=-1,records=[],currentId=null,editingId=null,view='agenda',activityOrigin='agenda',month=new Date(new Date().getFullYear(),new Date().getMonth(),1),connected=false,busy=false;
-function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
-function isoDate(v){if(v==null||v==='')return '';if(v instanceof Date)return [v.getFullYear(),String(v.getMonth()+1).padStart(2,'0'),String(v.getDate()).padStart(2,'0')].join('-');if(typeof v==='number'){const d=new Date(v*1000);return Number.isNaN(d.getTime())?'':d.toISOString().slice(0,10);}let s=String(v).trim();if(/^\d{4}-\d\d-\d\d/.test(s))return s.slice(0,10);if(/^\d\d\/\d\d\/\d{4}$/.test(s)){let [d,m,y]=s.split('/');return `${y}-${m}-${d}`;}return '';}
-function localDate(s){if(!s)return null;const d=new Date(s+'T12:00:00');return Number.isNaN(d.getTime())?null:d;}
-function fmtDate(s){const d=localDate(isoDate(s));return d?d.toLocaleDateString('fr-FR'):'Date non renseignée';}
-function dateToGrist(s){if(!s)return null;return Math.floor(Date.parse(s+'T00:00:00Z')/1000);}
-function schoolYear(s){const d=localDate(s);if(!d)return '';let y=d.getFullYear();if(d.getMonth()<7)y--;return `${y}-${y+1}`;}
-function activityTypeBadge(type){const i=TYPES.indexOf(type);return type?`<span class="activity-type-badge activity-type-${i<0?9:i}">${esc(type)}</span>`:'';}
-function classStatus(s){return ({'Terminée':'realisee','Annulée':'annulee','Reportée':'reportee'})[s]||'';}
-let activityToastTimer=null;
-function toast(t,kind=''){
-  if(activityToastTimer!==null){clearTimeout(activityToastTimer);activityToastTimer=null;}
-  const m=$('message');m.textContent=t;m.className='notice '+kind;
-  if(kind==='success')activityToastTimer=setTimeout(()=>{m.className='notice hidden';activityToastTimer=null;},4500);
-}
-function clearToast(){if(activityToastTimer!==null){clearTimeout(activityToastTimer);activityToastTimer=null;}$('message').className='notice hidden';}
-function setConnection(t,ok){$('connection').textContent=t;$('connection').style.background=ok?'#e7f7ef':'#fff2ed';$('connection').style.color=ok?'#067647':'#b42318';}
-function options(id,arr,placeholder){$(id).innerHTML=(placeholder?`<option value="">${esc(placeholder)}</option>`:'')+arr.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('');}
-function normalizeSearch(v){return String(v??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('fr').replace(/[^a-z0-9]+/g,' ').trim();}
-function deptCode(v,uai){let x=String(v||'').trim();let m={'Aude':'11','Gard':'30','Hérault':'34','Herault':'34','Lozère':'48','Lozere':'48','Pyrénées-Orientales':'66','Pyrenees-Orientales':'66'};return m[x]||(/^(11|30|34|48|66)$/.test(x)?x:'')||(/^(011|030|034|048|066)/.test(String(uai||''))?String(uai).slice(1,3):'');}
-function degreeValue(v){let x=normalizeSearch(v);return x==='1er'||x==='1er degre'||x==='premier degre'?'1er degré':x==='2nd'||x==='2nd degre'||x==='second degre'?'2nd degré':'';}
-function hideSuggestions(){const el=$('etabSuggestions');el.classList.add('hidden');$('etabSearch').setAttribute('aria-expanded','false');etabSelectedIndex=-1;}
-function matchingEstabs(q){let n=normalizeSearch(q);if(!n)return [];let parts=n.split(/\s+/);return establishments.filter(e=>parts.every(t=>e.search.includes(t))).slice(0,25);}
-function showSuggestions(){const q=$('etabSearch').value.trim(),box=$('etabSuggestions');if(!q||!establishments.length){hideSuggestions();return;}const found=matchingEstabs(q);box.innerHTML=found.length?found.map((e,i)=>`<button type="button" role="option" class="lookup-option" data-index="${i}"><strong>${esc(e.Etablissement)}</strong><small>${esc(e.Ville)} · ${esc(e.Departement)}</small></button>`).join(''):'<div class="lookup-empty">Aucun établissement trouvé.</div>';box.classList.remove('hidden');$('etabSearch').setAttribute('aria-expanded','true');etabSelectedIndex=-1;box.querySelectorAll('[data-index]').forEach(b=>b.addEventListener('mousedown',ev=>{ev.preventDefault();chooseEtab(found[Number(b.dataset.index)]);}));}
-function chooseEtab(e){if(!e)return;$('etabSearch').value=e.Etablissement;$('UAI').value=e.UAI;const d=deptCode(e.Departement,e.UAI);if(d)$('Departement').value=d;const degree=degreeValue(e.Degre);if(degree)$('Degre').value=degree;if(d&&!$('Equipe_EMAS').value)$('Equipe_EMAS').value='EMAS '+d;$('etabInfo').textContent=`Établissement sélectionné : ${e.Etablissement} (${e.UAI})`;$('etabInfo').className='lookup-picked';$('clearEtab').classList.remove('hidden');hideSuggestions();}
-function resetEtabSearch(){ $('etabSearch').value='';$('etabInfo').textContent=establishments.length?`${establishments.length.toLocaleString('fr-FR')} établissements disponibles. Saisissez le nom d’un établissement.`:'Importez la table ETABLISSEMENTS dans ce document Grist pour activer les suggestions.';$('etabInfo').className='lookup-info';$('clearEtab').classList.add('hidden');hideSuggestions();}
-async function loadEstablishments(){if(!window.grist)return;try{const data=await grist.docApi.fetchTable('ETABLISSEMENTS');if(!Array.isArray(data.id))throw Error('Format inattendu');establishments=data.id.map((id,i)=>{const g=k=>String((data[k]||[])[i]??'').trim();let e={id,UAI:g('UAI'),Etablissement:g('Etablissement'),Ville:g('Ville'),Departement:g('Departement'),Degre:g('Degre')};e.search=normalizeSearch([e.UAI,e.Etablissement,e.Ville,e.Departement,g('Nom_court')].join(' '));return e;}).filter(e=>e.UAI&&e.Etablissement);resetEtabSearch();render();}catch(e){establishments=[];resetEtabSearch();$('etabInfo').textContent='Recherche indisponible : ajoutez la table ETABLISSEMENTS (colonnes UAI, Etablissement, Ville, Departement, Degre) dans ce document Grist.';}}
-function initEtabLookup(){const el=$('etabSearch');el.addEventListener('input',()=>{if($('UAI').value&&normalizeSearch(el.value)!==normalizeSearch((establishments.find(e=>e.UAI===$('UAI').value)||{}).Etablissement)){$('UAI').value='';$('clearEtab').classList.add('hidden');}showSuggestions();});el.addEventListener('focus',showSuggestions);el.addEventListener('keydown',ev=>{let options=Array.from($('etabSuggestions').querySelectorAll('[data-index]'));if(!options.length)return;if(ev.key==='ArrowDown'||ev.key==='ArrowUp'){ev.preventDefault();etabSelectedIndex=(etabSelectedIndex+(ev.key==='ArrowDown'?1:-1)+options.length)%options.length;options.forEach((b,i)=>b.classList.toggle('selected',i===etabSelectedIndex));options[etabSelectedIndex].scrollIntoView({block:'nearest'});}else if(ev.key==='Enter'&&!$('etabSuggestions').classList.contains('hidden')){ev.preventDefault();options[Math.max(0,etabSelectedIndex)].dispatchEvent(new MouseEvent('mousedown',{bubbles:true}));}else if(ev.key==='Escape')hideSuggestions();});el.addEventListener('blur',()=>setTimeout(hideSuggestions,140));$('clearEtab').onclick=()=>{['UAI'].forEach(id=>$(id).value='');resetEtabSearch();el.focus();};}
-let extraOpen=false;
-const ALWAYS=['Type_activite','Intitule','Date_debut','Statut','Departement','Lieu'];
-const BY_TYPE={
- 'Formation':['Thematique','Structure_concernee','etabSearch','Participants_prevus','Participants_reels','Intervenants'],
- 'Sensibilisation':['Thematique','Structure_concernee','etabSearch','Participants_prevus','Participants_reels','Intervenants'],
- 'Accompagnement':['Objet_demande','Structure_concernee','etabSearch','Intervenants','Compte_rendu'],
- 'Diagnostic de sécurité':['Objet_demande','Structure_concernee','etabSearch','Intervenants','Compte_rendu'],
- 'Sécurisation':['Objet_demande','Structure_concernee','etabSearch','Intervenants','Compte_rendu'],
- 'Conseil de discipline':['Structure_concernee','etabSearch','Intervenants','Compte_rendu'],
- 'Exercice de crise':['Thematique','Structure_concernee','etabSearch','Participants_prevus','Participants_reels','Intervenants','Compte_rendu'],
- 'Conseil et expertise':['Objet_demande','Structure_concernee','etabSearch','Intervenants','Compte_rendu'],
- 'Réunion et coordination':['Objet_demande','Structure_concernee','etabSearch','Intervenants','Participants_reels'],
- 'Autre':['Objet_demande','Structure_concernee','etabSearch','Intervenants','Compte_rendu']
-};
-function adaptForm(){
- const type=$('Type_activite').value;
- const relevant=new Set([...ALWAYS,...(BY_TYPE[type]||[])]);
- // In modification mode, keep populated fields visible to prevent losing context.
- if(editingId!==null){for(const c of COLS){const el=$(c);if(el&&String(el.value||'').trim())relevant.add(c);}}
- document.querySelectorAll('#activityForm .field').forEach(field=>{
-  const control=field.querySelector('input[id],select[id],textarea[id]');
-  if(!control)return;
-  const show=extraOpen||relevant.has(control.id);
-  field.hidden=!show;
- });
- // Subheadings only appear if at least one following field is visible.
- document.querySelectorAll('#activityForm .subhead').forEach(h=>{
-  let n=h.nextElementSibling,has=false;
-  while(n&&!n.classList.contains('subhead')&&!n.classList.contains('form-more')){
-   if(n.classList.contains('field')&&!n.hidden)has=true;
-   n=n.nextElementSibling;
-  }
-  h.hidden=!has;
- });
- $('toggleExtra').textContent=extraOpen?'− Masquer les informations complémentaires':'+ Informations complémentaires';
- $('toggleExtra').setAttribute('aria-expanded',String(extraOpen));
- $('formTip').textContent=type==='Formation'||type==='Sensibilisation'?'Participants et thématique affichés pour cette activité.':'Formulaire adapté : '+type.toLocaleLowerCase('fr')+'.';
-}
-function setup(){initEtabLookup();$('Type_activite').addEventListener('change',adaptForm);$('toggleExtra').onclick=()=>{extraOpen=!extraOpen;adaptForm();};options('Type_activite',TYPES);options('Statut',STATUSES);options('Departement',DEPTS,'Non précisé');options('Degre',DEGREES,'Non précisé');options('Equipe_EMAS',DEPTS.map(x=>'EMAS '+x),'Non précisée');options('filterType',TYPES,'Tous les types');options('filterStatus',STATUSES,'Tous les statuts');options('filterDept',DEPTS,'Tous les départements');options('filterDegree',DEGREES,'Tous les degrés');document.querySelectorAll('.tab').forEach(x=>x.onclick=()=>show(x.dataset.view));$('refresh').onclick=load;$('newTop').onclick=newActivity;$('prevMonth').onclick=()=>moveMonth(-1);$('nextMonth').onclick=()=>moveMonth(1);$('today').onclick=()=>{month=new Date(new Date().getFullYear(),new Date().getMonth(),1);renderCalendar();};$('resetFilters').onclick=()=>{['search','filterType','filterStatus','filterDept','filterDegree'].forEach(id=>$(id).value='');render();};['search','filterType','filterStatus','filterDept','filterDegree'].forEach(id=>$(id).addEventListener('input',render));$('activityForm').onsubmit=save;$('deleteActivity').onclick=deleteActivity;$('cancelForm').onclick=$('cancelBottom').onclick=()=>show(activityOrigin);$('backDetail').onclick=()=>show(activityOrigin);$('editDetail').onclick=()=>editActivity(currentId);$('Date_debut').onchange=()=>{$('Annee_scolaire').value=schoolYear($('Date_debut').value);};$('Departement').onchange=()=>{if(!$('Equipe_EMAS').value&&$('Departement').value)$('Equipe_EMAS').value='EMAS '+$('Departement').value;};}
-function show(name){view=name;document.querySelectorAll('.view').forEach(x=>x.classList.toggle('active',x.id==='view-'+name));document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active',x.dataset.view===name));$('filtersPanel').classList.toggle('hidden',name==='formulaire'||name==='detail');if(name==='agenda')renderCalendar();if(name==='liste')renderList();window.scrollTo({top:0,behavior:'smooth'});}
-function filtered(){let q=$('search').value.trim().toLocaleLowerCase('fr');return records.filter(r=>{if($('filterType').value&&r.Type_activite!==$('filterType').value)return false;if($('filterStatus').value&&r.Statut!==$('filterStatus').value)return false;if($('filterDept').value&&r.Departement!==$('filterDept').value)return false;if($('filterDegree').value&&r.Degre!==$('filterDegree').value)return false;return !q||[r.Intitule,r.Thematique,r.Structure_concernee,r.Lieu,r.UAI,(establishments.find(e=>e.UAI===String(r.UAI||''))||{}).Etablissement,(establishments.find(e=>e.UAI===String(r.UAI||''))||{}).Ville,r.Intervenants,r.ID_Activite].some(v=>String(v||'').toLocaleLowerCase('fr').includes(q));});}
-function render(){const f=filtered(),today=new Date().toISOString().slice(0,10);$('kTotal').textContent=f.length;$('kDone').textContent=f.filter(r=>r.Statut==='Terminée').length;$('kFuture').textContent=f.filter(r=>r.Date_debut&&r.Date_debut>=today&&!['Terminée','Annulée','Reportée'].includes(r.Statut)).length;$('kParticipants').textContent=f.reduce((n,r)=>n+(r.Statut==='Terminée'&&Number.isFinite(+r.Participants_reels)?Number(r.Participants_reels):0),0).toLocaleString('fr-FR');$('filterCount').textContent=`${records.length} ${records.length<=1?'activité':'activités'} au total — ${records.filter(r=>r.Statut==='Terminée').length} ${records.filter(r=>r.Statut==='Terminée').length<=1?'activité réalisée':'activités réalisées'} dont ${records.filter(r=>['Programmée'].includes(r.Statut)).length} ${records.filter(r=>['Programmée'].includes(r.Statut)).length<=1?'activité planifiée':'activités planifiées'}`;renderCalendar();renderList();}
-function moveMonth(n){month=new Date(month.getFullYear(),month.getMonth()+n,1);renderCalendar();}
-function renderCalendar(){const root=$('calendar');const y=month.getFullYear(),m=month.getMonth();$('monthTitle').textContent=month.toLocaleDateString('fr-FR',{month:'long',year:'numeric'});let start=new Date(y,m,1);start.setDate(start.getDate()-((start.getDay()+6)%7));let html=['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'].map(x=>`<div class="weekday">${x}</div>`).join('');let f=filtered(),now=new Date().toISOString().slice(0,10);for(let i=0;i<42;i++){let d=new Date(start);d.setDate(start.getDate()+i);let s=[d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-');let dayEvents=f.filter(r=>r.Date_debut&&r.Date_debut<=s&&(r.Date_fin?r.Date_fin>=s:r.Date_debut===s)).sort((a,b)=>(a.Heure_debut||'').localeCompare(b.Heure_debut||''));html+=`<div class="day ${d.getMonth()===m?'':'other'} ${s===now?'today':''}"><span class="num">${d.getDate()}</span>${dayEvents.slice(0,5).map(r=>`<button type="button" class="event activity-event-${TYPES.includes(r.Type_activite)?TYPES.indexOf(r.Type_activite):9}" data-record="${r.id}" title="${esc([fmtDate(s),r.Intitule,(establishments.find(e=>e.UAI===String(r.UAI||''))||{}).Etablissement,r.Structure_concernee].filter(v=>v&&String(v).trim()&&v!=='—').join(' — '))}"><span class="time">${esc(r.Heure_debut||'')}</span> ${esc(r.Intitule)}${activityTypeBadge(r.Type_activite)}</button>`).join('')}${dayEvents.length>5?`<div class="small muted">+${dayEvents.length-5} autres</div>`:''}</div>`;}root.innerHTML=html;root.querySelectorAll('[data-record]').forEach(b=>b.onclick=()=>detail(Number(b.dataset.record)));}
-function renderList(){const today=new Date().toLocaleDateString('sv-SE');let f=filtered().filter(r=>r.Date_debut&&r.Date_debut>=today).slice().sort((a,b)=>a.Date_debut.localeCompare(b.Date_debut)||(a.Heure_debut||'').localeCompare(b.Heure_debut||'')||(a.Intitule||'').localeCompare(b.Intitule||''));$('listCount').textContent=f.length+' activité(s)';$('activityRows').innerHTML=f.length?f.map(r=>`<tr><td>${esc(fmtDate(r.Date_debut))}${r.Heure_debut?`<div class="muted small">${esc(r.Heure_debut)}</div>`:''}</td><td><strong>${esc(r.Intitule)}</strong><div class="muted small">${esc(r.ID_Activite||'')}</div></td><td>${activityTypeBadge(r.Type_activite)}</td><td>${esc(r.Structure_concernee||(establishments.find(e=>e.UAI===String(r.UAI||''))||{}).Etablissement||'—')}<div class="muted small">${esc(r.Lieu||'')}</div></td><td>${esc(r.Departement||'—')}</td><td><span class="pill ${classStatus(r.Statut)}">${esc(r.Statut||'—')}</span></td><td><button type="button" class="btn mini" data-record="${r.id}">Consulter</button></td></tr>`).join(''):'<tr><td colspan="7" class="empty">Aucune activité trouvée.</td></tr>';$('activityRows').querySelectorAll('[data-record]').forEach(b=>b.onclick=()=>detail(Number(b.dataset.record)));}
-function detail(id){const r=records.find(x=>x.id===id);if(!r)return;if(view==='agenda'||view==='liste')activityOrigin=view;$('backDetail').textContent=activityOrigin==='agenda'?'Retour à l’agenda':'Retour à la liste';currentId=id;const items=[['Intitulé',r.Intitule],['Lieu',r.Lieu],['Nature',r.Type_activite],['Statut',r.Statut],['Thématique',r.Thematique],['Objet / demande',r.Objet_demande],['Date de début',fmtDate(r.Date_debut)],['Date de fin',r.Date_fin?fmtDate(r.Date_fin):'—'],['Horaires',[r.Heure_debut,r.Heure_fin].filter(Boolean).join(' – ')],['Année scolaire',r.Annee_scolaire],['Département',r.Departement],['Degré',r.Degre],['Équipe EMAS',r.Equipe_EMAS],['Structure concernée',r.Structure_concernee],['UAI',r.UAI],['Établissement',(establishments.find(e=>e.UAI===String(r.UAI||''))||{}).Etablissement],['Ville',(establishments.find(e=>e.UAI===String(r.UAI||''))||{}).Ville],['Intervenants',r.Intervenants],['Participants prévus',r.Participants_prevus],['Participants réels',r.Participants_reels],['Compte rendu',r.Compte_rendu],['Observations',r.Observations],['Dernière modification',r.Date_modification?String(r.Date_modification):'']];$('detailContent').innerHTML=items.filter(([k,v])=>['Intitulé','Lieu','Nature','Statut'].includes(k)||v!==null&&v!==undefined&&String(v).trim()!==''&&v!=='—'&&v!=='Date non renseignée').map(([k,v])=>`<div class="item ${['Intitulé','Objet / demande','Compte rendu','Observations'].includes(k)?'wide':''}"><b>${esc(k)}</b><div style="white-space:pre-wrap">${k==='Nature'?activityTypeBadge(v):k==='Statut'?`<span class="pill ${v==='Programmée'?'programmee':classStatus(v)}">${esc(v)}</span>`:esc(v===null||v===undefined||v===''?'—':v)}</div></div>`).join('');show('detail');}
-function newActivity(){if(view==='agenda'||view==='liste')activityOrigin=view;editingId=null;$('activityForm').reset();resetEtabSearch();$('Type_activite').value='Formation';$('Statut').value='Programmée';$('Date_debut').value=new Date().toLocaleDateString('sv-SE');$('Annee_scolaire').value=schoolYear($('Date_debut').value);$('formTitle').textContent='Nouvelle activité';$('saveBtn').textContent='Enregistrer';$('deleteActivity').hidden=true;extraOpen=false;adaptForm();show('formulaire');}
-function editActivity(id){const r=records.find(x=>x.id===id);if(!r)return;editingId=id;for(const c of COLS){const el=$(c);if(!el)continue;let v=r[c];el.value=(c==='Date_debut'||c==='Date_fin')?isoDate(v):(v==null?'':String(v));if(c==='Statut'&&v&&!STATUSES.includes(v)){el.selectedIndex=-1;} }if(!DEPTS.includes($('Departement').value))$('Departement').value='';resetEtabSearch();if(r.UAI){const et=establishments.find(e=>e.UAI===String(r.UAI));$('etabSearch').value=et?et.Etablissement:'';$('etabInfo').textContent=et?'Établissement associé : '+et.Etablissement+' — '+et.Ville:'UAI associé : '+r.UAI+' (établissement absent du référentiel)';$('clearEtab').classList.remove('hidden');}$('formTitle').textContent='Modifier une activité';$('saveBtn').textContent='Enregistrer';$('deleteActivity').hidden=false;extraOpen=false;adaptForm();show('formulaire');}
-function parseRows(data){if(!data||!Array.isArray(data.id))throw Error('Réponse Grist inattendue : aucune ligne exploitable.');return data.id.map((id,i)=>{let r={id};for(let c of COLS){let v=(data[c]||[])[i];if(c==='Date_debut'||c==='Date_fin')v=isoDate(v);if(c==='Departement'&&v!=null)v=String(v);if(c==='Type_activite')v=({'Conseil / expertise':'Conseil et expertise','Réunion / coordination':'Réunion et coordination'})[v]||v;if(c==='Statut')v=({'Réalisée':'Terminée','À confirmer':'Programmée','À planifier':'Programmée'})[v]||v;r[c]=v==null?'':v;}return r;});}
-async function load(){if(!window.grist){setConnection('Hors Grist',false);toast('Ouvrez cette page comme widget personnalisé dans Grist, avec accès complet au document.','error');return;}try{const data=await grist.docApi.fetchTable(TABLE);records=parseRows(data);connected=true;setConnection('Grist connecté',true);clearToast();render();}catch(e){connected=false;setConnection('Connexion indisponible',false);toast('Impossible de lire la table '+TABLE+' : '+(e.message||e)+'. Vérifiez le nom de la table et les autorisations du widget.','error');}}
-function nextId(){let max=0;for(let r of records){const m=/^ACT-(\d+)$/i.exec(r.ID_Activite||'');if(m)max=Math.max(max,Number(m[1]));}return 'ACT-'+String(max+1).padStart(4,'0');}
-function values(){const o={};for(const c of COLS){if(c==='ID_Activite'||c==='Date_modification')continue;const el=$(c);if(!el)continue;let v=el.value.trim();if(['Date_debut','Date_fin'].includes(c))v=dateToGrist(v);else if(['Participants_prevus','Participants_reels'].includes(c))v=v===''?null:Number(v);o[c]=v===''?null:v;}o.Annee_scolaire=schoolYear($('Date_debut').value);o.Date_modification=Math.floor(Date.now()/1000);return o;}
-async function deleteActivity(){
-  if(busy||editingId===null)return;
-  const r=records.find(x=>x.id===editingId);
-  if(!r)return;
-  const targetId=editingId;
-  busy=true;
-  let confirmed=false;
-  try{confirmed=await showModal({title:'Supprimer cette activité ?',message:'Vous êtes sur le point de supprimer définitivement l’activité suivante :\n'+(r.Intitule||r.ID_Activite||'')+'\n\nCette action est irréversible.',type:'error',confirmText:'Supprimer',cancelText:'Annuler'});}
-  finally{busy=false;}
-  if(!confirmed||editingId!==targetId||document.getElementById('activityApp').hidden)return;
-  if(!connected){toast('La connexion Grist est nécessaire pour supprimer.','error');return;}
-  busy=true;$('deleteActivity').disabled=true;$('saveBtn').disabled=true;
-  try{
-    await grist.docApi.applyUserActions([['RemoveRecord',TABLE,editingId]]);
-    editingId=null;
-    await load();
-    show(activityOrigin);
-    toast('Activité supprimée.','success');
-  }catch(err){toast('Suppression impossible : '+(err.message||err),'error');}
-  finally{busy=false;$('deleteActivity').disabled=false;$('saveBtn').disabled=false;}
-}
-async function save(e){e.preventDefault();if(busy)return;if(!connected){toast('La connexion Grist est nécessaire pour enregistrer.','error');return;}if($('Date_fin').value&&$('Date_fin').value<$('Date_debut').value){toast('La date de fin doit être postérieure ou égale à la date de début.','error');return;}if($('Heure_debut').value&&$('Heure_fin').value&&(!$('Date_fin').value||$('Date_fin').value===$('Date_debut').value)&&$('Heure_fin').value<$('Heure_debut').value){toast('L’heure de fin précède l’heure de début.','error');return;}if($('etabSearch').value.trim()&&!$('UAI').value.trim()){toast('Sélectionnez un établissement dans la liste de suggestions ou videz la recherche.','error');return;}if(!STATUSES.includes($('Statut').value)){toast('Sélectionnez un statut valide.','error');return;}const wasEditing=editingId!==null;const fields=values();if(wasEditing&&!fields.Degre){const old=records.find(r=>r.id===editingId);if(old&&old.Degre&&!DEGREES.includes(old.Degre))fields.Degre=old.Degre;}if(!wasEditing)fields.ID_Activite=nextId();const action=wasEditing?['UpdateRecord',TABLE,editingId,fields]:['AddRecord',TABLE,null,fields];busy=true;$('saveBtn').disabled=true;try{await grist.docApi.applyUserActions([action]);await load();toast(wasEditing?'Activité modifiée et enregistrée.':'Nouvelle activité enregistrée.','success');show(activityOrigin);}catch(err){toast('Enregistrement refusé par Grist : '+(err.message||err)+'. Vérifiez les types des colonnes et les droits du widget.','error');}finally{busy=false;$('saveBtn').disabled=false;}}
-setup();render();if(window.grist){grist.ready({requiredAccess:'full',allowSelectBy:false});grist.onRecords(()=>{if(!busy&&view!=='formulaire')load();});load();loadEstablishments();}else{setConnection('Hors Grist',false);toast('Mode aperçu : installez ce HTML dans un widget personnalisé Grist et autorisez l’accès complet pour activer la sauvegarde.','error');}
-</script></div><script>(function(){
+</div><script>(function(){
 
 'use strict';
 const TABLE='ACTIVITES_EMAS';
@@ -3068,7 +3001,7 @@ function adaptForm(){
   h.hidden=!has;
  });
 }
-function setup(){initEtabLookup();$('Type_activite').addEventListener('change',adaptForm);options('Type_activite',TYPES);options('Statut',STATUSES);options('Departement',DEPTS,'Non précisé');options('Degre',DEGREES,'Non précisé');options('Equipe_EMAS',DEPTS.map(x=>'EMAS '+x),'Non précisée');options('filterType',TYPES,'Tous les types');options('filterStatus',STATUSES,'Tous les statuts');options('filterDept',DEPTS,'Tous les départements');options('filterDegree',DEGREES,'Tous les degrés');document.querySelectorAll('.tab').forEach(x=>x.onclick=()=>show(x.dataset.view));$('refresh').onclick=load;$('newTop').onclick=newActivity;$('prevMonth').onclick=()=>moveMonth(-1);$('nextMonth').onclick=()=>moveMonth(1);$('today').onclick=()=>{month=new Date(new Date().getFullYear(),new Date().getMonth(),1);renderCalendar();};$('resetFilters').onclick=()=>{['search','filterType','filterStatus','filterDept','filterDegree'].forEach(id=>$(id).value='');render();};['search','filterType','filterStatus','filterDept','filterDegree'].forEach(id=>$(id).addEventListener('input',render));$('activityForm').onsubmit=save;$('deleteActivity').onclick=deleteActivity;$('cancelForm').onclick=$('cancelBottom').onclick=()=>show(activityOrigin);$('backDetail').onclick=()=>show(activityOrigin);$('editDetail').onclick=()=>editActivity(currentId);$('Date_debut').onchange=()=>{$('Annee_scolaire').value=schoolYear($('Date_debut').value);};$('Departement').onchange=()=>{if(!$('Equipe_EMAS').value&&$('Departement').value)$('Equipe_EMAS').value='EMAS '+$('Departement').value;};}
+function setup(){initEtabLookup();$('Type_activite').addEventListener('change',adaptForm);options('Type_activite',TYPES);options('Statut',STATUSES);options('Departement',DEPTS,'Non précisé');options('Degre',DEGREES,'Non précisé');options('Equipe_EMAS',DEPTS.map(x=>'EMAS '+x),'Non précisée');options('filterType',TYPES,'Tous les types');options('filterStatus',STATUSES,'Tous les statuts');options('filterDept',DEPTS,'Tous les départements');options('filterDegree',DEGREES,'Tous les degrés');document.querySelectorAll('#activityApp .tab').forEach(x=>x.onclick=()=>{if(busy)return;if(x.dataset.view==='formulaire')newActivity();else show(x.dataset.view);});$('refresh').onclick=load;$('newTop').onclick=newActivity;$('prevMonth').onclick=()=>moveMonth(-1);$('nextMonth').onclick=()=>moveMonth(1);$('today').onclick=()=>{month=new Date(new Date().getFullYear(),new Date().getMonth(),1);renderCalendar();};$('resetFilters').onclick=()=>{['search','filterType','filterStatus','filterDept','filterDegree'].forEach(id=>$(id).value='');render();};['search','filterType','filterStatus','filterDept','filterDegree'].forEach(id=>$(id).addEventListener('input',render));$('activityForm').onsubmit=save;$('deleteActivity').onclick=deleteActivity;$('cancelForm').onclick=$('cancelBottom').onclick=()=>show(activityOrigin);$('backDetail').onclick=()=>show(activityOrigin);$('editDetail').onclick=()=>editActivity(currentId);$('Date_debut').onchange=()=>{$('Annee_scolaire').value=schoolYear($('Date_debut').value);};$('Departement').onchange=()=>{if(!$('Equipe_EMAS').value&&$('Departement').value)$('Equipe_EMAS').value='EMAS '+$('Departement').value;};}
 function show(name){view=name;document.querySelectorAll('.view').forEach(x=>x.classList.toggle('active',x.id==='view-'+name));document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active',x.dataset.view===name));$('filtersPanel').classList.toggle('hidden',name==='formulaire'||name==='detail');if(name==='agenda')renderCalendar();if(name==='liste')renderList();window.scrollTo({top:0,behavior:'smooth'});}
 function filtered(){let q=$('search').value.trim().toLocaleLowerCase('fr');return records.filter(r=>{if($('filterType').value&&r.Type_activite!==$('filterType').value)return false;if($('filterStatus').value&&r.Statut!==$('filterStatus').value)return false;if($('filterDept').value&&r.Departement!==$('filterDept').value)return false;if($('filterDegree').value&&r.Degre!==$('filterDegree').value)return false;return !q||[r.Intitule,r.Thematique,r.Structure_concernee,r.Lieu,r.UAI,(establishments.find(e=>e.UAI===String(r.UAI||''))||{}).Etablissement,(establishments.find(e=>e.UAI===String(r.UAI||''))||{}).Ville,r.Intervenants,r.ID_Activite].some(v=>String(v||'').toLocaleLowerCase('fr').includes(q));});}
 function render(){const f=filtered(),today=new Date().toISOString().slice(0,10);$('kTotal').textContent=f.length;$('kDone').textContent=f.filter(r=>r.Statut==='Terminée').length;$('kFuture').textContent=f.filter(r=>r.Date_debut&&r.Date_debut>=today&&!['Terminée','Annulée','Reportée'].includes(r.Statut)).length;$('kParticipants').textContent=f.reduce((n,r)=>n+(r.Statut==='Terminée'&&Number.isFinite(+r.Participants_reels)?Number(r.Participants_reels):0),0).toLocaleString('fr-FR');$('filterCount').textContent=`${records.length} ${records.length<=1?'activité':'activités'} au total — ${records.filter(r=>r.Statut==='Terminée').length} ${records.filter(r=>r.Statut==='Terminée').length<=1?'activité réalisée':'activités réalisées'} dont ${records.filter(r=>['Programmée'].includes(r.Statut)).length} ${records.filter(r=>['Programmée'].includes(r.Statut)).length<=1?'activité planifiée':'activités planifiées'}`;renderCalendar();renderList();}
@@ -3076,7 +3009,7 @@ function moveMonth(n){month=new Date(month.getFullYear(),month.getMonth()+n,1);r
 function renderCalendar(){const root=$('calendar');const y=month.getFullYear(),m=month.getMonth();$('monthTitle').textContent=month.toLocaleDateString('fr-FR',{month:'long',year:'numeric'});let start=new Date(y,m,1);start.setDate(start.getDate()-((start.getDay()+6)%7));let html=['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'].map(x=>`<div class="weekday">${x}</div>`).join('');let f=filtered(),now=new Date().toISOString().slice(0,10);for(let i=0;i<42;i++){let d=new Date(start);d.setDate(start.getDate()+i);let s=[d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-');let dayEvents=f.filter(r=>r.Date_debut&&r.Date_debut<=s&&(r.Date_fin?r.Date_fin>=s:r.Date_debut===s)).sort((a,b)=>(a.Heure_debut||'').localeCompare(b.Heure_debut||''));html+=`<div class="day ${d.getMonth()===m?'':'other'} ${s===now?'today':''}"><span class="num">${d.getDate()}</span>${dayEvents.slice(0,5).map(r=>`<button type="button" class="event activity-event-${TYPES.includes(r.Type_activite)?TYPES.indexOf(r.Type_activite):9}" data-record="${r.id}" title="${esc([fmtDate(s),r.Intitule,(establishments.find(e=>e.UAI===String(r.UAI||''))||{}).Etablissement,r.Structure_concernee].filter(v=>v&&String(v).trim()&&v!=='—').join(' — '))}"><span class="time">${esc(r.Heure_debut||'')}</span> ${esc(r.Intitule)}${activityTypeBadge(r.Type_activite)}</button>`).join('')}${dayEvents.length>5?`<div class="small muted">+${dayEvents.length-5} autres</div>`:''}</div>`;}root.innerHTML=html;root.querySelectorAll('[data-record]').forEach(b=>b.onclick=()=>detail(Number(b.dataset.record)));}
 function renderList(){const today=new Date().toLocaleDateString('sv-SE');let f=filtered().filter(r=>r.Date_debut&&r.Date_debut>=today).slice().sort((a,b)=>a.Date_debut.localeCompare(b.Date_debut)||(a.Heure_debut||'').localeCompare(b.Heure_debut||'')||(a.Intitule||'').localeCompare(b.Intitule||''));$('listCount').textContent=f.length+' activité(s)';$('activityRows').innerHTML=f.length?f.map(r=>`<tr><td>${esc(fmtDate(r.Date_debut))}${r.Heure_debut?`<div class="muted small">${esc(r.Heure_debut)}</div>`:''}</td><td><strong>${esc(r.Intitule)}</strong><div class="muted small">${esc(r.ID_Activite||'')}</div></td><td>${activityTypeBadge(r.Type_activite)}</td><td>${esc(r.Structure_concernee||(establishments.find(e=>e.UAI===String(r.UAI||''))||{}).Etablissement||'—')}<div class="muted small">${esc(r.Lieu||'')}</div></td><td>${esc(r.Departement||'—')}</td><td><span class="pill ${classStatus(r.Statut)}">${esc(r.Statut||'—')}</span></td><td><button type="button" class="btn mini" data-record="${r.id}">Consulter</button></td></tr>`).join(''):'<tr><td colspan="7" class="empty">Aucune activité trouvée.</td></tr>';$('activityRows').querySelectorAll('[data-record]').forEach(b=>b.onclick=()=>detail(Number(b.dataset.record)));}
 function detail(id){const r=records.find(x=>x.id===id);if(!r)return;if(view==='agenda'||view==='liste')activityOrigin=view;$('backDetail').textContent=activityOrigin==='agenda'?'Retour à l’agenda':'Retour à la liste';currentId=id;const items=[['Intitulé',r.Intitule],['Lieu',r.Lieu],['Nature',r.Type_activite],['Statut',r.Statut],['Thématique',r.Thematique],['Objet / demande',r.Objet_demande],['Date de début',fmtDate(r.Date_debut)],['Date de fin',r.Date_fin?fmtDate(r.Date_fin):'—'],['Horaires',[r.Heure_debut,r.Heure_fin].filter(Boolean).join(' – ')],['Année scolaire',r.Annee_scolaire],['Département',r.Departement],['Degré',r.Degre],['Équipe EMAS',r.Equipe_EMAS],['Structure concernée',r.Structure_concernee],['UAI',r.UAI],['Établissement',(establishments.find(e=>e.UAI===String(r.UAI||''))||{}).Etablissement],['Ville',(establishments.find(e=>e.UAI===String(r.UAI||''))||{}).Ville],['Intervenants',r.Intervenants],['Participants prévus',r.Participants_prevus],['Participants réels',r.Participants_reels],['Compte rendu',r.Compte_rendu],['Observations',r.Observations],['Dernière modification',r.Date_modification?String(r.Date_modification):'']];$('detailContent').innerHTML=items.filter(([k,v])=>['Intitulé','Lieu','Nature','Statut'].includes(k)||v!==null&&v!==undefined&&String(v).trim()!==''&&v!=='—'&&v!=='Date non renseignée').map(([k,v])=>`<div class="item ${['Intitulé','Objet / demande','Compte rendu','Observations'].includes(k)?'wide':''}"><b>${esc(k)}</b><div style="white-space:pre-wrap">${k==='Nature'?activityTypeBadge(v):k==='Statut'?`<span class="pill ${v==='Programmée'?'programmee':classStatus(v)}">${esc(v)}</span>`:esc(v===null||v===undefined||v===''?'—':v)}</div></div>`).join('');show('detail');}
-function newActivity(){if(view==='agenda'||view==='liste')activityOrigin=view;editingId=null;$('activityForm').reset();resetEtabSearch();$('Type_activite').value='Formation';$('Statut').value='Programmée';$('Date_debut').value=new Date().toLocaleDateString('sv-SE');$('Annee_scolaire').value=schoolYear($('Date_debut').value);$('formTitle').textContent='Nouvelle activité';$('saveBtn').textContent='Enregistrer';$('deleteActivity').hidden=true;adaptForm();show('formulaire');}
+function newActivity(){if(busy)return;if(view==='agenda'||view==='liste')activityOrigin=view;currentId=null;editingId=null;$('activityForm').reset();resetEtabSearch();$('Type_activite').value='Formation';$('Statut').value='Programmée';$('Date_debut').value=new Date().toLocaleDateString('sv-SE');$('Annee_scolaire').value=schoolYear($('Date_debut').value);$('formTitle').textContent='Nouvelle activité';$('saveBtn').textContent='Enregistrer';$('deleteActivity').hidden=true;adaptForm();show('formulaire');}
 function editActivity(id){const r=records.find(x=>x.id===id);if(!r)return;editingId=id;for(const c of COLS){const el=$(c);if(!el)continue;let v=r[c];el.value=(c==='Date_debut'||c==='Date_fin')?isoDate(v):(v==null?'':String(v));if(c==='Statut'&&v&&!STATUSES.includes(v)){el.selectedIndex=-1;} }if(!DEPTS.includes($('Departement').value))$('Departement').value='';resetEtabSearch();if(r.UAI){const et=establishments.find(e=>e.UAI===String(r.UAI));$('etabSearch').value=et?et.Etablissement:'';$('etabInfo').textContent=et?'Établissement associé : '+et.Etablissement+' — '+et.Ville:'UAI associé : '+r.UAI+' (établissement absent du référentiel)';$('clearEtab').classList.remove('hidden');}$('formTitle').textContent='Modifier une activité';$('saveBtn').textContent='Enregistrer';$('deleteActivity').hidden=false;adaptForm();show('formulaire');}
 function parseRows(data){if(!data||!Array.isArray(data.id))throw Error('Réponse Grist inattendue : aucune ligne exploitable.');return data.id.map((id,i)=>{let r={id};for(let c of COLS){let v=(data[c]||[])[i];if(c==='Date_debut'||c==='Date_fin')v=isoDate(v);if(c==='Departement'&&v!=null)v=String(v);if(c==='Type_activite')v=({'Conseil / expertise':'Conseil et expertise','Réunion / coordination':'Réunion et coordination'})[v]||v;if(c==='Statut')v=({'Réalisée':'Terminée','À confirmer':'Programmée','À planifier':'Programmée'})[v]||v;r[c]=v==null?'':v;}return r;});}
 async function load(){if(!window.grist){setConnection('Hors Grist',false);toast('Ouvrez cette page comme widget personnalisé dans Grist, avec accès complet au document.','error');return;}try{const data=await grist.docApi.fetchTable(TABLE);records=parseRows(data);connected=true;setConnection('Grist connecté',true);clearToast();render();}catch(e){connected=false;setConnection('Connexion indisponible',false);toast('Impossible de lire la table '+TABLE+' : '+(e.message||e)+'. Vérifiez le nom de la table et les autorisations du widget.','error');}}
@@ -3103,7 +3036,7 @@ async function deleteActivity(){
   }catch(err){toast('Suppression impossible : '+(err.message||err),'error');}
   finally{busy=false;$('deleteActivity').disabled=false;$('saveBtn').disabled=false;}
 }
-async function save(e){e.preventDefault();if(busy)return;if(!connected){toast('La connexion Grist est nécessaire pour enregistrer.','error');return;}if($('Date_fin').value&&$('Date_fin').value<$('Date_debut').value){toast('La date de fin doit être postérieure ou égale à la date de début.','error');return;}if($('Heure_debut').value&&$('Heure_fin').value&&(!$('Date_fin').value||$('Date_fin').value===$('Date_debut').value)&&$('Heure_fin').value<$('Heure_debut').value){toast('L’heure de fin précède l’heure de début.','error');return;}if($('etabSearch').value.trim()&&!$('UAI').value.trim()){toast('Sélectionnez un établissement dans la liste de suggestions ou videz la recherche.','error');return;}if(!STATUSES.includes($('Statut').value)){toast('Sélectionnez un statut valide.','error');return;}const wasEditing=editingId!==null;const fields=values();if(wasEditing&&!fields.Degre){const old=records.find(r=>r.id===editingId);if(old&&old.Degre&&!DEGREES.includes(old.Degre))fields.Degre=old.Degre;}if(!wasEditing)fields.ID_Activite=nextId();const action=wasEditing?['UpdateRecord',TABLE,editingId,fields]:['AddRecord',TABLE,null,fields];busy=true;$('saveBtn').disabled=true;try{await grist.docApi.applyUserActions([action]);await load();toast(wasEditing?'Activité modifiée et enregistrée.':'Nouvelle activité enregistrée.','success');show(activityOrigin);}catch(err){toast('Enregistrement refusé par Grist : '+(err.message||err)+'. Vérifiez les types des colonnes et les droits du widget.','error');}finally{busy=false;$('saveBtn').disabled=false;}}
+async function save(e){e.preventDefault();if(busy)return;if(!connected){toast('La connexion Grist est nécessaire pour enregistrer.','error');return;}if($('Date_fin').value&&$('Date_fin').value<$('Date_debut').value){toast('La date de fin doit être postérieure ou égale à la date de début.','error');return;}if($('Heure_debut').value&&$('Heure_fin').value&&(!$('Date_fin').value||$('Date_fin').value===$('Date_debut').value)&&$('Heure_fin').value<$('Heure_debut').value){toast('L’heure de fin précède l’heure de début.','error');return;}if($('etabSearch').value.trim()&&!$('UAI').value.trim()){toast('Sélectionnez un établissement dans la liste de suggestions ou videz la recherche.','error');return;}if(!STATUSES.includes($('Statut').value)){toast('Sélectionnez un statut valide.','error');return;}const wasEditing=editingId!==null;const fields=values();if(wasEditing&&!fields.Degre){const old=records.find(r=>r.id===editingId);if(old&&old.Degre&&!DEGREES.includes(old.Degre))fields.Degre=old.Degre;}if(!wasEditing)fields.ID_Activite=nextId();const action=wasEditing?['UpdateRecord',TABLE,editingId,fields]:['AddRecord',TABLE,null,fields];busy=true;$('saveBtn').disabled=true;try{await grist.docApi.applyUserActions([action]);await load();toast(wasEditing?'Activité modifiée et enregistrée.':'Nouvelle activité enregistrée.','success');editingId=null;currentId=null;show(activityOrigin);}catch(err){toast('Enregistrement refusé par Grist : '+(err.message||err)+'. Vérifiez les types des colonnes et les droits du widget.','error');}finally{busy=false;$('saveBtn').disabled=false;}}
 setup();render();if(window.grist){grist.ready({requiredAccess:'full',allowSelectBy:false});grist.onRecords(()=>{if(!busy&&view!=='formulaire')load();});load();loadEstablishments();}else{setConnection('Hors Grist',false);toast('Mode aperçu : installez ce HTML dans un widget personnalisé Grist et autorisez l’accès complet pour activer la sauvegarde.','error');}
 
 })();</script><div aria-labelledby="appModalTitle" aria-modal="true" class="modal-backdrop hidden" id="appModal" role="dialog"><div class="modal-box" id="appModalBox"><div class="modal-title" id="appModalTitle"></div><div class="modal-message" id="appModalMessage"></div><div class="modal-actions" id="appModalActions"></div></div></div><script>(function(){
@@ -3113,6 +3046,6 @@ setup();render();if(window.grist){grist.ready({requiredAccess:'full',allowSelect
   document.getElementById('activityApp').hidden=name!=='activities';
   tabs.forEach(b=>{const on=b.dataset.section===name;b.classList.toggle('selected',on);b.setAttribute('aria-pressed',String(on));});
  }
- tabs.forEach(b=>b.addEventListener('click',()=>setSection(b.dataset.section)));
+ tabs.forEach(b=>b.addEventListener('click',()=>{const returning=b.dataset.section==='operational'&&document.getElementById('operationalApp').hidden;setSection(b.dataset.section);if(returning){render();void refreshFEAndNotifications();}}));
  setSection('operational');
 })();</script></body></html>
