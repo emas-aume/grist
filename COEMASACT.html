@@ -497,6 +497,17 @@ function restRecordsToRows(payload,source){
   const records=Array.isArray(payload?.records)?payload.records:[];
   return records.map(r=>({id:r.id,_source:source,...(r.fields||{})}));
 }
+// SQL Grist peut renvoyer des lignes plates ou des champs imbriqués (id dans fields).
+function sqlFERows(payload){
+  let records=Array.isArray(payload)?payload:payload?.records;
+  if(!Array.isArray(records))throw new Error("Format SQL Grist inattendu : clés "+Object.keys(payload||{}).join(", "));
+  return records.map(r=>{
+    const fields=r?.fields??r;
+    const id=Number(r?.id??fields?.id);
+    if(!fields||!Number.isSafeInteger(id)||id<=0||!("Date_de_transmission" in fields))throw new Error("Format SQL Grist inattendu : champs "+Object.keys(fields||{}).join(", "));
+    return {...fields,id,_source:T.CUR};
+  });
+}
 async function gristGet(path,params=null,retry=true){
   const t=await getTokenInfo(false);
   const qs=new URLSearchParams(params||{});
@@ -1296,10 +1307,9 @@ async function pollNewFE(){
   if(feNoticeBusy)return;
   feNoticeBusy=true;
   try{
-    if(!feNoticeReady){if(!currentEquipier||!identityVerified)await detectCurrentEquipier();await feNoticeInitialize()}
+    if(!feNoticeReady){if(!currentEquipier||!identityVerified)await detectCurrentEquipier();if(!identityVerified||!currentEquipier)return;await feNoticeInitialize()}
     const payload=await gristGet("/sql",{q:liveFEQuery(null,null)});
-    if(!Array.isArray(payload?.records)||payload.records.some(r=>!Number.isFinite(Number(r.id))||!r.fields||!("Date_de_transmission" in r.fields)))throw new Error("Notifications : format de lecture SQL Grist inattendu.");
-    const facts=restRecordsToRows(payload,T.CUR);
+    const facts=sqlFERows(payload);
     const now=Date.now(),start=feNoticeWindowStart(),active=new Map();
     for(const f of facts){
       if(!isCurrentOperationalFact(f))continue;
@@ -1462,8 +1472,7 @@ async function readLiveFESnapshot(){
   if(Date.now()>=liveSqlUnavailableUntil){
     try{
       const payload=await gristGet("/sql",{q:liveFEQuery(spec,uai)});
-      if(!Array.isArray(payload?.records)||payload.records.some(r=>!Number.isFinite(Number(r.id))||!r.fields||!("Date_de_transmission" in r.fields)))throw new Error("Format SQL Grist inattendu");
-      return restRecordsToRows(payload,T.CUR);
+      return sqlFERows(payload);
     }catch(e){
       // Ne jamais substituer un échantillon incomplet aux notifications.
       liveSqlUnavailableUntil=Date.now()+300000;
