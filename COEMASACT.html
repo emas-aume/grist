@@ -195,6 +195,10 @@ select{background-color:#fff!important;color-scheme:light!important;}
 #emasMainTabs{position:sticky;top:0;z-index:11000;min-height:70px;background:#fff;border-bottom:1px solid #e4e7ec;box-shadow:0 2px 12px #1720330b;flex-wrap:nowrap}
 #emasMainTabs .emasTabsSpacer{flex:1;min-width:10px}
 #emasMainTabs #notificationHub{position:relative;top:auto;right:auto;z-index:1;pointer-events:auto;flex:0 0 auto;margin-left:auto}
+#emasMainTabs .connection-badge{display:inline-flex;align-items:center;white-space:nowrap;border-radius:999px;padding:6px 10px;font-size:11px;font-weight:700;background:#f2f4f7;color:#667085;flex-shrink:0}
+#emasMainTabs .connection-badge.online{background:#ecfdf3;color:#067647}
+#emasMainTabs #headerEquipier{white-space:nowrap;flex-shrink:0}
+#emasMainTabs #notificationHub{margin-left:0}
 #emasMainTabs #bellButton{box-shadow:none;border:1px solid #d4ddea;width:43px;height:43px}
 /* Cloche neutre par défaut, bleue seulement si des notifications non lues existent. */
 #emasMainTabs #bellButton{background:#fff;color:#294b73}
@@ -274,7 +278,7 @@ select{background-color:#fff!important;color-scheme:light!important;}
 
 
 </style>
-</head><body><nav aria-label="Sections du centre opérationnel" id="emasMainTabs"><button aria-pressed="true" class="emasMainTab selected" data-section="operational" type="button">SUIVI OPÉRATIONNEL</button><button aria-pressed="false" class="emasMainTab" data-section="activities" type="button">SUIVI DES ACTIVITÉS</button><div class="emasTabsSpacer" aria-hidden="true"></div><div id="notificationHub"><button aria-label="Centre d’information" id="bellButton" title="Nouveaux FE" type="button">🔔<span hidden="" id="bellCount">0</span></button><div hidden="" id="notificationPanel"><div class="bellHead"><strong>Nouveaux FE</strong><span><button class="bellClear" id="bellClear" type="button">Tout supprimer</button></span></div><div id="bellItems"></div></div></div></nav><div id="operationalApp"><div aria-atomic="false" aria-live="polite" id="toastStack"></div><main class="page">
+</head><body><nav aria-label="Sections du centre opérationnel" id="emasMainTabs"><button aria-pressed="true" class="emasMainTab selected" data-section="operational" type="button">SUIVI OPÉRATIONNEL</button><button aria-pressed="false" class="emasMainTab" data-section="activities" type="button">SUIVI DES ACTIVITÉS</button><div class="emasTabsSpacer" aria-hidden="true"></div><span id="headerConnection" class="connection-badge" role="status" title="Vérification de la connexion Grist">Vérification…</span><span id="headerEquipier" class="equipier-badge" title="Équipier identifié par Grist">Identification…</span><div id="notificationHub"><button aria-label="Centre d’information" id="bellButton" title="Nouveaux FE" type="button">🔔<span hidden="" id="bellCount">0</span></button><div hidden="" id="notificationPanel"><div class="bellHead"><strong>Nouveaux FE</strong><span><button class="bellClear" id="bellClear" type="button">Tout supprimer</button></span></div><div id="bellItems"></div></div></div></nav><div id="operationalApp"><div aria-atomic="false" aria-live="polite" id="toastStack"></div><main class="page">
 <section class="card" id="listView">
 <div class="top"><div><h1>Bureau des légendes</h1><div class="muted">Car vous êtes des légendes — Consultation et suivi des faits d’établissement — 34 et 48</div></div></div>
 <div class="periodbar">
@@ -498,7 +502,7 @@ async function gristGet(path,params=null,retry=true){
   const qs=new URLSearchParams(params||{});
   qs.set("auth",t.token);
   const url=t.baseUrl+path+(qs.size?"?"+qs.toString():"");
-  const response=await fetch(url,{method:"GET",credentials:"omit"});
+  const response=await fetch(url,{method:"GET",credentials:"omit",signal:AbortSignal.timeout(20000)});
   if(response.status===401&&retry){tokenInfo=null;await getTokenInfo(true);return gristGet(path,params,false)}
   if(!response.ok){const detail=await response.text().catch(()=>response.statusText);throw new Error("HTTP "+response.status+" — "+detail.slice(0,240))}
   return response.json();
@@ -608,9 +612,11 @@ async function detectCurrentEquipier(){
       currentEquipier=matches[0];
       currentUserProfile={email,name};
       identityVerified=true;
+      updateHeaderEquipier();
       return currentEquipier;
     }catch(e){
       console.warn("Identification par formule Grist impossible :",e);
+      updateHeaderEquipier();
       return null;
     }finally{
       // Nettoyage immédiat : une session ne doit pas laisser de lignes permanentes.
@@ -1291,8 +1297,9 @@ async function pollNewFE(){
   feNoticeBusy=true;
   try{
     if(!feNoticeReady){if(!currentEquipier||!identityVerified)await detectCurrentEquipier();await feNoticeInitialize()}
-    const facts=await apiAllPaged(T.CUR,{sort:'id',pageSize:1000,maxRows:50000});
-    if(facts.length>=50000)throw new Error('Base FE trop volumineuse : lecture incomplète.');
+    const payload=await gristGet("/sql",{q:liveFEQuery(null,null)});
+    if(!Array.isArray(payload?.records)||payload.records.some(r=>!Number.isFinite(Number(r.id))||!r.fields||!("Date_de_transmission" in r.fields)))throw new Error("Notifications : format de lecture SQL Grist inattendu.");
+    const facts=restRecordsToRows(payload,T.CUR);
     const now=Date.now(),start=feNoticeWindowStart(),active=new Map();
     for(const f of facts){
       if(!isCurrentOperationalFact(f))continue;
@@ -1441,6 +1448,7 @@ function liveFEQuery(spec,uai,now=Date.now()){
   for(let t=start-86400000;t<=now+86400000;t+=86400000){
     const parts=Object.fromEntries(feTransmissionFormat.formatToParts(new Date(t)).map(p=>[p.type,p.value]));
     days.add(`${parts.day}/${parts.month}/${parts.year}`);
+    days.add(`${parts.year}-${parts.month}-${parts.day}`);
   }
   const transmission=`(substr(trim(CAST("Date_de_transmission" AS TEXT)),1,10) IN (${[...days].map(d=>"'"+d+"'").join(",")}) OR (typeof("Date_de_transmission") IN ('integer','real') AND ("Date_de_transmission" BETWEEN ${Math.floor(start/1000)} AND ${Math.ceil(now/1000)} OR "Date_de_transmission" BETWEEN ${start} AND ${now})))`;
   const conditions=[transmission];
@@ -1466,7 +1474,32 @@ async function readLiveFESnapshot(){
 }
 // Une seule cadence : le tableau est rafraîchi en premier, puis les notifications.
 // Le second passage utilise les mêmes données Grist récentes, sans temporisation séparée.
-let feAndNoticeBusy=false;
+let feAndNoticeBusy=false, lastPeriodSuccess=0, lastResumeAttempt=0, resumePending=false, connectionProbeBusy=false, connectionProbeGeneration=0;
+function updateHeaderEquipier(){
+  const el=$("headerEquipier");if(!el)return;
+  el.textContent=identityVerified&&currentEquipier?String(currentEquipier.Nom||currentEquipier.Email||"Équipier"):"Non identifié";
+  el.classList.toggle("unassigned",!identityVerified);
+}
+function setHeaderConnection(ok,detail){
+  const el=$("headerConnection");if(!el)return;
+  el.textContent=ok?"Connecté":"Déconnecté";el.classList.toggle("online",ok);el.title=detail;
+}
+async function probeHeaderConnection(){
+  if(!navigator.onLine){setHeaderConnection(false,"Connexion réseau indisponible");return;}
+  if(connectionProbeBusy)return;
+  connectionProbeBusy=true;const generation=connectionProbeGeneration;
+  try{await api(T.CUR,{limit:1});if(generation===connectionProbeGeneration&&navigator.onLine)setHeaderConnection(true,"Grist accessible");}
+  catch(e){if(generation===connectionProbeGeneration)setHeaderConnection(false,"Grist inaccessible : "+String(e.message||e));}
+  finally{connectionProbeBusy=false;}
+}
+function resumeLiveRefresh(force=false){
+  if(document.hidden||!navigator.onLine)return;
+  const now=Date.now();if(!force&&(now-lastPeriodSuccess<15000||now-lastResumeAttempt<5000))return;
+  lastResumeAttempt=now;
+  if(feAndNoticeBusy)resumePending=true;else void refreshFEAndNotifications();
+  void refreshLiveSuivi();void pollNewFE();void probeHeaderConnection();
+}
+
 async function refreshFEAndNotifications(){
   if(feAndNoticeBusy||document.hidden)return;
   feAndNoticeBusy=true;
@@ -1474,17 +1507,20 @@ async function refreshFEAndNotifications(){
     const generation=loadCurrentGeneration, etabGeneration=establishmentLoadGeneration;
     const spec=periodSpec();
     const periodPromise=spec?apiAllPaged(T.CUR,{filter:{Date_de_saisie:spec.dates},sort:"-id",pageSize:1000,maxRows:10000}):Promise.resolve(null);
-    const snapshotPromise=readLiveFESnapshot();
-    const [periodResult,snapshotResult]=await Promise.allSettled([periodPromise,snapshotPromise]);
+    const snapshotPromise=readLiveFESnapshot().then(value=>({status:"fulfilled",value}),reason=>({status:"rejected",reason}));
+    const periodResult=await Promise.resolve(periodPromise).then(value=>({status:"fulfilled",value}),reason=>({status:"rejected",reason}));
+    if(periodResult.status==="fulfilled"&&generation===loadCurrentGeneration&&etabGeneration===establishmentLoadGeneration){await refreshLiveFEList([],periodResult.value);lastPeriodSuccess=Date.now();render();}
+    const snapshotResult=await snapshotPromise;
     const snapshot=snapshotResult.status==="fulfilled"?snapshotResult.value:null;
     await Promise.allSettled([(async()=>{
-      if(periodResult.status==="fulfilled"&&generation===loadCurrentGeneration&&etabGeneration===establishmentLoadGeneration)await refreshLiveFEList(snapshot||[],periodResult.value);
+      if(periodResult.status==="fulfilled"&&generation===loadCurrentGeneration&&etabGeneration===establishmentLoadGeneration){await refreshLiveFEList(snapshot||[],periodResult.value);lastPeriodSuccess=Date.now();render();}
       await refreshLiveSuivi();
     })()]);
   }catch(e){console.warn("Actualisation commune FE indisponible",e);
-  }finally{feAndNoticeBusy=false}
+  }finally{feAndNoticeBusy=false;if(resumePending){resumePending=false;if(!document.hidden&&navigator.onLine)void refreshFEAndNotifications();}}
 }
 function startLiveRefresh(){
+  updateHeaderEquipier();void probeHeaderConnection();
   if(liveRefreshTimer)clearInterval(liveRefreshTimer);
   // Synchronisation légère indépendante de la lecture des FE et des notifications.
   liveRefreshTimer=setInterval(()=>void refreshLiveSuivi(),LIVE_SUIVI_REFRESH_MS);
@@ -1499,8 +1535,7 @@ function startLiveRefresh(){
 }
 document.addEventListener("visibilitychange",async()=>{
   if(document.hidden)return;
-  void pollNewFE();
-  void refreshLiveSuivi();
+  resumeLiveRefresh(true);
   await refreshFEAndNotifications();
   // Au retour d'un onglet en veille, ne jamais considérer un ancien verrou local comme encore acquis.
   if(selectedEtab&&currentEtabLock){
@@ -1509,7 +1544,14 @@ document.addEventListener("visibilitychange",async()=>{
     currentEtabLock=(active[0]&&editLockMine(active[0]))?active[0]:null;
   }
 });
-window.addEventListener("focus",()=>{void refreshLiveSuivi();void refreshFEAndNotifications()});
+window.addEventListener("focus",()=>resumeLiveRefresh(true));
+window.addEventListener("pageshow",()=>resumeLiveRefresh(true));
+window.addEventListener("online",()=>{connectionProbeGeneration++;resumeLiveRefresh(true);void probeHeaderConnection();});
+window.addEventListener("offline",()=>{connectionProbeGeneration++;setHeaderConnection(false,"Connexion réseau indisponible");});
+for(const event of ["pointermove","pointerdown","keydown"])document.addEventListener(event,()=>resumeLiveRefresh(),{passive:true});
+let lastWakeTick=Date.now();
+setInterval(()=>{const now=Date.now(),gap=now-lastWakeTick;lastWakeTick=now;if(!document.hidden){resumeLiveRefresh(gap>30000);void probeHeaderConnection();}},15000);
+
 
 function editLockActive(l){if(!l)return false;const t=Number(l.Derniere_activite||0);return !!t&&(Math.floor(Date.now()/1000)-t)<CLAIM_TTL_SECONDS}
 function editLockMine(l){return !!l&&!!currentEquipier&&Number(l.Equipier)===Number(currentEquipier.id)&&String(l.Session||"")===String(currentClaimSession)}
