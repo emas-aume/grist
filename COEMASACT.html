@@ -976,7 +976,12 @@ function periodSpec(){
   return null;
 }
 let loadCurrentGeneration=0;
-function feOrderDescending(a,b){const x=Number(a.manualSort),y=Number(b.manualSort);if(Number.isFinite(x)&&Number.isFinite(y)&&x!==y)return y-x;return (Number(b.id)||0)-(Number(a.id)||0)}
+function feOrderDescending(a,b){
+  const x=feTransmissionTime(a.Date_de_transmission),y=feTransmissionTime(b.Date_de_transmission);
+  if(Number.isFinite(x)&&Number.isFinite(y)&&x!==y)return y-x;
+  if(Number.isFinite(x)!==Number.isFinite(y))return Number.isFinite(x)?-1:1;
+  return (Number(b.id)||0)-(Number(a.id)||0);
+}
 async function loadCurrent(){const generation=++loadCurrentGeneration;let spec=periodSpec();if(!spec){notice("Choisissez une période valide.","error");return}notice(`Chargement des faits ${spec.label} — départements 34 et 48…`);let loaded=await apiAllPaged(T.CUR,{filter:{Date_de_saisie:spec.dates},sort:"-id",pageSize:1000,maxRows:10000});if(generation!==loadCurrentGeneration)return;const nextRows=loaded.filter(isCurrentOperationalFact).sort(feOrderDescending);await Promise.all([loadSuiviFor(nextRows),loadClaimsFor(nextRows)]);if(generation!==loadCurrentGeneration)return;currentRows=nextRows;rows=[...nextRows];livePeriodKey=spec.dates.join(",");livePeriodFingerprint=feListSignature(nextRows);notice(`${currentRows.length} fait(s) des départements 34 et 48 chargé(s) pour ${spec.label}.`,"ok");page=1;render()}
 async function loadSuiviFor(facts){
   // Une requête par groupe de FE distincts évite les filtres REST démesurés.
@@ -1830,13 +1835,7 @@ function filtered(){
       if(!terms.every(term=>hay.includes(term)))return false;
     }
     return true;
-  }).sort((a,b)=>{
-    // L’ordre physique de FE26_27_2 est représenté par son ID Grist :
-    // la dernière ligne ajoutée apparaît toujours en premier, même après recherche.
-    if(a._source===T.CUR&&b._source!==T.CUR)return -1;
-    if(b._source===T.CUR&&a._source!==T.CUR)return 1;
-    return (Number(b.id)||0)-(Number(a.id)||0);
-  });
+  }).sort(feOrderDescending);
 }
 function render(){let a=filtered(),pages=Math.max(1,Math.ceil(a.length/PAGE));page=Math.min(page,pages);let slice=a.slice((page-1)*PAGE,page*PAGE);$("body").innerHTML=slice.length?slice.map(f=>{let su=suiviMap.get(feNumericKey(f.Numero_FE)),cl=activeClaimFor(f);let eq=isArchivedFact(f)?(f.Equipier||"N/A"):eqName(cl ? cl.Equipier : (su?su.Equipier:f.Equipier));return `<tr><td>${dateFR(f.Date_de_saisie)}</td><td><span class="badge ${displayLevel(f.Niveau)==="3"?"b3":""}">${esc(displayLevel(f.Niveau))}</span></td><td>${factTypeBadges(f.Types_de_fait,displayLevel(f.Niveau))}</td><td><button class="etab-link" data-etab-from-fe="${f._source}:${f.id}">${esc(f.Etablissement||"—")}</button></td><td>${esc(f.Ville||"—")}</td><td>${badgeStatus(statusOf(f))}</td><td>${equipierBadge(eq)}</td><td>${esc(f.Numero_FE)}</td><td><button class="btn open-btn" data-open="${f._source}:${f.id}" title="Ouvrir le fait" aria-label="Ouvrir le fait">↗</button></td></tr>`}).join(""):'<tr><td colspan="9" class="loading">Aucun résultat.</td></tr>';document.querySelectorAll("[data-open]").forEach(b=>b.onclick=()=>openFact(b.dataset.open));document.querySelectorAll("[data-etab-from-fe]").forEach(b=>b.onclick=()=>openEstablishmentFromFact(b.dataset.etabFromFe));$("count").textContent=a.length+" résultat(s) dans les données actuellement chargées";$("pageInfo").textContent=`Page ${page} / ${pages}`;$("prev").disabled=page<=1;$("next").disabled=page>=pages}
 async function openEstablishmentFromFact(key){
