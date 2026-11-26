@@ -1,12 +1,10 @@
 
-
-
-
 <!DOCTYPE html>
+
 <html lang="fr">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Centre opérationnel EMAS</title>
+<meta charset="utf-8"/><meta content="width=device-width,initial-scale=1" name="viewport"/>
+<title>Centre opérationnel EMAS — Suivi opérationnel et activités</title>
 <!-- BUILD: 2026-10-07-centre-op-audit-v1-actif-fe -->
 <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -20,18 +18,20 @@ select{background-color:#fff!important;color-scheme:light!important;}
 .btn:not(.primary){color:#172033!important;-webkit-text-fill-color:#172033!important;background:#fff!important;}
 
 /* Ajustements du listing */
-#listView .tablewrap table{table-layout:fixed;min-width:1120px}
-#listView th:nth-child(1),#listView td:nth-child(1){width:88px}
+#listView .tablewrap table{table-layout:fixed;min-width:1450px}
+#listView th:nth-child(1),#listView td:nth-child(1){width:150px}
 #listView th:nth-child(2),#listView td:nth-child(2){width:72px;text-align:center}
-#listView th:nth-child(3),#listView td:nth-child(3){width:240px}
-#listView th:nth-child(4),#listView td:nth-child(4){width:240px}
-#listView th:nth-child(5),#listView td:nth-child(5){width:145px}
+#listView th:nth-child(3),#listView td:nth-child(3){width:205px}
+#listView th:nth-child(4),#listView td:nth-child(4){width:350px}
+#listView th:nth-child(5),#listView td:nth-child(5){width:290px}
 #listView th:nth-child(6),#listView td:nth-child(6){width:105px;white-space:nowrap}
 #listView th:nth-child(7),#listView td:nth-child(7){width:105px;white-space:nowrap}
 #listView th:nth-child(8),#listView td:nth-child(8){width:80px}
 #listView th:nth-child(9),#listView td:nth-child(9){width:85px}
 #listView td:nth-child(1){font-size:12.5px;white-space:nowrap}
-#listView td:nth-child(4),#listView td:nth-child(4) .etab-link{font-size:12.5px;line-height:1.25;font-weight:400;color:var(--text)!important}
+#listView td:nth-child(5),#listView td:nth-child(5) .etab-link{font-size:12.5px;line-height:1.25;font-weight:400;color:var(--text)!important}
+#listView td:nth-child(4){font-size:12.5px;line-height:1.4;white-space:pre-line;overflow-wrap:anywhere}
+#listView .type-badge[title]{cursor:help}
 #listView td:nth-child(2) .badge{justify-content:center;min-width:30px}
 #listView .status-badge,#listView .equipier-badge{white-space:nowrap}
 #listView td:nth-child(6),#listView td:nth-child(7){white-space:nowrap}
@@ -41,8 +41,10 @@ select{background-color:#fff!important;color-scheme:light!important;}
 
 /* V21 — notifications discrètes */
 #toastStack{position:fixed;top:16px;right:16px;z-index:10000;display:flex;flex-direction:column;gap:8px;width:min(360px,calc(100vw - 32px));pointer-events:none}
-.toast{pointer-events:auto;padding:10px 12px;border:1px solid;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.10);font-size:13px;line-height:1.35;background:#fff;opacity:0;transform:translateY(-6px);transition:opacity .18s ease,transform .18s ease}
+.toast{pointer-events:auto;padding:10px 12px;border:1px solid;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.10);font-size:13px;line-height:1.35;background:#fff;opacity:0;transform:translateY(-12px);transition:opacity .4s ease,transform .4s cubic-bezier(.22,.61,.36,1)}
 .toast.show{opacity:1;transform:translateY(0)}
+.toast[data-fe-key]{font-size:12px;padding:8px 10px}
+.toast[data-fe-key].leaving{pointer-events:none}
 .toast-success{background:#f2f7ff;border-color:#c9d9ee;color:#294b73}
 .toast-error{background:#fff2f2;border-color:#edbcbc;color:#8b2929}
 .toast-warning{background:#fff2f2;border-color:#edbcbc;color:#8b2929}
@@ -78,59 +80,265 @@ select{background-color:#fff!important;color-scheme:light!important;}
 .issue-row small{color:#667085;display:block;margin-bottom:5px}
 .issue-row strong{display:block;margin-bottom:4px}
 </style>
-</head><body><div id="notificationHub"><button id="bellButton" type="button" aria-label="Centre d’information" title="Nouveaux FE">🔔<span id="bellCount" hidden>0</span></button><div id="notificationPanel" hidden><div class="bellHead"><strong>Nouveaux FE</strong><span><button type="button" class="bellClear" id="bellClear">Tout supprimer</button></span></div><div id="bellItems"></div></div></div><div id="toastStack" aria-live="polite" aria-atomic="false"></div><main class="page">
-<section id="listView" class="card">
- <div class="top"><div><h1>Bureau des légendes</h1><div class="muted">Car vous êtes des légendes — Consultation et suivi des faits d’établissement — 34 et 48</div></div></div>
- <div class="periodbar">
-  <div class="field"><label>Jour</label><select id="daySelect"><option value="">Choisir un jour</option></select></div>
-  <div class="field"><label>Semaine</label><select id="weekSelect"><option value="">Choisir une semaine</option></select></div>
- </div>
- <div class="toolbar">
-  <input id="q" type="search" placeholder="N° FE, établissement ou id=185… puis Entrée">
-  <select id="dep"><option value="all">Tous départements</option><option>34</option><option>48</option></select>
-  <select id="degree"><option value="all">Tous degrés</option><option value="1er">1er degré</option><option value="2nd">2nd degré</option></select>
-  <select id="level"><option value="all">Tous niveaux</option><option value="2">Niveau 2</option><option value="3">Niveau 3</option></select>
-  <select id="status"><option value="all">Tous statuts</option><option value="Non attribué">Non attribué</option><option value="En cours">En cours</option></select>
-  <select id="equipierFilter"><option value="all">Tous équipiers</option></select>
- </div>
- <div id="etabMatches" class="hidden" style="margin-top:10px"></div>
- <div id="notice" class="hidden" aria-live="polite"></div>
- <div class="tablewrap" style="margin-top:14px"><table><thead><tr><th>Date</th><th>Niveau</th><th>Type de fait</th><th>Établissement</th><th>Ville</th><th>Statut</th><th>Équipier</th><th>N° FE</th><th></th></tr></thead><tbody id="body"><tr><td colspan="9" class="loading">Chargement…</td></tr></tbody></table></div>
- <div class="pagination"><div class="actions"><button id="issueButton" class="btn" type="button" title="Consulter le journal des anomalies" aria-label="Journal des anomalies">☷ <span id="issueCount" hidden>0</span></button><span id="count" class="muted"></span></div><div class="actions"><button id="prev" class="btn">Précédent</button><span id="pageInfo" class="muted"></span><button id="next" class="btn">Suivant</button></div></div>
+<style>
+#emasMainTabs{position:sticky;top:0;z-index:1000;display:flex;align-items:center;gap:8px;padding:12px 20px;background:#fff;border-bottom:1px solid #dbe2ed;flex-wrap:wrap}
+.emasMainTab{appearance:none;border:1px solid #d4ddea;border-radius:9px;background:#fff;color:#475569;padding:11px 17px;font:700 13px system-ui,Arial,sans-serif;letter-spacing:.02em;cursor:pointer}
+.emasMainTab.selected{background:#2f6fed;color:#fff;border-color:#2f6fed}
+#operationalApp[hidden],#activityApp[hidden]{display:none!important}
+#activityApp{font-family:Inter,'Segoe UI',Arial,sans-serif;font-size:14px;background:#f6f7f9;color:#1f2937;min-height:calc(100vh - 65px)}
+#activityApp{--bg:#f6f7f9;--card:#fff;--text:#1f2937;--muted:#667085;--line:#e5e7eb;--primary:#2f6fed;--primary-hover:#245bcc;--radius:14px;--shadow:0 4px 20px #182d4a08}
+#activityApp *{box-sizing:border-box}
+#activityApp{margin:0;background:var(--bg);color:var(--text);font-family:Inter,"Segoe UI",Arial,sans-serif;font-size:14px}
+#activityApp .page{padding:24px;max-width:1600px;margin:auto}
+#activityApp .hero,#activityApp .section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:24px;margin-bottom:20px;box-shadow:var(--shadow)}
+#activityApp .hero h1{margin:0 0 7px;font-size:29px}
+#activityApp h2{font-size:20px;margin:0 0 14px}
+#activityApp h3{font-size:16px;margin:0 0 12px}
+#activityApp p{line-height:1.5}
+#activityApp .muted{color:var(--muted)}
+#activityApp .toolbar,#activityApp .actions,#activityApp .nav,#activityApp .filters{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+#activityApp .toolbar{justify-content:space-between}
+#activityApp .nav{margin:18px 0 0}
+#activityApp .btn{border:1px solid var(--line);background:#fff;border-radius:9px;color:var(--text);padding:10px 14px;font:inherit;cursor:pointer;font-weight:600}
+#activityApp .btn:hover{background:#f4f7ff}
+#activityApp .btn.primary{background:var(--primary);border-color:var(--primary);color:#fff}
+#activityApp .btn.primary:hover{background:var(--primary-hover)}
+#activityApp .btn.danger{color:#b42318}
+#activityApp .btn.active{background:#eaf0ff;border-color:#b9ccff;color:#245bcc}
+#activityApp .btn:disabled{opacity:.5;cursor:not-allowed}
+#activityApp .tabs{display:flex;gap:8px;flex-wrap:wrap}
+#activityApp .tab{border:1px solid var(--line);background:white;border-radius:9px;padding:11px 18px;font-weight:650;cursor:pointer;color:var(--muted)}
+#activityApp .tab.active{color:var(--primary);border-color:#9dbaf9;background:#edf3ff}
+#activityApp .view{display:none}
+#activityApp .view.active{display:block}
+#activityApp .grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
+#activityApp .kpi{background:white;border:1px solid var(--line);border-radius:12px;padding:18px}
+#activityApp .kpi strong{display:block;font-size:29px;margin-bottom:7px}
+#activityApp .kpi span{color:var(--muted)}
+#activityApp .filters{margin:18px 0}
+#activityApp .filters input,#activityApp .filters select,#activityApp .field input,#activityApp .field select,#activityApp .field textarea{width:100%;border:1px solid #d6dce5;border-radius:9px;background:white;padding:10px 11px;font:inherit;color:var(--text);min-height:40px}
+#activityApp .filters input,#activityApp .filters select{width:auto;min-width:150px}
+#activityApp .field label{font-weight:650;display:block;margin-bottom:6px}
+#activityApp .field small{display:block;color:var(--muted);margin-top:5px}
+#activityApp .field textarea{resize:vertical;min-height:80px}
+#activityApp .form-more{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:18px}
+#activityApp .field[hidden],#activityApp .subhead[hidden]{display:none!important}
+#activityApp .formgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+#activityApp .field.wide{grid-column:span 2}
+#activityApp .field.full{grid-column:1/-1}
+#activityApp .subhead{grid-column:1/-1;border-bottom:1px solid var(--line);font-weight:700;font-size:15px;padding:14px 0 8px;margin-top:6px}
+#activityApp .calendar-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:16px}
+#activityApp .calendar-head h2{margin:0}
+#activityApp .calendar{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));border:1px solid var(--line);border-radius:12px;overflow:hidden}
+#activityApp .weekday{background:#f1f5fa;padding:12px 5px;text-align:center;font-weight:700;color:#526179}
+#activityApp .day{min-height:100px;border-top:1px solid var(--line);border-right:1px solid var(--line);padding:8px;overflow:hidden}
+#activityApp .day:nth-child(7n){border-right:0}
+#activityApp .day.other{background:#f9fafb;color:#a0a7b5}
+#activityApp .day.today .num{background:var(--primary);color:white}
+#activityApp .num{display:inline-flex;align-items:center;justify-content:center;min-width:26px;height:26px;border-radius:50%;font-weight:700}
+#activityApp .event{display:block;width:100%;border:0;border-left:3px solid var(--primary);background:#eaf1ff;color:#244b91;border-radius:5px;text-align:left;padding:5px 7px;margin-top:5px;cursor:pointer;font-size:12px;line-height:1.3;overflow-wrap:anywhere}
+#activityApp .event:hover{filter:brightness(.96)}
+#activityApp .event.realisee{background:#e7f7ef;color:#067647;border-color:#12a56a}
+#activityApp .event.annulee{background:#fff0ef;color:#a53c35;border-color:#e3655e}
+#activityApp .event.reportee{background:#fff6e8;color:#965d12;border-color:#e9a43e}
+#activityApp .event .time{font-weight:700}
+#activityApp .tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:11px}
+#activityApp table{border-collapse:collapse;width:100%;min-width:900px}
+#activityApp th,#activityApp td{text-align:left;border-bottom:1px solid var(--line);padding:12px 14px;vertical-align:middle}
+#activityApp th{background:#f7f9fc;font-size:12px;text-transform:uppercase;letter-spacing:.03em;color:#536174}
+#activityApp tr:last-child td{border-bottom:0}
+#activityApp tbody tr:hover{background:#f8faff}
+#activityApp .pill{display:inline-block;border-radius:99px;padding:5px 9px;background:#f0f3f8;color:#536174;font-size:12px;font-weight:650}
+#activityApp .pill.realisee{background:#e7f7ef;color:#067647}
+#activityApp .pill.annulee{background:#fff0ef;color:#a53c35}
+#activityApp .pill.reportee{background:#fff6e8;color:#965d12}
+#activityApp .notice{border-radius:10px;background:#f1f5ff;border-left:4px solid var(--primary);padding:12px 15px;margin:12px 0;color:#31517d}
+#activityApp .notice.error{background:#fff1f1;border-color:#ce3e3e;color:#a22d2d}
+#activityApp .notice.success{background:#eaf8ef;border-color:#17a56b;color:#087246}
+#activityApp .hidden{display:none!important}
+#activityApp .empty{text-align:center;padding:35px;color:var(--muted)}
+#activityApp .detail{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+#activityApp .detail .item{padding:12px;border:1px solid var(--line);border-radius:9px;min-width:0;overflow-wrap:anywhere}
+#activityApp .detail .item b{display:block;color:var(--muted);font-size:12px;margin-bottom:6px}
+#activityApp .detail .item.wide{grid-column:span 3}
+#activityApp .count{font-size:12px;color:var(--muted)}
+#activityApp .sticky{position:sticky;bottom:0;background:#fff;border-top:1px solid var(--line);padding:14px 0 0;margin-top:20px;z-index:3}
+#activityApp .layoutline{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+#activityApp .small{font-size:12px}
+#activityApp .mini{padding:6px 10px}
+#activityApp .alert{margin-top:14px}
+#activityApp .loading{opacity:.6;pointer-events:none}
+@media (max-width:1000px){#activityApp .grid{grid-template-columns:repeat(2,1fr)}
+#activityApp .formgrid{grid-template-columns:repeat(2,minmax(0,1fr))}
+#activityApp .day{min-height:85px;padding:4px}
+#activityApp .event{font-size:11px}}
+@media (max-width:650px){#activityApp .page{padding:10px}
+#activityApp .hero,#activityApp .section{padding:15px}
+#activityApp .grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+#activityApp .kpi{padding:12px}
+#activityApp .kpi strong{font-size:23px}
+#activityApp .formgrid,#activityApp .detail{grid-template-columns:1fr}
+#activityApp .field.wide,#activityApp .detail .item.wide{grid-column:1}
+#activityApp .calendar{grid-template-columns:repeat(7,minmax(0,1fr))}
+#activityApp .weekday{font-size:10px;padding:7px 0}
+#activityApp .day{min-height:60px;padding:2px}
+#activityApp .num{font-size:11px;min-width:20px;height:20px}
+#activityApp .event{font-size:0;padding:3px;min-height:10px;border-left-width:5px}
+#activityApp .event .time{font-size:0}
+#activityApp .filters input,#activityApp .filters select{width:100%}
+#activityApp .filters>*{flex:1 1 100%}}
+#activityApp .lookup{position:relative}
+#activityApp .lookup-results{position:absolute;z-index:30;left:0;right:0;top:calc(100% + 4px);background:#fff;border:1px solid #cbd5e1;border-radius:10px;box-shadow:0 14px 30px #182d4a22;max-height:280px;overflow:auto}
+#activityApp .lookup-option{display:block;width:100%;text-align:left;border:0;border-bottom:1px solid #eef0f4;background:#fff;padding:11px 13px;cursor:pointer;color:var(--text);font:inherit}
+#activityApp .lookup-option:hover,#activityApp .lookup-option.selected{background:#edf3ff}
+#activityApp .lookup-option small{display:block;color:var(--muted);margin-top:4px}
+#activityApp .lookup-empty{padding:12px;color:var(--muted)}
+#activityApp .lookup-picked{margin-top:6px;color:#087246;font-size:12px}
+#activityApp .lookup-info{color:var(--muted);font-size:12px;margin-top:6px}</style><style>
+/* Harmonisation visuelle avec le suivi opérationnel — aucune logique métier modifiée */
+#emasMainTabs{position:sticky;top:0;z-index:11000;min-height:70px;background:#fff;border-bottom:1px solid #e4e7ec;box-shadow:0 2px 12px #1720330b;flex-wrap:nowrap}
+#emasMainTabs .emasTabsSpacer{flex:1;min-width:10px}
+#emasMainTabs #notificationHub{position:relative;top:auto;right:auto;z-index:1;pointer-events:auto;flex:0 0 auto;margin-left:auto}
+#emasMainTabs .connection-badge{display:inline-flex;align-items:center;white-space:nowrap;border-radius:999px;padding:6px 10px;font-size:11px;font-weight:700;background:#f2f4f7;color:#667085;flex-shrink:0}
+#emasMainTabs .connection-badge.online{background:#ecfdf3;color:#067647}
+#emasMainTabs #headerEquipier{white-space:nowrap;flex-shrink:0}
+#emasMainTabs #notificationHub{margin-left:0}
+#emasMainTabs #bellButton{box-shadow:none;border:1px solid #d4ddea;width:43px;height:43px}
+/* Cloche neutre par défaut, bleue seulement si des notifications non lues existent. */
+#emasMainTabs #bellButton{background:#fff;color:#294b73;transition:background-color .4s ease,border-color .4s ease,color .4s ease,box-shadow .2s ease,transform .2s ease}
+#bellButton .bellGlyph{display:inline-block;transform-origin:50% 20%}
+@keyframes emasBellRing{0%,100%{transform:rotate(0)}15%,45%,75%{transform:rotate(-9deg)}30%,60%{transform:rotate(9deg)}90%{transform:rotate(4deg)}}
+#bellButton .bellGlyph.bellRinging{animation:emasBellRing .65s ease-in-out}
+@media(prefers-reduced-motion:reduce){#bellButton .bellGlyph.bellRinging{animation:none}#emasMainTabs #bellButton{transition:none}}
+#emasMainTabs #bellButton.has-unread{background:#2563eb;border-color:#2563eb;color:#fff}
+#emasMainTabs #bellButton.has-unread:hover{background:#1d4ed8}
+#emasMainTabs #bellButton:focus-visible{outline:3px solid #93c5fd;outline-offset:2px}
+#emasMainTabs #notificationPanel{z-index:12000;top:calc(100% + 12px)}
+#activityApp{--bg:#f5f7fa;--card:#fff;--text:#172033;--muted:#667085;--line:#e4e7ec;--primary:#2563eb;--primary-hover:#1d4ed8;--radius:14px;--shadow:none;background:var(--bg);color:var(--text)}
+#activityApp .page{max-width:none;padding:24px}
+#activityApp .hero,#activityApp .section{border-color:var(--line);border-radius:var(--radius);box-shadow:none;padding:20px;margin-bottom:16px}
+#activityApp .hero h1{font-size:27px;font-weight:750;color:var(--text)}
+#activityApp h2{font-size:21px;color:var(--text)}
+#activityApp .tab{background:#fff;border-color:#d4ddea;color:#475569}
+#activityApp .tab.active{background:#2563eb;color:#fff;border-color:#2563eb}
+#activityApp .btn{border-color:#d0d5dd;border-radius:9px}
+#activityApp .btn.primary{background:#2563eb;border-color:#2563eb;color:#fff}
+#activityApp .btn.primary:hover{background:#1d4ed8}
+#activityApp .kpi{border-color:var(--line);border-radius:12px;box-shadow:none}
+#activityApp .kpi strong{color:#172033}
+#activityApp .filters input,#activityApp .filters select,#activityApp .field input,#activityApp .field select,#activityApp .field textarea{border-color:#d0d5dd;border-radius:8px}
+#activityApp .tablewrap{border-color:#e4e7ec}
+#activityApp th{background:#f8fafc;color:#475467}
+#activityApp td{border-color:#e4e7ec}
+#activityApp .weekday{background:#f2f4f7;color:#475467}
+#activityApp .event{border-left-color:#2563eb}
+#activityApp .event.realisee{border-left-color:#12a56a}
+#activityApp .event.annulee{border-left-color:#e3655e}
+#activityApp .event.reportee{border-left-color:#e9a43e}
+#activityApp .sticky{background:#fff}
+@media(max-width:650px){#emasMainTabs{padding:8px;gap:5px;min-height:60px}#emasMainTabs .emasMainTab{padding:9px 7px;font-size:10px;letter-spacing:0}#emasMainTabs #bellButton{width:38px;height:38px}#activityApp .page{padding:10px}#activityApp .hero,#activityApp .section{padding:15px}}
+
+/* Activités : en-tête et statistiques compactes, sans retirer les éléments techniques. */
+#activityApp #connection,#activityApp #refresh,#activityApp #newTop,#activityApp .grid[hidden]{display:none!important}
+#activityApp .hero .toolbar>.actions:empty{display:none}
+#activityApp .hero{padding:20px;margin-bottom:16px}
+#activityApp .hero h1{margin:0 0 5px;font-size:26px;line-height:1.25}
+#activityApp .hero .muted{line-height:1.4}
+#activityApp #filterCount{font-size:13px;color:#667085;font-weight:400;margin-top:12px}
+@media(max-width:650px){#activityApp .hero{padding:20px}#activityApp #filterCount{font-size:13px}}
+
+/* Barre d’actions : fixée au viewport, même au bas du formulaire. */
+#activityApp #activityForm{padding-bottom:90px}
+#activityApp #activityBottomBar{position:fixed;left:0;right:0;bottom:0;z-index:40;box-sizing:border-box;width:100%;max-width:none;margin:0;padding:14px 20px 20px;background:#fff;border-top:1px solid #dbe2ed;box-shadow:0 -5px 16px rgba(24,45,74,.07);justify-content:flex-end}
+#activityApp #activityBottomBar .actions{width:100%;justify-content:flex-end;gap:10px}
+#activityApp #activityBottomBar #deleteActivity:not([hidden]){color:#b42318;border-color:#f0b5b1}
+#activityApp #activityBottomBar [hidden]{display:none!important}
+#activityApp #message.notice.success{position:relative;overflow:hidden;padding-bottom:17px}
+#activityApp #message.notice.success::after{content:"";position:absolute;left:0;bottom:0;height:4px;width:100%;background:#17a56b;transform-origin:left center;animation:activityNoticeCountdown 4.5s linear forwards}
+@keyframes activityNoticeCountdown{from{transform:scaleX(1)}to{transform:scaleX(0)}}
+@media(max-width:650px){#activityApp #activityBottomBar{padding:12px 12px 18px}#activityApp #activityBottomBar .actions{gap:6px}#activityApp #activityBottomBar .btn{padding:9px 10px}}
+</style>
+<style>
+#activityApp .event .activity-type-badge{display:table;margin-top:3px;border-radius:999px;padding:2px 6px;font-size:10px;font-weight:700;line-height:1.3;max-width:100%;white-space:normal;}
+#activityApp #activityRows .activity-type-badge{display:inline-flex;align-items:center;justify-content:center;text-align:center;border-radius:999px;padding:6px 9px;font-size:12px;font-weight:700;line-height:1.3;max-width:100%;white-space:normal;}
+#activityApp .activity-type-0{background:#e0ecff;color:#175cd3;}
+#activityApp .activity-type-1{background:#f0e7ff;color:#6941c6;}
+#activityApp .activity-type-2{background:#dcfae6;color:#067647;}
+#activityApp .activity-type-3{background:#ffead5;color:#b54708;}
+#activityApp .activity-type-4{background:#fee4e2;color:#b42318;}
+#activityApp .activity-type-5{background:#fce7f6;color:#a11069;}
+#activityApp .activity-type-6{background:#cff9fe;color:#0e7090;}
+#activityApp .activity-type-7{background:#e0e7ff;color:#3538cd;}
+#activityApp .activity-type-8{background:#fef0c7;color:#93370d;}
+#activityApp .activity-type-9{background:#eaecf0;color:#475467;}
+#activityApp .calendar .event.activity-event-0{background:#e0ecff;color:#175cd3;border-left-color:#175cd3;}
+#activityApp .calendar .event.activity-event-1{background:#f0e7ff;color:#6941c6;border-left-color:#6941c6;}
+#activityApp .calendar .event.activity-event-2{background:#dcfae6;color:#067647;border-left-color:#067647;}
+#activityApp .calendar .event.activity-event-3{background:#ffead5;color:#b54708;border-left-color:#b54708;}
+#activityApp .calendar .event.activity-event-4{background:#fee4e2;color:#b42318;border-left-color:#b42318;}
+#activityApp .calendar .event.activity-event-5{background:#fce7f6;color:#a11069;border-left-color:#a11069;}
+#activityApp .calendar .event.activity-event-6{background:#cff9fe;color:#0e7090;border-left-color:#0e7090;}
+#activityApp .calendar .event.activity-event-7{background:#e0e7ff;color:#3538cd;border-left-color:#3538cd;}
+#activityApp .calendar .event.activity-event-8{background:#fef0c7;color:#93370d;border-left-color:#93370d;}
+#activityApp .calendar .event.activity-event-9{background:#eaecf0;color:#475467;border-left-color:#475467;}
+#activityApp #view-detail > .layoutline{margin-bottom:16px;}
+#activityApp #detailContent .activity-type-badge{display:inline-block;border-radius:999px;padding:5px 9px;font-size:12px;font-weight:700;}
+#activityApp #detailContent .pill.programmee{background:#e0ecff;color:#175cd3;}
+
+
+</style>
+</head><body><nav aria-label="Sections du centre opérationnel" id="emasMainTabs"><button aria-pressed="true" class="emasMainTab selected" data-section="operational" type="button">SUIVI OPÉRATIONNEL</button><button aria-pressed="false" class="emasMainTab" data-section="activities" type="button">SUIVI DES ACTIVITÉS</button><div class="emasTabsSpacer" aria-hidden="true"></div><span id="headerConnection" class="connection-badge" role="status" title="Vérification de la connexion Grist">Vérification…</span><span id="headerEquipier" class="equipier-badge" title="Équipier identifié par Grist">Identification…</span><div id="notificationHub"><button aria-label="Centre d’information" id="bellButton" title="Mes notifications" type="button"><span class="bellGlyph" aria-hidden="true">🔔</span><span hidden="" id="bellCount">0</span></button><div hidden="" id="notificationPanel"><div class="bellHead"><strong>Mes notifications</strong><span><button class="bellClear" id="bellClear" type="button">Tout supprimer</button></span></div><div id="bellItems"></div></div></div></nav><div id="operationalApp"><div aria-atomic="false" aria-live="polite" id="toastStack"></div><main class="page">
+<section class="card" id="listView">
+<div class="top"><div><h1>Bureau des légendes</h1><div class="muted">Car vous êtes des légendes — Consultation et suivi des faits d’établissement — 34 et 48</div></div></div>
+<div class="periodbar">
+<div class="field"><label>Jour</label><select id="daySelect"><option value="">Choisir un jour</option></select></div>
+<div class="field"><label>Semaine</label><select id="weekSelect"><option value="">Choisir une semaine</option></select></div>
+</div>
+<div class="toolbar">
+<input id="q" placeholder="N° FE, établissement ou id=185… puis Entrée" type="search"/>
+<select id="dep"><option value="all">Tous départements</option><option>34</option><option>48</option></select>
+<select id="degree"><option value="all">Tous degrés</option><option value="1er">1er degré</option><option value="2nd">2nd degré</option></select>
+<select id="level"><option value="all">Tous niveaux</option><option value="2">Niveau 2</option><option value="3">Niveau 3</option></select>
+<select id="status"><option value="all">Tous statuts</option><option value="Non attribué">Non attribué</option><option value="En cours">En cours</option></select>
+<select id="equipierFilter"><option value="all">Tous équipiers</option></select>
+</div>
+<div class="hidden" id="etabMatches" style="margin-top:10px"></div>
+<div aria-live="polite" class="hidden" id="notice"></div>
+<div class="tablewrap" style="margin-top:14px"><table><thead><tr><th>Date</th><th>Niveau</th><th>Type de fait</th><th>Résumé</th><th>Établissement</th><th>Statut</th><th>Équipier</th><th>N° FE</th><th></th></tr></thead><tbody id="body"><tr><td class="loading" colspan="9">Chargement…</td></tr></tbody></table></div>
+<div class="pagination"><div class="actions"><button aria-label="Journal des anomalies" class="btn" id="issueButton" title="Consulter le journal des anomalies" type="button">☷ <span hidden="" id="issueCount">0</span></button><span class="muted" id="count"></span></div><div class="actions"><button class="btn" id="prev">Précédent</button><span class="muted" id="pageInfo"></span><button class="btn" id="next">Suivant</button></div></div>
 </section>
-<section id="detailView" class="hidden">
- <div class="card"><div class="top"><div class="actions"><button id="back" class="btn">← Retour</button><button id="openEtab" class="btn">Voir l’établissement</button></div><div class="actions"><span id="detailStatus"></span><button id="exportFePdf" class="btn" type="button" title="Exporter la fiche FE et son suivi au format PDF">PDF</button></div></div>
- <div class="sectiontitle"><div><h2 id="title"></h2><div id="subtitle" class="muted"></div><div id="detailAuthor" class="detail-author"></div><div id="operationalId" class="operational-id hidden"></div></div><div class="actions"><button id="assignOperationalId" class="btn assign-id-btn hidden" type="button">Attribuer un ID opérationnel</button></div></div>
- <div id="sourceGrid" class="grid"></div>
- </div>
- <div id="opsCard" class="card"><div class="sectiontitle"><h2>Suivi opérationnel</h2><span id="saveMeta" class="muted"></span></div>
-  <div class="editgrid">
-   <div class="field span2"><label>Équipier</label><select id="equipier"></select><div id="currentEquipierInfo" class="muted" style="margin-top:7px;font-size:12px"></div></div>
-   <select id="editStatus" class="hidden" aria-hidden="true" tabindex="-1"><option>Non attribué</option><option>En cours</option></select>
-   <div class="inline-edit-field" data-inline-field="emas"><div class="inline-edit-head"><span class="inline-edit-label">Traitement / accompagnement EMAS</span><button class="inline-edit-pencil" type="button" data-inline-edit="emas" title="Modifier" aria-label="Modifier le traitement EMAS">✎</button></div><div id="emasDisplay" class="inline-edit-display"></div><div id="emasEditor" class="inline-edit-editor hidden"><textarea id="emas"></textarea><div class="inline-edit-actions"><button class="btn" type="button" data-inline-cancel="emas">Annuler</button><button class="btn primary" type="button" data-inline-save="emas">Valider</button></div></div></div>
-   <div class="inline-edit-field" data-inline-field="suivi"><div class="inline-edit-head"><span class="inline-edit-label">Suivi établissement</span><button class="inline-edit-pencil" type="button" data-inline-edit="suivi" title="Modifier" aria-label="Modifier le suivi établissement">✎</button></div><div id="suiviDisplay" class="inline-edit-display"></div><div id="suiviEditor" class="inline-edit-editor hidden"><textarea id="suivi"></textarea><div class="inline-edit-actions"><button class="btn" type="button" data-inline-cancel="suivi">Annuler</button><button class="btn primary" type="button" data-inline-save="suivi">Valider</button></div></div></div>
-   <div class="inline-edit-field span2" data-inline-field="notes"><div class="inline-edit-head"><span class="inline-edit-label">Notes et informations internes</span><button class="inline-edit-pencil" type="button" data-inline-edit="notes" title="Modifier" aria-label="Modifier les notes internes">✎</button></div><div id="notesDisplay" class="inline-edit-display"></div><div id="notesEditor" class="inline-edit-editor hidden"><textarea id="notes"></textarea><div class="inline-edit-actions"><button class="btn" type="button" data-inline-cancel="notes">Annuler</button><button class="btn primary" type="button" data-inline-save="notes">Valider</button></div></div></div>
-   <div class="inline-edit-field span2" data-inline-field="eleveSuivi"><div class="inline-edit-head"><span class="inline-edit-label">Élève suivi</span><button class="inline-edit-pencil" type="button" data-inline-edit="eleveSuivi" title="Modifier" aria-label="Modifier l’élève suivi">✎</button></div><div id="eleveSuiviDisplay" class="inline-edit-display"></div><div id="eleveSuiviEditor" class="inline-edit-editor hidden"><input id="eleveSuivi" type="text" placeholder="Saisie libre"><div class="inline-edit-actions"><button class="btn" type="button" data-inline-cancel="eleveSuivi">Annuler</button><button class="btn primary" type="button" data-inline-save="eleveSuivi">Valider</button></div></div></div>
-  </div>
-  <h3 class="qualification-title">Qualification de l’activité EMAS</h3>
-  <div class="editgrid">
-   <div class="field"><label>Sécurisation</label><div id="securisationChoices" class="choicebox"></div></div>
-   <div class="field"><label>Prévention</label><div id="preventionChoices" class="choicebox"></div></div>
-   <div class="field"><label>Accompagnement</label><div id="accompagnementChoices" class="choicebox"></div></div>
-   <div class="field"><label>Formation</label><div id="formationChoices" class="choicebox"></div></div>
-   <div class="field span2"><label>Représentation / Partenariat</label><div id="representationChoices" class="choicebox"></div></div>
-  </div>
-  <div id="treatmentDate" class="treatment-date"></div>
-  <div class="ops-actions"><div class="actions"><button id="resetFollowup" class="btn" type="button" title="Réinitialiser le suivi" aria-label="Réinitialiser le suivi" style="padding:7px 9px;min-width:auto;font-size:15px">🗑️</button></div><div class="actions"><button id="save" class="btn primary">Enregistrer</button><button id="toggleDone" class="btn finish">Terminé</button></div></div>
- </div>
+<section class="hidden" id="detailView">
+<div class="card"><div class="top"><div class="actions"><button class="btn" id="back">← Retour</button><button class="btn" id="openEtab">Voir l’établissement</button></div><div class="actions"><span id="detailStatus"></span><button class="btn" id="exportFePdf" title="Exporter la fiche FE et son suivi au format PDF" type="button">PDF</button></div></div>
+<div class="sectiontitle"><div><h2 id="title"></h2><div class="muted" id="subtitle"></div><div class="detail-author" id="detailAuthor"></div><div class="operational-id hidden" id="operationalId"></div></div><div class="actions"><button class="btn assign-id-btn hidden" id="assignOperationalId" type="button">Attribuer un ID opérationnel</button></div></div>
+<div class="grid" id="sourceGrid"></div>
+</div>
+<div class="card" id="opsCard"><div class="sectiontitle"><h2>Suivi opérationnel</h2><span class="muted" id="saveMeta"></span></div>
+<div class="editgrid">
+<div class="field span2"><label>Équipier</label><select id="equipier"></select><div class="muted" id="currentEquipierInfo" style="margin-top:7px;font-size:12px"></div></div>
+<select aria-hidden="true" class="hidden" id="editStatus" tabindex="-1"><option>Non attribué</option><option>En cours</option></select>
+<div class="inline-edit-field" data-inline-field="emas"><div class="inline-edit-head"><span class="inline-edit-label">Traitement / accompagnement EMAS</span><button aria-label="Modifier le traitement EMAS" class="inline-edit-pencil" data-inline-edit="emas" title="Modifier" type="button">✎</button></div><div class="inline-edit-display" id="emasDisplay"></div><div class="inline-edit-editor hidden" id="emasEditor"><textarea id="emas"></textarea><div class="inline-edit-actions"><button class="btn" data-inline-cancel="emas" type="button">Annuler</button><button class="btn primary" data-inline-save="emas" type="button">Valider</button></div></div></div>
+<div class="inline-edit-field" data-inline-field="suivi"><div class="inline-edit-head"><span class="inline-edit-label">Suivi établissement</span><button aria-label="Modifier le suivi établissement" class="inline-edit-pencil" data-inline-edit="suivi" title="Modifier" type="button">✎</button></div><div class="inline-edit-display" id="suiviDisplay"></div><div class="inline-edit-editor hidden" id="suiviEditor"><textarea id="suivi"></textarea><div class="inline-edit-actions"><button class="btn" data-inline-cancel="suivi" type="button">Annuler</button><button class="btn primary" data-inline-save="suivi" type="button">Valider</button></div></div></div>
+<div class="inline-edit-field span2" data-inline-field="notes"><div class="inline-edit-head"><span class="inline-edit-label">Notes et informations internes</span><button aria-label="Modifier les notes internes" class="inline-edit-pencil" data-inline-edit="notes" title="Modifier" type="button">✎</button></div><div class="inline-edit-display" id="notesDisplay"></div><div class="inline-edit-editor hidden" id="notesEditor"><textarea id="notes"></textarea><div class="inline-edit-actions"><button class="btn" data-inline-cancel="notes" type="button">Annuler</button><button class="btn primary" data-inline-save="notes" type="button">Valider</button></div></div></div>
+<div class="inline-edit-field span2" data-inline-field="eleveSuivi"><div class="inline-edit-head"><span class="inline-edit-label">Élève suivi</span><button aria-label="Modifier l’élève suivi" class="inline-edit-pencil" data-inline-edit="eleveSuivi" title="Modifier" type="button">✎</button></div><div class="inline-edit-display" id="eleveSuiviDisplay"></div><div class="inline-edit-editor hidden" id="eleveSuiviEditor"><input id="eleveSuivi" placeholder="Saisie libre" type="text"/><div class="inline-edit-actions"><button class="btn" data-inline-cancel="eleveSuivi" type="button">Annuler</button><button class="btn primary" data-inline-save="eleveSuivi" type="button">Valider</button></div></div></div>
+</div>
+<h3 class="qualification-title">Qualification de l’activité EMAS</h3>
+<div class="editgrid">
+<div class="field"><label>Sécurisation</label><div class="choicebox" id="securisationChoices"></div></div>
+<div class="field"><label>Prévention</label><div class="choicebox" id="preventionChoices"></div></div>
+<div class="field"><label>Accompagnement</label><div class="choicebox" id="accompagnementChoices"></div></div>
+<div class="field"><label>Formation</label><div class="choicebox" id="formationChoices"></div></div>
+<div class="field span2"><label>Représentation / Partenariat</label><div class="choicebox" id="representationChoices"></div></div>
+</div>
+<div class="treatment-date" id="treatmentDate"></div>
+<div class="ops-actions"><div class="actions"><button class="btn primary" id="save">Enregistrer</button><button class="btn finish" id="toggleDone">Terminé</button></div></div>
+</div>
 </section>
-<section id="etabView" class="hidden">
- <div class="card"><div class="actions"><button id="etabBack" class="btn">← Retour</button></div><div class="sectiontitle"><div><h2 id="etabTitle">Établissement</h2><div id="etabSub" class="muted"></div></div></div><div id="etabGrid" class="grid"></div><div id="etabCounts" class="notice" style="margin-top:14px">Chargement du nombre de faits…</div></div>
- <div class="card ambiance-card"><div class="ambiance-head"><h2>Renseignements d’ambiance</h2><button id="ambianceEdit" class="ambiance-edit-btn" type="button" title="Modifier les renseignements d’ambiance" aria-label="Modifier les renseignements d’ambiance">✎</button></div><div id="ambianceDisplay"><div class="ambiance-text ambiance-empty">Aucun renseignement d’ambiance</div></div><div id="ambianceEditor" class="ambiance-editor hidden"><textarea id="ambianceText" placeholder="Saisir un renseignement d’ambiance…"></textarea><div class="ambiance-editor-actions"><button id="ambianceCancel" class="btn" type="button">Annuler</button><button id="ambianceSave" class="btn primary" type="button">Enregistrer</button></div></div></div>
- <div class="card"><h2>Historique des faits</h2><div id="history" class="timeline" style="margin-top:16px"></div></div>
+<section class="hidden" id="etabView">
+<div class="card"><div class="actions"><button class="btn" id="etabBack">← Retour</button></div><div class="sectiontitle"><div><h2 id="etabTitle">Établissement</h2><div class="muted" id="etabSub"></div></div></div><div class="grid" id="etabGrid"></div><div class="notice" id="etabCounts" style="margin-top:14px">Chargement du nombre de faits…</div></div>
+<div class="card ambiance-card"><div class="ambiance-head"><h2>Renseignements d’ambiance</h2><button aria-label="Modifier les renseignements d’ambiance" class="ambiance-edit-btn" id="ambianceEdit" title="Modifier les renseignements d’ambiance" type="button">✎</button></div><div id="ambianceDisplay"><div class="ambiance-text ambiance-empty">Aucun renseignement d’ambiance</div></div><div class="ambiance-editor hidden" id="ambianceEditor"><textarea id="ambianceText" placeholder="Saisir un renseignement d’ambiance…"></textarea><div class="ambiance-editor-actions"><button class="btn" id="ambianceCancel" type="button">Annuler</button><button class="btn primary" id="ambianceSave" type="button">Enregistrer</button></div></div></div>
+<div class="card"><h2>Historique des faits</h2><div class="timeline" id="history" style="margin-top:16px"></div></div>
 </section>
-</main><div id="issuePanel" hidden role="dialog" aria-modal="true" aria-label="Journal des anomalies"><div class="issue-box"><div class="issue-head"><h2>Journal des anomalies</h2><div class="actions"><button class="btn" id="issueClear" type="button">Effacer ce journal</button><button class="btn" id="issueClose" type="button">Fermer</button></div></div><p class="muted" id="issueScope">Journal local ; synchronisation partagée en attente.</p><div id="issueItems"></div></div></div>
-<div id="appModal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="appModalTitle"><div id="appModalBox" class="modal-box"><div id="appModalTitle" class="modal-title"></div><div id="appModalMessage" class="modal-message"></div><div id="appModalActions" class="modal-actions"></div></div></div>
+</main><div aria-label="Journal des anomalies" aria-modal="true" hidden="" id="issuePanel" role="dialog"><div class="issue-box"><div class="issue-head"><h2>Journal des anomalies</h2><div class="actions"><button class="btn" id="issueClear" type="button">Effacer ce journal</button><button class="btn" id="issueClose" type="button">Fermer</button></div></div><p class="muted" id="issueScope">Journal local ; synchronisation partagée en attente.</p><div id="issueItems"></div></div></div>
 <!-- CO-EMAS V49 — correction libellé après remise à zéro -->
 <script>
 "use strict";
@@ -264,14 +472,19 @@ function toast(message,type="info",title="",duration=10000,onOpen=null){
   if(title){const h=document.createElement("div");h.className="toast-title";h.textContent=title;el.appendChild(h)}
   const msg=document.createElement("div");msg.className="toast-message";msg.textContent=String(message||"");el.appendChild(msg);
   const progress=document.createElement("div");progress.className="toast-progress";progress.style.setProperty("--toast-duration",`${duration}ms`);el.appendChild(progress);
-  stack.appendChild(el);requestAnimationFrame(()=>el.classList.add("show"));
+  stack.appendChild(el);void el.offsetWidth;requestAnimationFrame(()=>{if(!closed)el.classList.add("show")});
   let remaining=duration,started=Date.now(),timer=null,closed=false;
-  const close=()=>{if(closed)return;closed=true;clearTimeout(timer);el.classList.remove("show");setTimeout(()=>el.remove(),220)};
+  const close=()=>{if(closed)return;closed=true;clearTimeout(timer);el.classList.remove("show");el.classList.add("leaving");setTimeout(()=>{
+    const others=[...stack.children].filter(n=>n!==el),before=others.map(n=>n.getBoundingClientRect().top);
+    el.remove();
+    others.forEach((n,i)=>{const dy=before[i]-n.getBoundingClientRect().top;if(dy&&n.animate&&!matchMedia('(prefers-reduced-motion: reduce)').matches)n.animate([{translate:`0 ${dy}px`},{translate:'0 0'}],{duration:300,easing:'ease-out'})});
+  },420)};
   const start=()=>{started=Date.now();timer=setTimeout(close,remaining)};
   el.addEventListener("mouseenter",()=>{clearTimeout(timer);remaining=Math.max(0,remaining-(Date.now()-started))});
   el.addEventListener("mouseleave",()=>{if(!closed)start()});
   el.addEventListener("click",()=>{close();if(onOpen)onOpen()});
   start();
+  return new Promise(resolve=>{const observer=new MutationObserver(()=>{if(!el.isConnected){observer.disconnect();resolve()}});observer.observe(stack,{childList:true});if(!el.isConnected){observer.disconnect();resolve()}});
 }
 function esc(v){return String(v??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;")}
 function norm(v){return String(v??"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/\s+/g," ").trim()}
@@ -286,12 +499,14 @@ function notice(s,type=""){
   }
   let n=$("notice");if(!n)return;n.textContent=s;n.className="notice"+(type?" "+type:"");
 }
+let tokenRequestPending=null;
 async function getTokenInfo(force=false){
   const now=Date.now();
   if(!force && tokenInfo && tokenInfo._expiresAt && now < tokenInfo._expiresAt-30000)return tokenInfo;
-  const t=await grist.docApi.getAccessToken({readOnly:false});
-  tokenInfo={...t,_expiresAt:now+(t.ttlMsecs||240000)};
-  return tokenInfo;
+  if(tokenRequestPending)return tokenRequestPending;
+  tokenRequestPending=(async()=>{const t=await grist.docApi.getAccessToken({readOnly:false});
+    tokenInfo={...t,_expiresAt:Date.now()+(t.ttlMsecs||240000)};return tokenInfo;})();
+  try{return await tokenRequestPending}finally{tokenRequestPending=null}
 }
 function restRecordsToRows(payload,source){
   const records=Array.isArray(payload?.records)?payload.records:[];
@@ -302,10 +517,12 @@ async function gristGet(path,params=null,retry=true){
   const qs=new URLSearchParams(params||{});
   qs.set("auth",t.token);
   const url=t.baseUrl+path+(qs.size?"?"+qs.toString():"");
-  const response=await fetch(url,{method:"GET",credentials:"omit"});
+  const response=await fetch(url,{method:"GET",credentials:"omit",signal:AbortSignal.timeout(20000)});
   if(response.status===401&&retry){tokenInfo=null;await getTokenInfo(true);return gristGet(path,params,false)}
   if(!response.ok){const detail=await response.text().catch(()=>response.statusText);throw new Error("HTTP "+response.status+" — "+detail.slice(0,240))}
-  return response.json();
+  const payload=await response.json();
+  if(navigator.onLine){lastSuccessfulGristRead=Date.now();setHeaderConnection(true,"Grist accessible");}
+  return payload;
 }
 async function api(table,{filter=null,sort=null,limit=null,offset=null}={}){
   try{
@@ -380,7 +597,7 @@ function isActiveFact(f){
 }
 function visibleFact(f){return isArchivedFact(f)||isActiveFact(f)}
 function claimKey(f){return feNumericKey(f?.Numero_FE)}
-function claimIsActive(c){return !!c&&Number(c.Derniere_activite||0)>=(Math.floor(Date.now()/1000)-CLAIM_TTL_SECONDS)}
+function claimIsActive(c){return !!c&&Number(c.Derniere_activite||0)>=(Math.floor(Date.now()/1000)-FE_CLAIM_TTL_SECONDS)}
 function activeClaimFor(f){const c=claimMap.get(claimKey(f));return claimIsActive(c)?c:null}
 function claimOwnerName(c){return c?(eqName(c.Equipier)||String(c.Email||"").trim()||"un autre équipier"):"N/A"}
 function claimOwnedByMe(c){return !!c&&!!currentEquipier&&Number(c.Equipier)===Number(currentEquipier.id)&&String(c.Session||"")===currentClaimSession}
@@ -412,9 +629,11 @@ async function detectCurrentEquipier(){
       currentEquipier=matches[0];
       currentUserProfile={email,name};
       identityVerified=true;
+      updateHeaderEquipier();
       return currentEquipier;
     }catch(e){
       console.warn("Identification par formule Grist impossible :",e);
+      updateHeaderEquipier();
       return null;
     }finally{
       // Nettoyage immédiat : une session ne doit pas laisser de lignes permanentes.
@@ -426,22 +645,35 @@ async function detectCurrentEquipier(){
   })();
   try{return await identityPromise}finally{identityPromise=null}
 }
+let claimLoadGeneration=0,lastFeInteraction=0;
 async function loadClaimsFor(facts){
+  const generation=++claimLoadGeneration;
+  facts=[...(facts||[]),...(selected?[selected]:[])];
   const ids=[...new Set((facts||[]).filter(f=>!isArchivedFact(f)&&isActiveFact(f)).map(claimKey).filter(Boolean))];
-  claimMap.clear();if(!ids.length)return;
+  if(!ids.length)return;
+  const next=new Map();
   try{
     const recs=await api(T.CLAIM,{filter:{Numero_FE:ids},limit:Math.max(200,ids.length*3)});
     for(const c of recs){
       const k=Number(c.Numero_FE);if(!k||!claimIsActive(c))continue;
-      const prev=claimMap.get(k);
-      if(!prev||Number(c.Derniere_activite||0)>Number(prev.Derniere_activite||0))claimMap.set(k,c);
+      const prev=next.get(k);
+      if(!prev||Number(c.id)<Number(prev.id))next.set(k,c);
     }
+    if(generation===claimLoadGeneration){for(const id of ids){if(next.has(id))claimMap.set(id,next.get(id));else claimMap.delete(id)}}
   }catch(e){console.warn("Table PRISE_EN_CHARGE_FE indisponible",e)}
 }
-async function ensureTemporaryClaim(){
+let pendingFeClaim=null;
+function ensureTemporaryClaim(){
+  if(!selected||isArchivedFact(selected)||!isActiveFact(selected))return Promise.resolve(false);
+  const key=claimKey(selected);
+  if(pendingFeClaim)return pendingFeClaim.key===key?pendingFeClaim.promise:Promise.resolve(false);
+  const promise=acquireTemporaryClaim().finally(()=>{if(pendingFeClaim?.promise===promise)pendingFeClaim=null});
+  pendingFeClaim={key,promise};return promise;
+}
+async function acquireTemporaryClaim(){
   if(claimBusy)return false;
   if(!selected||isArchivedFact(selected)||!isActiveFact(selected))return false;
-  const numero=requireFeNumericKey(selected.Numero_FE);claimBusy=true;
+  const numero=requireFeNumericKey(selected.Numero_FE),context=feContextToken(selected);claimBusy=true;lastFeInteraction=Date.now();
   try{
     const liveSuivi=await api(T.SUIVI,{filter:{Numero_FE:[numero]},limit:3});
     if(liveSuivi.length>1){await showModal({title:"Prise en charge impossible",message:"Plusieurs suivis existent pour ce FE. La prise en charge est bloquée.",type:"error"});return false}
@@ -454,26 +686,30 @@ async function ensureTemporaryClaim(){
     let all=await api(T.CLAIM,{filter:{Numero_FE:[numero]},limit:20});
     const active=all.filter(claimIsActive).sort((a,b)=>Number(a.id)-Number(b.id))[0]||null;
     if(active&&!claimOwnedByMe(active)){claimMap.set(numero,active);render();if(!opsDirty())renderOps();await showModal({title:"Fiche déjà prise en charge",message:`Cette fiche est actuellement prise en charge par ${claimOwnerName(active)}.`,type:"error"});return false}
+    assertFeContext(context);
     const now=Math.floor(Date.now()/1000),fields={Numero_FE:numero,Equipier:Number(currentEquipier.id),Email:String(currentEquipier.Email||""),Session:currentClaimSession,Debut:active?.Debut||now,Derniere_activite:now};
     if(active&&claimOwnedByMe(active))await grist.docApi.applyUserActions([["UpdateRecord",T.CLAIM,active.id,fields]]);
     else{
-      const expired=all.filter(c=>!claimIsActive(c));
+      const expired=all.filter(c=>!claimIsActive(c)&&claimOwnedByMe(c));
       if(expired.length)await grist.docApi.applyUserActions(expired.map(c=>["RemoveRecord",T.CLAIM,c.id]));
       const recheck=(await api(T.CLAIM,{filter:{Numero_FE:[numero]},limit:20})).filter(claimIsActive).sort((a,b)=>Number(a.id)-Number(b.id));
       if(recheck.length){claimMap.set(numero,recheck[0]);return claimOwnedByMe(recheck[0])}
+      assertFeContext(context);
       await grist.docApi.applyUserActions([["AddRecord",T.CLAIM,null,fields]]);
+      await new Promise(resolve=>setTimeout(resolve,450));
       const after=(await api(T.CLAIM,{filter:{Numero_FE:[numero]},limit:20})).filter(claimIsActive).sort((a,b)=>Number(a.id)-Number(b.id));
       const winner=after[0]||null;
-      if(after.some(c=>!claimOwnedByMe(c))){
-        claimMap.set(numero,winner);
-        toast("Réservations concurrentes détectées : enregistrement suspendu.","error","Conflit de réservation",10000);
-        return false;
+      if(!winner||!claimOwnedByMe(winner)){
+        const mine=after.filter(claimOwnedByMe);if(mine.length)await grist.docApi.applyUserActions(mine.map(c=>["RemoveRecord",T.CLAIM,c.id]));
+        if(winner)claimMap.set(numero,winner);else claimMap.delete(numero);
+        render();if(!opsDirty())renderOps();else updateFeLockUI();return false;
       }
-      if(!winner||!claimOwnedByMe(winner)){claimMap.set(numero,winner);render();if(!opsDirty())renderOps();await showModal({title:"Fiche déjà prise en charge",message:`La fiche vient d’être prise en charge par ${claimOwnerName(winner)}.`,type:"error"});return false}
       const losers=after.filter(c=>c.id!==winner.id&&claimOwnedByMe(c));
       if(losers.length)await grist.docApi.applyUserActions(losers.map(c=>["RemoveRecord",T.CLAIM,c.id]));
     }
-    await loadClaimsFor(rows);render();if(!opsDirty())renderOps();return true;
+    assertFeContext(context);
+    await requireOwnedActiveClaim(numero);
+    await loadClaimsFor([...rows,...(selected?[selected]:[])]);render();if(!opsDirty())renderOps();else if(selected&&claimKey(selected)===numero&&claimOwnedByMe(activeClaimFor(selected))){$("detailStatus").innerHTML=badgeStatus("En cours");$("currentEquipierInfo").innerHTML=`Prise en charge temporaire : ${equipierBadge(eqName(currentEquipier.id))}`;}return true;
   }catch(e){await showModal({title:"Prise en charge impossible",message:"La réservation temporaire n’a pas pu être créée : "+e.message,type:"error"});return false}
   finally{claimBusy=false}
 }
@@ -485,7 +721,7 @@ async function requireOwnedActiveClaim(numero){
   const all=await api(T.CLAIM,{filter:{Numero_FE:[numero]},limit:30});
   const active=all.filter(claimIsActive).sort((a,b)=>Number(a.id)-Number(b.id));
   const winner=active[0]||null;
-  if(active.some(c=>!claimOwnedByMe(c)))throw new Error("Plusieurs réservations concurrentes sont visibles pour ce FE. Enregistrement suspendu jusqu’à résolution du conflit.");
+  if(winner&&!claimOwnedByMe(winner)){const mine=active.filter(claimOwnedByMe);if(mine.length)await grist.docApi.applyUserActions(mine.map(c=>["RemoveRecord",T.CLAIM,c.id]));}
   if(!winner)throw new Error("La prise en charge temporaire de cette fiche a expiré. Reprenez la modification avant d’enregistrer.");
   if(!claimOwnedByMe(winner))throw new Error(`Cette fiche est maintenant prise en charge par ${claimOwnerName(winner)}. Vos modifications n’ont pas été écrasées, mais l’enregistrement est bloqué.`);
   // Nettoyer d'éventuels doublons de notre propre session sans toucher au gagnant.
@@ -497,24 +733,27 @@ async function requireOwnedActiveClaim(numero){
 
 async function heartbeatClaim(){
   if(document.hidden||!selected||isArchivedFact(selected))return;
+  if(claimBusy||pendingFeClaim||$("detailView").classList.contains("hidden"))return;
   const c=activeClaimFor(selected);if(!claimOwnedByMe(c))return;
+  if(Date.now()-lastFeInteraction>=300000){await releaseMyTemporaryClaim();updateFeLockUI();return;}
+  const numero=claimKey(selected),context=feContextToken(selected);
   try{
     const now=Math.floor(Date.now()/1000);
-    const activeClaims=(await api(T.CLAIM,{filter:{Numero_FE:[claimKey(selected)]},limit:20})).filter(claimIsActive).sort((a,b)=>Number(a.id)-Number(b.id));
+    const activeClaims=(await api(T.CLAIM,{filter:{Numero_FE:[numero]},limit:20})).filter(claimIsActive).sort((a,b)=>Number(a.id)-Number(b.id));
     const live=activeClaims[0]||null;
-    if(activeClaims.some(c=>!claimOwnedByMe(c))){
-      toast("Réservations concurrentes détectées. Enregistrement bloqué jusqu'à résolution.","error","Conflit de prise en charge",10000);
-      return;
-    }
+    if(feContextToken(selected)!==context)return;
+    if(live&&!claimOwnedByMe(live)){const mine=activeClaims.filter(claimOwnedByMe);if(mine.length)await grist.docApi.applyUserActions(mine.map(c=>["RemoveRecord",T.CLAIM,c.id]));}
     if(!live||!claimOwnedByMe(live)){if(live)claimMap.set(claimKey(selected),live);else claimMap.delete(claimKey(selected));render();if(!opsDirty())renderOps();else toast("La réservation de cette fiche a expiré ou changé de titulaire. Votre saisie reste affichée, mais son enregistrement est bloqué.","error","Prise en charge perdue",10000);return}
     await grist.docApi.applyUserActions([["UpdateRecord",T.CLAIM,live.id,{Derniere_activite:now}]]);
-    live.Derniere_activite=now;claimMap.set(claimKey(selected),live);
+    live.Derniere_activite=now;claimMap.set(numero,live);
   }catch(e){console.warn("Heartbeat réservation impossible",e)}
 }
 async function releaseMyTemporaryClaim(){
   if(!selected||isArchivedFact(selected))return;
   try{
-    const numero=claimKey(selected),all=await api(T.CLAIM,{filter:{Numero_FE:[numero]},limit:20}),mine=all.filter(claimOwnedByMe);
+    const numero=claimKey(selected);
+    if(pendingFeClaim?.key===numero)await pendingFeClaim.promise;
+    const all=await api(T.CLAIM,{filter:{Numero_FE:[numero]},limit:20}),mine=all.filter(claimOwnedByMe);
     if(mine.length)await grist.docApi.applyUserActions(mine.map(c=>["RemoveRecord",T.CLAIM,c.id]));
     // La vue locale ne doit pas oublier la réservation d'une autre session.
     const remaining=await api(T.CLAIM,{filter:{Numero_FE:[numero]},limit:30});
@@ -523,7 +762,7 @@ async function releaseMyTemporaryClaim(){
     render();
   }catch(e){console.warn("Libération réservation impossible",e)}
 }
-function startClaimHeartbeat(){if(claimHeartbeatTimer)clearInterval(claimHeartbeatTimer);claimHeartbeatTimer=setInterval(heartbeatClaim,CLAIM_HEARTBEAT_MS)}
+function startClaimHeartbeat(){if(claimHeartbeatTimer)clearInterval(claimHeartbeatTimer);claimHeartbeatTimer=setInterval(heartbeatClaim,FE_CLAIM_HEARTBEAT_MS)}
 
 function statusOf(f){
   let s=suiviMap.get(feNumericKey(f.Numero_FE)),cl=activeClaimFor(f);
@@ -555,17 +794,29 @@ function hasSourceFollowup(f){
   return vals.some(v=>String(v??"").trim()&&!norm(v).includes("non renseigne")&&!norm(v).includes("non attrib"));
 }
 function badgeStatus(s){let c=s==="Terminé"?"done":s==="En cours"?"progress":"waiting",label=(!s||s==="Non attribué")?"N/A":s;return `<span class="badge ${c} status-badge">${esc(label)}</span>`}
-function factTypeBadges(v,level){
-  const t=norm(v); if(!t)return '<span class="muted">—</span>'; const out=[]; const add=x=>{if(!out.includes(x))out.push(x)};
-  if(t.includes("valeur")&&t.includes("republique")||t.includes("valrep"))add("ValRep");
-  if(t.includes("harcel"))add("Harcel");
-  if(t.includes("atteinte")&&t.includes("bien"))add("AttBiens");
-  if(t.includes("securite")||t.includes("climat scolaire"))add("AttSecu");
-  const vp=t.includes("violence physique"), vv=t.includes("violence verbale")||t.includes("menace orale"), vs=t.includes("violence sexuelle");
-  if(vp||vv||vs){let x=[];if(vp)x.push("VP");if(vs)x.push("VS");if(vv)x.push("VV");add("AttPers: "+x.join(" + "))}
-  else if(t.includes("atteinte")&&t.includes("personne"))add("AttPers");
-  if(!out.length)add(String(v).split(/[;,]/)[0].trim().slice(0,24)||"Autre");
-  return '<div class="type-badges">'+out.map(x=>`<span class="type-badge ${String(level)==="3"?"level3":""}">${esc(x)}</span>`).join("")+'</div>'
+function factTypeBadges(v,level,structured){
+  const paths=splitStructuredFactPaths(structured||v);
+  const groups=new Map(), kinds=new Set();
+  const add=(key,label)=>{if(!groups.has(key))groups.set(key,new Set());if(label)groups.get(key).add(label)};
+  for(const path of paths){
+    const parts=path.split(/\s*>\s*/), root=norm(parts[0]), t=norm(path), leaf=parts[parts.length-1];
+    if(root.includes("valeur")&&root.includes("republique")||root.includes("valrep"))add("ValRep",leaf);
+    else if(root.includes("atteinte")&&root.includes("bien"))add("AttBiens",leaf);
+    else if(root.includes("securite")||root.includes("climat scolaire"))add("AttSecu",leaf);
+    else if(root.includes("atteinte")&&root.includes("personne")||/violences? (physique|verbale|sexuelle)|harcel|menaces? orale/.test(t)){
+      add("AttPers",leaf);
+      if(/violences? physiques?/.test(t))kinds.add("VP");
+      if(/violences? sexuelles?/.test(t))kinds.add("VS");
+      if(/violences? verbales?|menaces? orales?/.test(t))kinds.add("VV");
+      if(t.includes("harcel"))add("Harcel",leaf);
+    }else add(leaf.slice(0,24)||"Autre",leaf);
+  }
+  if(!groups.size)return '<span class="muted">—</span>';
+  return '<div class="type-badges">'+[...groups].map(([key,labels])=>{
+    const codes=["VP","VS","VV"].filter(x=>kinds.has(x));
+    const label=key==="AttPers"&&codes.length?key+": "+codes.join(" + "):key;
+    return `<span class="type-badge ${String(level)==="3"?"level3":""}" title="${esc([...labels].join(", "))}">${esc(label)}</span>`;
+  }).join("")+'</div>';
 }
 const FACT_TAXONOMY={
   "Atteintes aux valeurs de la République":{
@@ -760,8 +1011,13 @@ function periodSpec(){
   return null;
 }
 let loadCurrentGeneration=0;
-function feOrderDescending(a,b){const x=Number(a.manualSort),y=Number(b.manualSort);if(Number.isFinite(x)&&Number.isFinite(y)&&x!==y)return y-x;return (Number(b.id)||0)-(Number(a.id)||0)}
-async function loadCurrent(){const generation=++loadCurrentGeneration;let spec=periodSpec();if(!spec){notice("Choisissez une période valide.","error");return}notice(`Chargement des faits ${spec.label} — départements 34 et 48…`);let loaded=await apiAllPaged(T.CUR,{filter:{Date_de_saisie:spec.dates},sort:"-id",pageSize:1000,maxRows:10000});if(generation!==loadCurrentGeneration)return;const nextRows=loaded.filter(isCurrentOperationalFact).sort(feOrderDescending);await Promise.all([loadSuiviFor(nextRows),loadClaimsFor(nextRows)]);if(generation!==loadCurrentGeneration)return;currentRows=nextRows;rows=[...nextRows];notice(`${currentRows.length} fait(s) des départements 34 et 48 chargé(s) pour ${spec.label}.`,"ok");page=1;render()}
+function feOrderDescending(a,b){
+  const x=feTransmissionTime(a.Date_de_transmission),y=feTransmissionTime(b.Date_de_transmission);
+  if(Number.isFinite(x)&&Number.isFinite(y)&&x!==y)return y-x;
+  if(Number.isFinite(x)!==Number.isFinite(y))return Number.isFinite(x)?-1:1;
+  return (Number(b.id)||0)-(Number(a.id)||0);
+}
+async function loadCurrent(){const generation=++loadCurrentGeneration;let spec=periodSpec();if(!spec){notice("Choisissez une période valide.","error");return}notice(`Chargement des faits ${spec.label} — départements 34 et 48…`);let loaded=await apiAllPaged(T.CUR,{filter:{Date_de_saisie:spec.dates},sort:"-id",pageSize:1000,maxRows:10000});if(generation!==loadCurrentGeneration)return;const nextRows=loaded.filter(isCurrentOperationalFact).sort(feOrderDescending);await Promise.all([loadSuiviFor(nextRows),loadClaimsFor(nextRows)]);if(generation!==loadCurrentGeneration)return;currentRows=nextRows;rows=[...nextRows];livePeriodKey=spec.dates.join(",");livePeriodFingerprint=feListSignature(nextRows);notice(`${currentRows.length} fait(s) des départements 34 et 48 chargé(s) pour ${spec.label}.`,"ok");page=1;render()}
 async function loadSuiviFor(facts){
   // Une requête par groupe de FE distincts évite les filtres REST démesurés.
   const ids=[...new Set(facts.filter(f=>!isArchivedFact(f)).map(f=>feNumericKey(f.Numero_FE)).filter(Boolean))];
@@ -788,21 +1044,45 @@ try{
 }catch(e){console.warn("Suivi des lignes FE non restauré",e)}
 function saveFeNoticeRowSnapshot(){try{sessionStorage.setItem(FE_ROW_SNAPSHOT_KEY,JSON.stringify([...feNoticeRowSnapshot.entries()].slice(-500)))}catch(e){console.warn("Suivi des lignes FE non sauvegardé",e)}}
 let feNoticeBusy=false,feNoticeTimer=null,feNoticeUnread=0,feNoticeReady=false,feNoticeState=null,feNoticeEmail="",feNoticeLastId=0;
-function feNoticeTime(ts){return new Intl.DateTimeFormat("fr-FR",{hour:"2-digit",minute:"2-digit",day:"2-digit",month:"2-digit"}).format(new Date(ts))}
+const feTransmissionFormat=new Intl.DateTimeFormat('fr-FR',{timeZone:'Europe/Paris',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'});
+function feTransmissionTime(v){
+  if(typeof v==='number')return Number.isFinite(v)&&v>0?(v<1e12?v*1000:v):NaN;
+  const m=/^(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2})(?::(\d{2}))?$/.exec(String(v??'').trim());
+  if(!m){const raw=String(v??'').trim();if(/^\d{10,13}(?:\.\d+)?$/.test(raw))return feTransmissionTime(Number(raw));if(/^\d{4}-\d{2}-\d{2}T.*(?:Z|[+-]\d{2}:?\d{2})$/i.test(raw))return Date.parse(raw);return NaN;}
+  const [,d,mo,y,h,mi,se='0']=m, target=Date.UTC(+y,+mo-1,+d,+h,+mi,+se);
+  let ts=target;
+  for(let i=0;i<3;i++){
+    const parts=Object.fromEntries(feTransmissionFormat.formatToParts(new Date(ts)).map(p=>[p.type,p.value]));
+    const civil=Date.UTC(+parts.year,+parts.month-1,+parts.day,+parts.hour,+parts.minute,+parts.second);
+    ts+=target-civil;
+  }
+  const parts=Object.fromEntries(feTransmissionFormat.formatToParts(new Date(ts)).map(p=>[p.type,p.value]));
+  return +parts.year===+y&&+parts.month===+mo&&+parts.day===+d&&+parts.hour===+h&&+parts.minute===+mi&&+parts.second===+se?ts:NaN;
+}
+function listTransmissionDate(f){
+  const ts=feTransmissionTime(f.Date_de_transmission);
+  if(!Number.isFinite(ts))return dateFR(f.Date_de_saisie);
+  const p=Object.fromEntries(feTransmissionFormat.formatToParts(new Date(ts)).map(x=>[x.type,x.value]));
+  return `${p.day}/${p.month}/${p.year} : ${p.hour}h${p.minute}`;
+}
+function feNoticeTime(ts){return new Intl.DateTimeFormat('fr-FR',{timeZone:'Europe/Paris',dateStyle:'short',timeStyle:'short'}).format(new Date(ts))}
+let feTransmissionIndex=null;
+function feNoticeKey(item){return String(item.numero??'').trim()}
 function feNoticeVisible(){return feNoticeHistory.filter(x=>!x.deleted&&feNoticeAllowedDepartment(x))}
 function renderFeBell(){
   feNoticeHistory.splice(0,feNoticeHistory.length,...feNoticeTrim(feNoticeHistory));
   const visible=feNoticeVisible();
   feNoticeUnread=visible.filter(x=>!x.read).length;
+  $("bellButton").classList.toggle("has-unread",feNoticeUnread>0);
   $("bellCount").textContent=String(feNoticeUnread);$("bellCount").hidden=feNoticeUnread===0;
   $("bellClear").disabled=!visible.length;
   $("bellItems").replaceChildren();
-  if(!visible.length){const p=document.createElement("div");p.className="bellEmpty";p.textContent="Aucun nouveau FE enregistré.";$("bellItems").appendChild(p);return}
+  if(!visible.length){const p=document.createElement("div");p.className="bellEmpty";p.textContent="Aucune nouvelle notification.";$("bellItems").appendChild(p);return}
   for(const item of visible){
     const row=document.createElement("div");row.className="bellRow";
     const btn=document.createElement("button");btn.type="button";btn.className="bellItem";
     const h=document.createElement("strong");h.textContent=`Nouveau FE · Niveau ${item.niveau}`;
-    const d=document.createElement("span");d.textContent=`${item.etab} — ${item.ville} · ${item.numero}`;const date=document.createElement("span");date.className="bellDate";date.textContent=`Arrivé le ${feNoticeTime(item.arrived)}`;
+    const d=document.createElement("span");d.textContent=`${item.etab} — ${item.ville} · ${item.numero}`;const date=document.createElement("span");date.className="bellDate";date.textContent=`Transmis le ${feNoticeTime(item.arrived)}`;
     btn.append(h,d,date);btn.onclick=()=>openNotifiedFE(item);
     const del=document.createElement("button");del.type="button";del.className="bellDelete";del.textContent="✕";del.title="Supprimer cette notification";del.setAttribute("aria-label",`Supprimer la notification ${item.numero}`);
     del.onclick=()=>void feNoticeDelete([String(item.occurrence||`${item.id}:${item.numero}`)]);
@@ -827,7 +1107,7 @@ async function openNotifiedFE(item){
   try{
     const found=await api(T.CUR,{filter:{id:[item.id]},limit:1});
     const f=found[0];
-    if(!f||!isCurrentOperationalFact(f)){toast("Ce FE n’est plus disponible.","error","Ouverture impossible");return}
+    if(!f||!isCurrentOperationalFact(f)||String(f.Numero_FE??'').trim()!==feNoticeKey(item)){toast("Ce FE n’est plus disponible.","error","Ouverture impossible");return}
     $("notificationPanel").hidden=true;await openFact(`${T.CUR}:${item.id}`);
     // La consultation du FE marque cette notification comme lue, sans la supprimer.
     const local=feNoticeHistory.find(x=>String(x.occurrence||`${x.id}:${x.numero}`)===String(item.occurrence||`${item.id}:${item.numero}`));
@@ -867,7 +1147,7 @@ function feNoticeTrim(items){
 function feNoticeRestore(row){
   feNoticeState=row;feNoticeLastId=Number(row.Dernier_FE_ID)||0;
   let history=[];try{history=JSON.parse(String(row.Historique_JSON||"[]"))}catch(e){console.warn("Historique de notifications illisible",e)}
-  feNoticeHistory.splice(0,feNoticeHistory.length,...(Array.isArray(history)?history:[]).filter(x=>x&&Number.isFinite(Number(x.id))).filter(x=>Number(x.arrived)>=feNoticeWindowStart()&&Number(x.arrived)<=Date.now()&&feNoticeAllowedDepartment(x)));
+  feNoticeHistory.splice(0,feNoticeHistory.length,...(Array.isArray(history)?history:[]).filter(x=>x&&Number.isFinite(Number(x.id))).filter(x=>feNoticeTrim([x]).length));
   const viewed=Number(row.Derniere_consultation)||0;
   feNoticeUnread=feNoticeHistory.filter(x=>!x.deleted&&!x.read).length;
   renderFeBell();
@@ -875,21 +1155,17 @@ function feNoticeRestore(row){
 // Les écritures de cet onglet sont sérialisées et fusionnées avec la dernière lecture.
 let feNoticeWriteQueue=Promise.resolve();
 function feNoticeMergeHistory(local,remote){
-  const byId=new Map();
-  for(const item of [...remote,...local])if(item&&Number.isFinite(Number(item.id))){
-    const key=Number(item.id),prev=byId.get(key);
-    if(!prev){byId.set(key,item);continue}
-    // A genuinely new FE in a reused Grist row supersedes the previous
-    // notification (including one that had been deleted or marked read).
-    if((String(item.numero||"")!==String(prev.numero||"")||String(item.occurrence||"")!==String(prev.occurrence||""))&&Number(item.arrived)>Number(prev.arrived)){
-      byId.set(key,item);continue;
-    }
-    if((String(item.numero||"")!==String(prev.numero||"")||String(item.occurrence||"")!==String(prev.occurrence||""))&&Number(prev.arrived)>Number(item.arrived))continue;
-    if(item.deleted&&!prev.deleted)byId.set(key,item);
-    else if(item.read&&!prev.read)byId.set(key,{...prev,read:true});
-    else if(Number(item.arrived)<Number(prev.arrived))byId.set(key,item);
+  const byNumber=new Map();
+  for(const item of [...remote,...local]){
+    if(!item||!Number.isFinite(Number(item.id)))continue;
+    const key=feNoticeKey(item);if(!key)continue;
+    const fact=feTransmissionIndex?.get(key);
+    // Une lecture partielle ou un FE ancien ne doit pas effacer un état individuel.
+    const prev=byNumber.get(key);
+    const merged={...prev,...item,...(fact||{}),read:Boolean(prev?.read||item.read),deleted:Boolean(prev?.deleted||item.deleted)};
+    byNumber.set(key,merged);
   }
-  return feNoticeTrim([...byId.values()].sort((a,b)=>Number(b.arrived)-Number(a.arrived)));
+  return feNoticeTrim([...byNumber.values()].sort((a,b)=>Number(b.arrived)-Number(a.arrived)));
 }
 function feNoticePersist(viewedAt=null){
   const pending=feNoticeWriteQueue.catch(()=>{}).then(async()=>{
@@ -909,7 +1185,7 @@ function feNoticePersist(viewedAt=null){
     const saved=confirmed[0];
     let savedHistory=[];
     try{savedHistory=JSON.parse(String(saved.Historique_JSON||"[]"))}catch(e){throw new Error("Historique des notifications illisible après sauvegarde.")}
-    if(!Array.isArray(savedHistory)||merged.some(item=>!savedHistory.some(x=>Number(x.id)===Number(item.id)&&(!item.deleted||x.deleted)))||Number(saved.Dernier_FE_ID||0)<cursor||Number(saved.Derniere_consultation||0)<viewed){
+    if(!Array.isArray(savedHistory)||merged.some(item=>!savedHistory.some(x=>feNoticeKey(x)===feNoticeKey(item)&&(!item.deleted||x.deleted)&&(!item.read||x.read)))||Number(saved.Dernier_FE_ID||0)<cursor||Number(saved.Derniere_consultation||0)<viewed){
       throw new Error("Une autre session a modifié les notifications pendant la sauvegarde. Actualisez la cloche.");
     }
     feNoticeState=saved;feNoticeLastId=Math.max(cursor,Number(saved.Dernier_FE_ID)||0);
@@ -1013,7 +1289,7 @@ async function feNoticeFanout(recent){
         id:Number(f.id),occurrence:`${Number(f.id)}:${String(f.Numero_FE||'')}`,
         numero:String(f.Numero_FE||''),niveau:String(f.Niveau||'—'),
         etab:String(f.Etablissement||'Établissement non renseigné'),ville:String(f.Ville||''),
-        departement:factDept(f),arrived:Date.now(),read:false,deleted:false
+        departement:factDept(f),arrived:feTransmissionTime(f.Date_de_transmission),read:false,deleted:false
       }));
       const merged=feNoticeMergeHistory(fresh,history);
       await grist.docApi.applyUserActions([["UpdateRecord",T.NOTIF,row.id,{
@@ -1036,44 +1312,90 @@ async function feNoticeFanout(recent){
   finally{feFanoutBusy=false}
 }
 function feNoticeRowSignature(f){return isCurrentOperationalFact(f)?String(f.Numero_FE||"").trim():""}
-// V87: central events created by Python, never by an open browser session.
-let centralNotificationWarningShown=false;
-async function pollNewFE(){
-  if(feNoticeBusy||document.hidden)return;
-  if(!feNoticeReady){
-    try{if(!currentEquipier||!identityVerified)await detectCurrentEquipier();await feNoticeInitialize()}
-    catch(e){console.warn('Notifications : identification en attente',e);return}
+// Lecture indépendante, registre collectif et file de toasts individuelle.
+const feToastQueue=[];let feToastActive=0,feNoticeLastError='',feNoticeLastErrorAt=0;
+function feNoticeError(e){
+  const message=String(e?.message||e);console.warn('Notifications',e);
+  if(message!==feNoticeLastError||Date.now()-feNoticeLastErrorAt>300000){issueAdd('Notifications FE',message);feNoticeLastError=message;feNoticeLastErrorAt=Date.now()}
+}
+function ringFeBell(){
+  const glyph=$("bellButton").querySelector(".bellGlyph");
+  if(!glyph)return;
+  glyph.classList.remove("bellRinging");
+  void glyph.offsetWidth;
+  glyph.classList.add("bellRinging");
+}
+function drainFeToasts(){
+  while(feToastActive<3&&feToastQueue.length){
+    const item=feToastQueue.shift();
+    const local=feNoticeHistory.find(x=>feNoticeKey(x)===item.numero);
+    if(!local||local.deleted||local.read)continue;
+    feToastActive++;
+    Promise.resolve().then(()=>toast(`${item.etab} — ${item.ville} · ${item.numero} · Transmis le ${feNoticeTime(item.arrived)}`,'info',`Nouveau FE · Niveau ${item.niveau}`,10000,()=>openNotifiedFE(item))).catch(e=>console.warn('Affichage notification',e)).finally(()=>{feToastActive--;drainFeToasts()});
   }
+}
+function queueFeToast(item){
+  ringFeBell();
+  feToastQueue.push(item);
+  drainFeToasts();
+}
+// Les FE transmis récemment sont la source commune de toutes les boîtes.
+// Aucun accès au registre NOTIFICATIONS_FE n'est nécessaire.
+// Lecture REST ciblée sur les jours civils de Paris couvrant les dernières 72 h.
+const feDayFormat=new Intl.DateTimeFormat('fr-FR',{timeZone:'Europe/Paris',year:'numeric',month:'2-digit',day:'2-digit'});
+function feRecentDays(now=Date.now()){
+  const parts=Object.fromEntries(feDayFormat.formatToParts(new Date(now-72*3600000)).map(p=>[p.type,p.value]));
+  const last=Object.fromEntries(feDayFormat.formatToParts(new Date(now)).map(p=>[p.type,p.value]));
+  const end=Date.UTC(+last.year,+last.month-1,+last.day), days=[];
+  for(let d=Date.UTC(+parts.year,+parts.month-1,+parts.day);d<=end;d+=86400000){
+    const x=new Date(d);days.push(`${String(x.getUTCDate()).padStart(2,'0')}/${String(x.getUTCMonth()+1).padStart(2,'0')}/${x.getUTCFullYear()}`);
+  }
+  return days;
+}
+let feAclSnapshot={at:0,key:'',rows:null,promise:null};
+async function readNotificationFacts(){
+  const days=feRecentDays(),key=days.join(',');
+  if(feAclSnapshot.key===key&&feAclSnapshot.rows&&Date.now()-feAclSnapshot.at<12000)return feAclSnapshot.rows;
+  if(feAclSnapshot.promise)return feAclSnapshot.promise;
+  feAclSnapshot.promise=(async()=>{
+    const rows=await apiAllPaged(T.CUR,{filter:{Jour_de_transmission:days},sort:'-id',pageSize:1000,maxRows:10000});
+    if(rows.length>=10000)throw new Error('Notifications : lecture des transmissions récentes incomplète.');
+    if(rows.some(f=>!days.includes(String(f.Jour_de_transmission??''))))throw new Error('Notifications : filtre Jour_de_transmission non respecté.');
+    feAclSnapshot.rows=rows;feAclSnapshot.key=key;feAclSnapshot.at=Date.now();return rows;
+  })();
+  try{return await feAclSnapshot.promise}finally{feAclSnapshot.promise=null}
+}
+async function pollNewFE(){
+  if(feNoticeBusy||document.hidden||!navigator.onLine)return;
   feNoticeBusy=true;
   try{
-    const central=await apiAllPaged(T.NOTIF_FE,{sort:'-Arrivee',pageSize:500,maxRows:10000});
-    const start=feNoticeWindowStart();
-    const eligible=central.filter(x=>Number(x.Arrivee)>=start&&Number(x.Arrivee)<=Date.now()&&['34','48'].includes(depCode(x.Departement))&&String(x.Numero_FE||'').trim());
-    const activeOccurrences=new Set(eligible.map(x=>String(x.Occurrence||`${x.FE_Row_ID}:${x.Numero_FE}`)));
-    feNoticeHistory.splice(0,feNoticeHistory.length,...feNoticeTrim(feNoticeHistory).filter(x=>activeOccurrences.has(String(x.occurrence||`${x.id}:${x.numero}`))));
-    const known=new Set(feNoticeHistory.map(x=>String(x.occurrence||'')));
-    const added=[];
-    for(const row of eligible){
-      const occurrence=String(row.Occurrence||`${row.FE_Row_ID}:${row.Numero_FE}`);
-      if(known.has(occurrence))continue;
-      const item={id:Number(row.FE_Row_ID),occurrence,numero:String(row.Numero_FE||''),niveau:String(row.Niveau||'—'),etab:String(row.Etablissement||'Établissement non renseigné'),ville:String(row.Ville||''),departement:depCode(row.Departement),arrived:Number(row.Arrivee),read:false,deleted:false};
-      if(!Number.isFinite(item.id)||item.id<=0)continue;
-      feNoticeHistory.push(item);known.add(occurrence);added.push(item);
+    if(!feNoticeReady){if(!currentEquipier||!identityVerified)await detectCurrentEquipier();if(!identityVerified||!currentEquipier)return;await feNoticeInitialize()}
+    const facts=await readNotificationFacts();
+    const now=Date.now(),start=feNoticeWindowStart(),active=new Map();
+    for(const f of facts){
+      if(!isCurrentOperationalFact(f))continue;
+      const numero=String(f.Numero_FE??'').trim(),arrived=feTransmissionTime(f.Date_de_transmission);
+      if(!numero||!Number.isFinite(arrived)||arrived<start||arrived>now)continue;
+      const item={id:Number(f.id),occurrence:numero,numero,niveau:displayLevel(f.Niveau),etab:String(f.Etablissement||'Établissement non renseigné'),ville:String(f.Ville||''),departement:factDept(f),arrived,detected:arrived,source:'transmission'};
+      active.set(numero,item);
     }
-    feNoticeHistory.splice(0,feNoticeHistory.length,...feNoticeTrim(feNoticeHistory).sort((a,b)=>Number(b.arrived)-Number(a.arrived)));
-    if(added.length)await feNoticePersist();
-    else {
-      // Recover per-user state changed from another device.
-      const mine=await api(T.NOTIF,{filter:{Email:[feNoticeEmail]},limit:10});
-      if(mine.length===1){let remote=[];try{remote=JSON.parse(String(mine[0].Historique_JSON||'[]'))}catch(_){}
-        if(Array.isArray(remote)){feNoticeHistory.splice(0,feNoticeHistory.length,...feNoticeMergeHistory(feNoticeHistory,remote).filter(x=>activeOccurrences.has(String(x.occurrence||`${x.id}:${x.numero}`))));feNoticeState=mine[0]}
-      }
-    }
+    feTransmissionIndex=active;
+    const mine=await api(T.NOTIF,{filter:{Email:[feNoticeEmail]},limit:10});
+    if(mine.length!==1)throw new Error('Boîte de notifications ambiguë ou absente.');
+    const remote=JSON.parse(String(mine[0].Historique_JSON||'[]'));
+    if(!Array.isArray(remote))throw new Error('Historique de notifications invalide.');
+    const seen=new Set(remote.map(feNoticeKey));
+    const added=[...active.values()].filter(item=>!seen.has(item.numero));
+    const merged=feNoticeMergeHistory([...feNoticeHistory,...active.values()],remote);
+    feNoticeState=mine[0];
+    feNoticeHistory.splice(0,feNoticeHistory.length,...merged);
     renderFeBell();
-    for(const item of added)toast(`${item.etab} — ${item.ville} · ${item.numero}`,'info',`Nouveau FE · Niveau ${item.niveau}`,10000,()=>openNotifiedFE(item));
-  }catch(e){if(!centralNotificationWarningShown){console.warn('Table NOTIFICATIONS_FE indisponible',e);centralNotificationWarningShown=true;toast('Vérifiez la table NOTIFICATIONS_FE et ses colonnes.','error','Notifications centrales indisponibles',6000)}}
-  finally{feNoticeBusy=false}
+    if(JSON.stringify(merged)!==JSON.stringify(remote))await feNoticePersist();
+    for(const item of added.sort((a,b)=>a.arrived-b.arrived||a.id-b.id))queueFeToast(item);
+    feNoticeLastError='';
+  }catch(e){feNoticeError(e)}finally{feNoticeBusy=false}
 }
+
 async function feNoticeMarkViewed(){
   if(!feNoticeState){console.warn("Notifications non initialisées : aucune écriture tentée.");return}
   try{
@@ -1101,25 +1423,26 @@ async function initFeBell(){
     await feNoticeInitialize();;
   }catch(e){console.warn("Centre d’information indisponible ; nouvelle tentative à la prochaine ouverture",e)}
 }
-const LIVE_REFRESH_MS=15000; const CLAIM_TTL_SECONDS=180,CLAIM_HEARTBEAT_MS=30000;
+const LIVE_REFRESH_MS=15000; const CLAIM_TTL_SECONDS=60,CLAIM_HEARTBEAT_MS=15000; const FE_CLAIM_TTL_SECONDS=60,FE_CLAIM_HEARTBEAT_MS=15000;
 let claimMap=new Map(),currentEquipier=null,currentUserProfile=null,currentClaimSession=(crypto.randomUUID?crypto.randomUUID():String(Date.now())+"-"+Math.random().toString(36).slice(2)),claimHeartbeatTimer=null,claimBusy=false,editLockHeartbeatTimer=null,currentEtabLock=null;
 let liveRefreshBusy=false,liveRefreshTimer=null,lastLiveRefreshAt=0;
 const LIVE_REFRESH_MIN_GAP_MS=4000;
+const LIVE_SUIVI_REFRESH_MS=5000;
 async function refreshLiveSuivi(){
-  if(liveRefreshBusy||document.hidden||Date.now()-lastLiveRefreshAt<LIVE_REFRESH_MIN_GAP_MS)return;
-  const facts=rows.filter(f=>!isArchivedFact(f)&&isActiveFact(f));
+  if(liveRefreshBusy||document.hidden)return;
+  const facts=[...rows,...(selected?[selected]:[])].filter(f=>!isArchivedFact(f)&&isActiveFact(f));
   const ids=[...new Set(facts.map(f=>feNumericKey(f.Numero_FE)).filter(Boolean))];
-  if(!ids.length)return;
+  if(!ids.length){render();return;}
   liveRefreshBusy=true;
   const refreshedFactKey=selected?`${selected._source}:${selected.id}`:null;
   try{
-    const ss=await api(T.SUIVI,{filter:{Numero_FE:ids},limit:Math.max(ids.length*2,200)});
-    await loadClaimsFor(facts);
-    const fresh=new Map(ss.map(s=>[Number(s.Numero_FE),s]));
+    const [suiviResult]=await Promise.allSettled([api(T.SUIVI,{filter:{Numero_FE:ids},limit:Math.max(ids.length*2,200)}),loadClaimsFor(facts)]);
+    if(suiviResult.status!=="fulfilled"){render();if(selected)updateFeLockUI();throw suiviResult.reason;}
+    const fresh=new Map(suiviResult.value.map(s=>[Number(s.Numero_FE),s]));
     for(const id of ids){if(fresh.has(id))suiviMap.set(id,fresh.get(id));else suiviMap.delete(id)}
-    // Une réponse ancienne ne doit pas réafficher la liste ni modifier la fiche ouverte.
-    if((selected?`${selected._source}:${selected.id}`:null)!==refreshedFactKey)return;
+    // Le tableau doit refléter les verrous même si la fiche ouverte a changé.
     render();
+    if((selected?`${selected._source}:${selected.id}`:null)!==refreshedFactKey)return;
     if(selected&&!isArchivedFact(selected)&&`${selected._source}:${selected.id}`===refreshedFactKey){
       const live=fresh.get(feNumericKey(selected.Numero_FE))||null;
       const opened=Number(selectedSuivi?.Derniere_modification||0),current=Number(live?.Derniere_modification||0);
@@ -1128,6 +1451,7 @@ async function refreshLiveSuivi(){
         if(!opsDirty()){selectedSuivi=live;suiviMap.set(feNumericKey(selected.Numero_FE),live);renderOps();}
         else{$("saveMeta").textContent=`⚠ Mise à jour externe détectée${live.Modifie_par?" — "+live.Modifie_par:""}${live.Derniere_modification?" — "+dateTimeFR(live.Derniere_modification):""}`;}
       }else if(!live&&selectedSuivi&&!opsDirty()){selectedSuivi=null;renderOps();}
+      if(!$("detailView").classList.contains("hidden")){if(!opsDirty())renderOps();else updateFeLockUI();}
     }
   }catch(e){console.warn("Actualisation automatique SUIVI impossible",e)}
   finally{lastLiveRefreshAt=Date.now();liveRefreshBusy=false}
@@ -1136,25 +1460,18 @@ let feListLiveTimer=null,feListLiveBusy=false,feListLiveLastMax=0;
 let livePeriodKey="",livePeriodFingerprint="",liveEtabFingerprint="",liveEtabPending=false;
 let liveRecentMax=0,liveLastFullCheck=0,liveLastEtabCheck=0;
 function feListSignature(facts){
-  return facts.map(f=>[f.id,f.Numero_FE,f.Date_de_saisie,f.Actif_FE,f.Niveau,f.Resume_du_fait,f.Expose_des_faits,f.Etablissement,f.UAI].join("~")).sort().join("|");
+  return facts.map(f=>JSON.stringify(Object.keys(f).sort().map(k=>[k,f[k]]))).sort().join("|");
 }
-async function refreshLiveFEList(){
+async function refreshLiveFEList(snapshot,periodRows){
   if(feListLiveBusy||document.hidden)return;
   feListLiveBusy=true;
   try{
     const spec=periodSpec();if(!spec)return;
     const key=spec.dates.join(",");
-    const latest=await recentFE();
-    const latestId=Math.max(0,...latest.map(f=>Number(f.id)||0));
-    const changed=latestId>liveRecentMax;
-    liveRecentMax=Math.max(liveRecentMax,latestId);
-    const force=key!==livePeriodKey||Date.now()-liveLastFullCheck>=15000;
-    // Contrôle intégral de la période affichée toutes les 15 secondes,
-    // même sans ajout, pour détecter les modifications des FE existants.
-    if(!changed&&!force)return;
-    liveLastFullCheck=Date.now();
-    // Le filtre Grist ne charge QUE la période sélectionnée, quelle que soit la vue ouverte.
-    const fetched=await apiAllPaged(T.CUR,{filter:{Date_de_saisie:spec.dates},sort:"-id",pageSize:500,maxRows:5000});
+    const generation=loadCurrentGeneration;
+    const fetched=periodRows;
+    if(!Array.isArray(fetched))return;
+    if(generation!==loadCurrentGeneration||periodSpec()?.dates.join(",")!==key)return;
     const fresh=fetched.filter(isCurrentOperationalFact).sort(feOrderDescending);
     const fingerprint=feListSignature(fresh);
     if(key!==livePeriodKey){livePeriodKey=key;livePeriodFingerprint=feListSignature(currentRows)}
@@ -1162,22 +1479,22 @@ async function refreshLiveFEList(){
       const previous=new Set(currentRows.map(f=>Number(f.id)));
       livePeriodFingerprint=fingerprint;
       currentRows=fresh;
+      if(!$("q").value.trim())notice(`${fresh.length} fait(s) des départements 34 et 48 chargé(s) pour ${spec.label}.`,"ok");
       // Conserver les FE historiques et les résultats de recherche déjà ouverts.
       const inPeriod=new Set(fresh.map(f=>`${T.CUR}:${f.id}`));
       rows=[...fresh,...rows.filter(f=>f._source!==T.CUR||!previous.has(Number(f.id))&&!inPeriod.has(`${T.CUR}:${f.id}`))];
-      await Promise.all([loadSuiviFor(fresh),loadClaimsFor(fresh)]);
-      // render() ne ferme pas la fiche ou l'établissement consulté.
-      render();
+      // Le cycle commun actualise les suivis et les verrous après la liste.
+      // Le rendu est effectué après la récupération commune des suivis.
       if(selected&&selected._source===T.CUR){
         const replacement=fresh.find(f=>Number(f.id)===Number(selected.id));
         if(replacement)selected=replacement;
       }
     }
     // L'historique d'un établissement doit également suivre les ajouts hors de la semaine affichée.
-    if(selectedEtab&&!$("etabView").classList.contains("hidden")){
-      const uai=Number(selectedEtab.UAI);
+    if(Array.isArray(snapshot)&&selectedEtab&&!$("etabView").classList.contains("hidden")){
+      const uai=Number(selectedEtab.id);
       if(Number.isFinite(uai)){
-        const facts=await apiAllPaged(T.CUR,{filter:{UAI:[uai]},sort:"-id",pageSize:500,maxRows:5000});
+        const facts=snapshot.filter(f=>Number(f.UAI)===uai);
         const active=facts.filter(isActiveFact);
         const sig=feListSignature(active);
         if(!liveEtabFingerprint){liveEtabFingerprint=sig}
@@ -1187,32 +1504,90 @@ async function refreshLiveFEList(){
           else{liveEtabPending=false;await openEstablishment(selectedEtab,uai)}
         }
       }
-    }else{liveEtabFingerprint="";liveEtabPending=false}
+    }else if(!selectedEtab||$("etabView").classList.contains("hidden")){liveEtabFingerprint="";liveEtabPending=false}
   }catch(e){console.warn("Actualisation FE en arrière-plan indisponible",e)}
   finally{feListLiveBusy=false}
 }
+// Historique courant : uniquement l'établissement ouvert, sans lecture annuelle globale.
+async function readLiveFESnapshot(){
+  if(!selectedEtab||$("etabView").classList.contains("hidden"))return null;
+  const uai=Number(selectedEtab.id);
+  if(!Number.isFinite(uai)||uai<=0)return null;
+  return apiAllPaged(T.CUR,{filter:{UAI:[uai]},sort:'-id',pageSize:1000,maxRows:10000});
+}
 // Une seule cadence : le tableau est rafraîchi en premier, puis les notifications.
 // Le second passage utilise les mêmes données Grist récentes, sans temporisation séparée.
-let feAndNoticeBusy=false;
+let lastSuccessfulGristRead=0;
+let feAndNoticeBusy=false, lastPeriodSuccess=0, lastResumeAttempt=0, resumePending=false, connectionProbeBusy=false, connectionProbeGeneration=0;
+function updateHeaderEquipier(){
+  const el=$("headerEquipier");if(!el)return;
+  el.textContent=identityVerified&&currentEquipier?String(currentEquipier.Nom||currentEquipier.Email||"Équipier"):"Non identifié";
+  el.classList.toggle("unassigned",!identityVerified);
+}
+function setHeaderConnection(ok,detail){
+  const el=$("headerConnection");if(!el)return;
+  el.textContent=ok?"Connecté":"Déconnecté";el.classList.toggle("online",ok);el.title=detail;
+}
+async function probeHeaderConnection(){
+  if(!navigator.onLine){setHeaderConnection(false,"Connexion réseau indisponible");return;}
+  if(connectionProbeBusy||Date.now()-lastSuccessfulGristRead<15000)return;
+  connectionProbeBusy=true;const generation=connectionProbeGeneration;
+  try{await api(T.CUR,{limit:1});if(generation===connectionProbeGeneration&&navigator.onLine)setHeaderConnection(true,"Grist accessible");}
+  catch(e){if(generation===connectionProbeGeneration)setHeaderConnection(false,"Grist inaccessible : "+String(e.message||e));}
+  finally{connectionProbeBusy=false;}
+}
+function resumeLiveRefresh(force=false){
+  if(document.hidden||!navigator.onLine)return;
+  const now=Date.now();if(!force&&(now-lastPeriodSuccess<15000||now-lastResumeAttempt<5000))return;
+  lastResumeAttempt=now;
+  if(feAndNoticeBusy)resumePending=true;else void refreshFEAndNotifications();
+  void refreshLiveSuivi();void pollNewFE();void probeHeaderConnection();
+}
+
 async function refreshFEAndNotifications(){
   if(feAndNoticeBusy||document.hidden)return;
   feAndNoticeBusy=true;
   try{
-    await refreshLiveFEList();
-    await pollNewFE();
-  }finally{feAndNoticeBusy=false}
+    const generation=loadCurrentGeneration, etabGeneration=establishmentLoadGeneration;
+    const spec=periodSpec();
+    const periodPromise=spec?apiAllPaged(T.CUR,{filter:{Date_de_saisie:spec.dates},sort:"-id",pageSize:1000,maxRows:10000}):Promise.resolve(null);
+    const snapshotPromise=readLiveFESnapshot().then(value=>({status:"fulfilled",value}),reason=>({status:"rejected",reason}));
+    const periodResult=await Promise.resolve(periodPromise).then(value=>({status:"fulfilled",value}),reason=>({status:"rejected",reason}));
+    if(periodResult.status==="fulfilled"&&generation===loadCurrentGeneration&&etabGeneration===establishmentLoadGeneration){await refreshLiveFEList(null,periodResult.value);lastPeriodSuccess=Date.now();render();}
+    const snapshotResult=await snapshotPromise;
+    const snapshot=snapshotResult.status==="fulfilled"?snapshotResult.value:null;
+    await Promise.allSettled([(async()=>{
+      if(snapshot&&periodResult.status==="fulfilled"&&generation===loadCurrentGeneration&&etabGeneration===establishmentLoadGeneration){await refreshLiveFEList(snapshot,periodResult.value);}
+      if(Date.now()-lastLiveRefreshAt>=LIVE_SUIVI_REFRESH_MS)await refreshLiveSuivi();
+    })()]);
+  }catch(e){console.warn("Actualisation commune FE indisponible",e);
+  }finally{feAndNoticeBusy=false;if(resumePending){resumePending=false;if(!document.hidden&&navigator.onLine)void refreshFEAndNotifications();}}
 }
+function staggeredInterval(fn,ms){
+  // Décalage fixe par poste, sans allonger la cadence nominale.
+  const handle={timer:null,stopped:false};
+  handle.timer=setTimeout(()=>{if(handle.stopped)return;fn();handle.timer=setInterval(fn,ms);},Math.floor(Math.random()*ms));
+  return handle;
+}
+function stopStaggeredInterval(handle){if(handle){handle.stopped=true;clearTimeout(handle.timer);clearInterval(handle.timer);}}
 function startLiveRefresh(){
-  if(liveRefreshTimer)clearInterval(liveRefreshTimer);
-  liveRefreshTimer=setInterval(refreshLiveSuivi,LIVE_REFRESH_MS);
-  if(feListLiveTimer)clearInterval(feListLiveTimer);
-  feListLiveTimer=setInterval(()=>void refreshFEAndNotifications(),15000);
+  updateHeaderEquipier();void probeHeaderConnection();
+  if(liveRefreshTimer)stopStaggeredInterval(liveRefreshTimer);
+  // Synchronisation légère indépendante de la lecture des FE et des notifications.
+  liveRefreshTimer=staggeredInterval(()=>void refreshLiveSuivi(),LIVE_SUIVI_REFRESH_MS);
+  void refreshLiveSuivi();
+  if(feListLiveTimer)stopStaggeredInterval(feListLiveTimer);
+  feListLiveTimer=staggeredInterval(()=>void refreshFEAndNotifications(),15000);
   // Premier passage après chargement initial, puis toutes les 15 secondes.
   void refreshFEAndNotifications();
+  if(feNoticeTimer)stopStaggeredInterval(feNoticeTimer);
+  feNoticeTimer=staggeredInterval(()=>void pollNewFE(),FE_NOTIFY_POLL_MS);
+  void pollNewFE();
 }
 document.addEventListener("visibilitychange",async()=>{
   if(document.hidden)return;
-  await Promise.allSettled([refreshLiveSuivi(),refreshFEAndNotifications()]);
+  resumeLiveRefresh(true);
+  // Le rattrapage FE a déjà été déclenché par resumeLiveRefresh.
   // Au retour d'un onglet en veille, ne jamais considérer un ancien verrou local comme encore acquis.
   if(selectedEtab&&currentEtabLock){
     const key=String(selectedEtab.UAI||"").trim();
@@ -1220,7 +1595,14 @@ document.addEventListener("visibilitychange",async()=>{
     currentEtabLock=(active[0]&&editLockMine(active[0]))?active[0]:null;
   }
 });
-window.addEventListener("focus",()=>{if(Date.now()-lastLiveRefreshAt>=LIVE_REFRESH_MS)refreshLiveSuivi()});
+window.addEventListener("focus",()=>resumeLiveRefresh(true));
+window.addEventListener("pageshow",()=>resumeLiveRefresh(true));
+window.addEventListener("online",()=>{connectionProbeGeneration++;lastSuccessfulGristRead=0;resumeLiveRefresh(true);});
+window.addEventListener("offline",()=>{connectionProbeGeneration++;lastSuccessfulGristRead=0;setHeaderConnection(false,"Connexion réseau indisponible");});
+for(const event of ["pointermove","pointerdown","keydown"])document.addEventListener(event,()=>resumeLiveRefresh(),{passive:true});
+let lastWakeTick=Date.now();
+setInterval(()=>{const now=Date.now(),gap=now-lastWakeTick;lastWakeTick=now;if(!document.hidden){resumeLiveRefresh(gap>30000);void probeHeaderConnection();}},15000);
+
 
 function editLockActive(l){if(!l)return false;const t=Number(l.Derniere_activite||0);return !!t&&(Math.floor(Date.now()/1000)-t)<CLAIM_TTL_SECONDS}
 function editLockMine(l){return !!l&&!!currentEquipier&&Number(l.Equipier)===Number(currentEquipier.id)&&String(l.Session||"")===String(currentClaimSession)}
@@ -1228,7 +1610,7 @@ function editLockOwner(l){return eqName(l?.Equipier)||String(l?.Email||"").trim(
 async function readEditLocks(type,key){return (await api(T.LOCK,{filter:{Type:[String(type)],Cle:[String(key)]},limit:30})).filter(editLockActive).sort((a,b)=>Number(a.id)-Number(b.id))}
 async function requireOwnedEditLock(type,key){
   const active=await readEditLocks(type,key),winner=active[0]||null;
-  if(active.some(l=>!editLockMine(l)))throw new Error("Des verrous concurrents existent pour cette ressource. Modification suspendue jusqu’à résolution du conflit.");
+  if(winner&&!editLockMine(winner)){const mine=active.filter(editLockMine);if(mine.length)await grist.docApi.applyUserActions(mine.map(x=>["RemoveRecord",T.LOCK,x.id]));}
   if(!winner)throw new Error("Le verrou d’édition a expiré. L’opération est annulée.");
   if(!editLockMine(winner))throw new Error(`Le verrou d’édition appartient maintenant à ${editLockOwner(winner)}. L’opération est annulée.`);
   return winner;
@@ -1243,7 +1625,7 @@ async function acquireEditLock(type,key,{silent=false}={}){
   const now=Math.floor(Date.now()/1000),fields={Type:String(type),Cle:String(key),Equipier:Number(currentEquipier.id),Email:String(currentEquipier.Email||""),Session:currentClaimSession,Debut:active[0]?.Debut||now,Derniere_activite:now};
   if(active.length&&editLockMine(active[0]))await grist.docApi.applyUserActions([["UpdateRecord",T.LOCK,active[0].id,fields]]);
   else{
-    const expired=all.filter(x=>!editLockActive(x));if(expired.length)await grist.docApi.applyUserActions(expired.map(x=>["RemoveRecord",T.LOCK,x.id]));
+    const expired=all.filter(x=>!editLockActive(x)&&editLockMine(x));if(expired.length)await grist.docApi.applyUserActions(expired.map(x=>["RemoveRecord",T.LOCK,x.id]));
     const before=await readEditLocks(type,key);if(before.length)return editLockMine(before[0])?before[0]:null;
     await grist.docApi.applyUserActions([["AddRecord",T.LOCK,null,fields]]);
   }
@@ -1251,12 +1633,6 @@ async function acquireEditLock(type,key,{silent=false}={}){
   // Ce délai réduit les collisions mais ne remplace PAS un verrou atomique côté serveur.
   await new Promise(resolve=>setTimeout(resolve,450));
   const after=await readEditLocks(type,key),winner=after[0]||null;
-  if(after.some(l=>!editLockMine(l))){
-    const mine=after.filter(editLockMine);
-    if(mine.length)await grist.docApi.applyUserActions(mine.map(x=>["RemoveRecord",T.LOCK,x.id]));
-    if(!silent)toast("Des réservations concurrentes ont été détectées. Réessayez après leur expiration.","error","Modification bloquée",10000);
-    return null;
-  }
   if(!winner||!editLockMine(winner)){
     const mine=after.filter(editLockMine);if(mine.length)await grist.docApi.applyUserActions(mine.map(x=>["RemoveRecord",T.LOCK,x.id]));
     if(!silent)await showModal({title:"Modification déjà en cours",message:`Cette ressource vient d’être réservée par ${editLockOwner(winner)}.`,type:"error"});return null
@@ -1277,7 +1653,7 @@ async function releaseCurrentEditResources(){
 }
 function releaseSessionResourcesBestEffort(){
   // pagehide/beforeunload ne permettent pas d'attendre une requête async.
-  // On tente une libération immédiate ; le TTL de 3 min reste le filet de sécurité.
+  // On tente une libération immédiate ; le TTL de 60 s pour les FE (3 min pour les établissements) reste le filet de sécurité.
   try{releaseMyTemporaryClaim()}catch(_){}
   try{
     const uai=String(selectedEtab?.UAI||"").trim();
@@ -1511,7 +1887,7 @@ function filtered(){
       if(degree==="1er"&&!dg.includes("1"))return false;
       if(degree==="2nd"&&!dg.includes("2"))return false;
     }
-    if(level!=="all"&&String(f.Niveau??"").trim()!==level)return false;
+    if(level!=="all"&&displayLevel(f.Niveau)!==level)return false;
 
     const su=suiviMap.get(feNumericKey(f.Numero_FE));
     const st=statusOf(f);
@@ -1538,15 +1914,9 @@ function filtered(){
       if(!terms.every(term=>hay.includes(term)))return false;
     }
     return true;
-  }).sort((a,b)=>{
-    // L’ordre physique de FE26_27_2 est représenté par son ID Grist :
-    // la dernière ligne ajoutée apparaît toujours en premier, même après recherche.
-    if(a._source===T.CUR&&b._source!==T.CUR)return -1;
-    if(b._source===T.CUR&&a._source!==T.CUR)return 1;
-    return (Number(b.id)||0)-(Number(a.id)||0);
-  });
+  }).sort(feOrderDescending);
 }
-function render(){let a=filtered(),pages=Math.max(1,Math.ceil(a.length/PAGE));page=Math.min(page,pages);let slice=a.slice((page-1)*PAGE,page*PAGE);$("body").innerHTML=slice.length?slice.map(f=>{let su=suiviMap.get(feNumericKey(f.Numero_FE)),cl=activeClaimFor(f);let eq=isArchivedFact(f)?(f.Equipier||"N/A"):eqName(cl ? cl.Equipier : (su?su.Equipier:f.Equipier));return `<tr><td>${dateFR(f.Date_de_saisie)}</td><td><span class="badge ${String(f.Niveau)==="3"?"b3":""}">${esc(f.Niveau||"—")}</span></td><td>${factTypeBadges(f.Types_de_fait,f.Niveau)}</td><td><button class="etab-link" data-etab-from-fe="${f._source}:${f.id}">${esc(f.Etablissement||"—")}</button></td><td>${esc(f.Ville||"—")}</td><td>${badgeStatus(statusOf(f))}</td><td>${equipierBadge(eq)}</td><td>${esc(f.Numero_FE)}</td><td><button class="btn open-btn" data-open="${f._source}:${f.id}" title="Ouvrir le fait" aria-label="Ouvrir le fait">↗</button></td></tr>`}).join(""):'<tr><td colspan="9" class="loading">Aucun résultat.</td></tr>';document.querySelectorAll("[data-open]").forEach(b=>b.onclick=()=>openFact(b.dataset.open));document.querySelectorAll("[data-etab-from-fe]").forEach(b=>b.onclick=()=>openEstablishmentFromFact(b.dataset.etabFromFe));$("count").textContent=a.length+" résultat(s) dans les données actuellement chargées";$("pageInfo").textContent=`Page ${page} / ${pages}`;$("prev").disabled=page<=1;$("next").disabled=page>=pages}
+function render(){let a=filtered(),pages=Math.max(1,Math.ceil(a.length/PAGE));page=Math.min(page,pages);let slice=a.slice((page-1)*PAGE,page*PAGE);$("body").innerHTML=slice.length?slice.map(f=>{let su=suiviMap.get(feNumericKey(f.Numero_FE)),cl=activeClaimFor(f);let eq=isArchivedFact(f)?(f.Equipier||"N/A"):eqName(cl ? cl.Equipier : (su?su.Equipier:f.Equipier));return `<tr><td>${esc(listTransmissionDate(f))}</td><td><span class="badge ${displayLevel(f.Niveau)==="3"?"b3":""}">${esc(displayLevel(f.Niveau))}</span></td><td>${factTypeBadges(f.Types_de_fait,displayLevel(f.Niveau),f.Types_de_fait_structure)}</td><td>${esc(f.Resume_du_fait||"—")}</td><td><button class="etab-link" data-etab-from-fe="${f._source}:${f.id}">${esc([f.Etablissement,f.Ville].filter(Boolean).join(" — ")||"—")}</button></td><td>${badgeStatus(statusOf(f))}</td><td>${equipierBadge(eq)}</td><td>${esc(f.Numero_FE)}</td><td><button class="btn open-btn" data-open="${f._source}:${f.id}" title="Ouvrir le fait" aria-label="Ouvrir le fait">↗</button></td></tr>`}).join(""):'<tr><td colspan="9" class="loading">Aucun résultat.</td></tr>';document.querySelectorAll("[data-open]").forEach(b=>b.onclick=()=>openFact(b.dataset.open));document.querySelectorAll("[data-etab-from-fe]").forEach(b=>b.onclick=()=>openEstablishmentFromFact(b.dataset.etabFromFe));$("count").textContent=a.length+" résultat(s) dans les données actuellement chargées";$("pageInfo").textContent=`Page ${page} / ${pages}`;$("prev").disabled=page<=1;$("next").disabled=page>=pages}
 async function openEstablishmentFromFact(key){
   if(!(await confirmLeaveIfDirty()))return;
   await releaseCurrentEditResources();
@@ -1567,7 +1937,7 @@ async function openEstablishmentFromFact(key){
 }
 function cleanDisplayText(v){return String(v??"").replace(/\r\n?/g,"\n").replace(/([^\n])\n(?!\n)/g,"$1 ").replace(/\n{3,}/g,"\n\n").replace(/[ \t]{2,}/g," ").trim()}
 function info(label,val,cls=""){return `<div class="info ${cls}"><span class="label">${esc(label)}</span><div class="value">${esc(cleanDisplayText(val)||"—")}</div></div>`}
-async function openFact(key){
+async function openFact(key,historyFact=null){
   let [source,id]=key.split(":");
   const previousSelected=selected;
   const nextKey=`${source}:${Number(id)}`;
@@ -1577,7 +1947,7 @@ async function openFact(key){
     await releaseCurrentEditResources();
     opsCleanSnapshot=null;ambianceCleanSnapshot=null;
   }
-  selected=rows.find(x=>x._source===source&&x.id===Number(id));if(!selected&&source&&id){let got=await api(source,{filter:{id:[Number(id)]},limit:1});selected=got[0]}if(!selected)return;if(!visibleFact(selected)){notice("Ce FE est désactivé et n’est plus affichable.","error");selected=null;return}selectedSuivi=null;$("listView").classList.add("hidden");$("etabView").classList.add("hidden");$("detailView").classList.remove("hidden");const origin=factOriginLabel(selected);const detailLevel=displayLevel(selected.Niveau);$("title").innerHTML=`FE n°${esc(selected.Numero_FE)} — <span class="${detailLevel==="3"?"event-level3":""}">Niveau ${esc(detailLevel)}</span>${origin?` <span class="fact-origin-badge ${origin.cls}">${esc(origin.label)}</span>`:""}`;$("subtitle").textContent=origin?.cls==="update"?`Date de saisie : ${dateFR(selected.Date_de_saisie)} — Date du fait : ${dateFR(selected.Date_du_fait)} — ${selected.Etablissement||"Établissement non renseigné"} — ${selected.Ville||""} — ${selected.Departement||""}`:`Date du fait : ${dateFR(selected.Date_du_fait)} — ${selected.Etablissement||"Établissement non renseigné"} — ${selected.Ville||""} — ${selected.Departement||""}`;let authorParts=[];if(selected.Redacteur)authorParts.push(String(selected.Redacteur).trim());if(selected.Courriel_redacteur)authorParts.push(String(selected.Courriel_redacteur).trim());$("detailAuthor").textContent=authorParts.length?`Rédigé par ${authorParts.join(", ")}`:"Rédacteur non renseigné";renderOperationalId();$("detailStatus").innerHTML=badgeStatus(isArchivedFact(selected)?"Terminé":((selectedSuivi||sourceSuivi(selected)).Statut||"Non attribué"));const archived=[T.OLD,T.OLD2].includes(source);const sourceParts=[];const detailedTypes=selected.Types_de_fait_structure||selected.Types_de_fait;if(String(detailedTypes||"").trim())sourceParts.push(`<div class="info span4"><span class="label">Types de fait détaillés</span><div class="detail-type-wrap">${structuredTypeBadges(detailedTypes,detailLevel)}</div></div>`);if(String(selected.Resume_du_fait||"").trim())sourceParts.push(info("Résumé du fait",selected.Resume_du_fait,"span4"));if(String(selected.Expose_des_faits||"").trim())sourceParts.push(info("Exposé des faits",selected.Expose_des_faits,"span4"));$("sourceGrid").innerHTML=sourceParts.join("");if(archived){opsCleanSnapshot=null;$("opsCard").classList.remove("hidden");const archivedParts=[];const archivedEquipier=String(selected.Equipier||"").trim();if(archivedEquipier&&!norm(archivedEquipier).includes("non attrib")&&archivedEquipier!=="—")archivedParts.push(info("Équipier",selected.Equipier));if(selected.Date_traitement_EMS)archivedParts.push(info("Date traitement EMAS",dateFR(selected.Date_traitement_EMS)));if(String(selected.Suivi_etablissement||"").trim()&&!norm(selected.Suivi_etablissement).includes("non renseigne"))archivedParts.push(info("Suivi établissement",selected.Suivi_etablissement,"span2"));if(String(selected.Accompagnement_EMAS||"").trim()&&!norm(selected.Accompagnement_EMAS).includes("non renseigne"))archivedParts.push(info("Accompagnement EMAS",selected.Accompagnement_EMAS,"span2"));$("opsCard").innerHTML=`<div class="sectiontitle"><h2>Suivi archivé</h2>${badgeStatus("Terminé")}</div>${archivedParts.length?`<div class="grid">${archivedParts.join("")}</div>`:'<div class="muted">Aucune information de suivi archivée.</div>'}`;return}await loadSingleSuivi(selected);renderOps()}
+  selected=historyFact||rows.find(x=>x._source===source&&x.id===Number(id));if(!selected&&source&&id){let got=await api(source,{filter:{id:[Number(id)]},limit:1});selected=got[0]}if(!selected)return;if(!visibleFact(selected)){notice("Ce FE est désactivé et n’est plus affichable.","error");selected=null;return}selectedSuivi=null;$("listView").classList.add("hidden");$("etabView").classList.add("hidden");$("detailView").classList.remove("hidden");const origin=factOriginLabel(selected);const detailLevel=displayLevel(selected.Niveau);$("title").innerHTML=`FE n°${esc(selected.Numero_FE)} — <span class="${detailLevel==="3"?"event-level3":""}">Niveau ${esc(detailLevel)}</span>${origin?` <span class="fact-origin-badge ${origin.cls}">${esc(origin.label)}</span>`:""}`;$("subtitle").textContent=origin?.cls==="update"?`Date de saisie : ${dateFR(selected.Date_de_saisie)} — Date du fait : ${dateFR(selected.Date_du_fait)} — ${selected.Etablissement||"Établissement non renseigné"} — ${selected.Ville||""} — ${selected.Departement||""}`:`Date du fait : ${dateFR(selected.Date_du_fait)} — ${selected.Etablissement||"Établissement non renseigné"} — ${selected.Ville||""} — ${selected.Departement||""}`;let authorParts=[];if(selected.Redacteur)authorParts.push(String(selected.Redacteur).trim());if(selected.Courriel_redacteur)authorParts.push(String(selected.Courriel_redacteur).trim());$("detailAuthor").textContent=authorParts.length?`Rédigé par ${authorParts.join(", ")}`:"Rédacteur non renseigné";renderOperationalId();$("detailStatus").innerHTML=badgeStatus(isArchivedFact(selected)?"Terminé":((selectedSuivi||sourceSuivi(selected)).Statut||"Non attribué"));const archived=[T.OLD,T.OLD2].includes(source);const sourceParts=[];const detailedTypes=selected.Types_de_fait_structure||selected.Types_de_fait;if(String(detailedTypes||"").trim())sourceParts.push(`<div class="info span4"><span class="label">Types de fait détaillés</span><div class="detail-type-wrap">${structuredTypeBadges(detailedTypes,detailLevel)}</div></div>`);if(String(selected.Resume_du_fait||"").trim())sourceParts.push(info("Résumé du fait",selected.Resume_du_fait,"span4"));if(String(selected.Expose_des_faits||"").trim())sourceParts.push(info("Exposé des faits",selected.Expose_des_faits,"span4"));$("sourceGrid").innerHTML=sourceParts.join("");if(archived){opsCleanSnapshot=null;$("opsCard").classList.remove("hidden");const archivedParts=[];const archivedEquipier=String(selected.Equipier||"").trim();if(archivedEquipier&&!norm(archivedEquipier).includes("non attrib")&&archivedEquipier!=="—")archivedParts.push(info("Équipier",selected.Equipier));if(selected.Date_traitement_EMS)archivedParts.push(info("Date traitement EMAS",dateFR(selected.Date_traitement_EMS)));if(String(selected.Suivi_etablissement||"").trim()&&!norm(selected.Suivi_etablissement).includes("non renseigne"))archivedParts.push(info("Suivi établissement",selected.Suivi_etablissement,"span2"));if(String(selected.Accompagnement_EMAS||"").trim()&&!norm(selected.Accompagnement_EMAS).includes("non renseigne"))archivedParts.push(info("Accompagnement EMAS",selected.Accompagnement_EMAS,"span2"));$("opsCard").innerHTML=`<div class="sectiontitle"><h2>Suivi archivé</h2>${badgeStatus("Terminé")}</div>${archivedParts.length?`<div class="grid">${archivedParts.join("")}</div>`:'<div class="muted">Aucune information de suivi archivée.</div>'}`;return}await loadSingleSuivi(selected);renderOps()}
 async function loadSingleSuivi(f){
   const numero=requireFeNumericKey(f.Numero_FE);
   const ss=await api(T.SUIVI,{filter:{Numero_FE:[numero]},limit:5});
@@ -1738,7 +2108,7 @@ function editInlineField(id){if(!selected||isArchivedFact(selected))return;const
 function cancelInlineField(id){const s=selectedSuivi||sourceSuivi(selected);$(id).value=cleanDisplayText(s[INLINE_TEXT_FIELDS[id].source]||"");setInlineFieldDisplay(id,$(id).value)}
 async function saveInlineField(id){const btn=document.querySelector(`[data-inline-save="${id}"]`);if(btn)btn.disabled=true;try{const ok=await persistOps(null);if(ok){const s=selectedSuivi||sourceSuivi(selected);setInlineFieldDisplay(id,s[INLINE_TEXT_FIELDS[id].source]||$(id).value)}}finally{if(btn)btn.disabled=false}}
 function renderInlineTextFields(s,done){for(const [id,cfg] of Object.entries(INLINE_TEXT_FIELDS)){const value=cleanDisplayText(s[cfg.source]||"");$(id).value=value;setInlineFieldDisplay(id,value);const pencil=document.querySelector(`[data-inline-edit="${id}"]`);if(pencil)pencil.classList.toggle("hidden",done)}}
-function renderOps(){if(!document.getElementById("save")){location.reload();return}let cl=activeClaimFor(selected);let s=selectedSuivi||sourceSuivi(selected);if(cl)s={...s,Equipier:cl.Equipier,Statut:"En cours"};equipierSelectionTouched=false;const currentEqName=eqName(s.Equipier);if($("detailStatus"))$("detailStatus").innerHTML=badgeStatus(s.Statut||"Non attribué");$("currentEquipierInfo").innerHTML=`Attribution actuelle : ${equipierBadge(currentEqName)}`;const currentEq=eqMap.get(Number(s.Equipier));$("equipier").value=currentEq&&isAllowedEquipier(currentEq)?String(s.Equipier):"";$("editStatus").value=s.Statut||"Non attribué";setChoiceBox("Securisation",s.Securisation);setChoiceBox("Prevention",s.Prevention);setChoiceBox("Accompagnement",s.Accompagnement);setChoiceBox("Formation",s.Formation);setChoiceBox("Representation_Partenariat",s.Representation_Partenariat);$("treatmentDate").textContent=s.Date_traitement_EMS?`Première prise en charge EMAS : ${dateFR(s.Date_traitement_EMS)}`:"La date de première prise en charge sera enregistrée automatiquement au premier enregistrement.";const hasRealSuivi=!!selectedSuivi&&(
+function renderOps(){if(!document.getElementById("save")){location.reload();return}let cl=activeClaimFor(selected);let s=selectedSuivi||sourceSuivi(selected);if(cl)s={...s,Equipier:equipierRef(s.Equipier)||cl.Equipier,Statut:"En cours"};equipierSelectionTouched=false;const currentEqName=eqName(s.Equipier);if($("detailStatus"))$("detailStatus").innerHTML=badgeStatus(s.Statut||"Non attribué");$("currentEquipierInfo").innerHTML=`Attribution actuelle : ${equipierBadge(currentEqName)}`;const currentEq=eqMap.get(Number(s.Equipier));$("equipier").value=currentEq&&isAllowedEquipier(currentEq)?String(s.Equipier):"";$("editStatus").value=s.Statut||"Non attribué";setChoiceBox("Securisation",s.Securisation);setChoiceBox("Prevention",s.Prevention);setChoiceBox("Accompagnement",s.Accompagnement);setChoiceBox("Formation",s.Formation);setChoiceBox("Representation_Partenariat",s.Representation_Partenariat);$("treatmentDate").textContent=s.Date_traitement_EMS?`Première prise en charge EMAS : ${dateFR(s.Date_traitement_EMS)}`:"La date de première prise en charge sera enregistrée automatiquement au premier enregistrement.";const hasRealSuivi=!!selectedSuivi&&(
   String(selectedSuivi.Suivi_etablissement||"").trim()||
   String(selectedSuivi.Accompagnement_EMAS||"").trim()||
   String(selectedSuivi.Notes_informations||"").trim()||
@@ -1748,7 +2118,7 @@ function renderOps(){if(!document.getElementById("save")){location.reload();retu
   choiceValues(selectedSuivi.Accompagnement).length||choiceValues(selectedSuivi.Formation).length||
   choiceValues(selectedSuivi.Representation_Partenariat).length||
   !["","non attribue"].includes(norm(selectedSuivi.Statut))
-);$("saveMeta").textContent=s.Derniere_modification?`Dernière modification : ${dateTimeFR(s.Derniere_modification)}${s.Modifie_par?" — "+s.Modifie_par:""}`:(hasRealSuivi?"Suivi existant":(!selectedSuivi&&hasSourceFollowup(selected)?"Suivi existant — issu des données FE":"Aucun suivi enregistré"));let done=(s.Statut||"Non attribué")==="Terminé";const lockedByOther=!!cl&&!claimOwnedByMe(cl);renderInlineTextFields(s,done||lockedByOther);$("toggleDone").textContent=done?"Réouvrir — En cours":"Terminé";$("toggleDone").classList.toggle("finish",!done);["equipier","suivi","emas","notes","eleveSuivi"].forEach(id=>$(id).disabled=done||lockedByOther);document.querySelectorAll("[data-choice-field]").forEach(cb=>cb.disabled=done||lockedByOther);$("save").classList.toggle("hidden",done||lockedByOther);$("resetFollowup").classList.toggle("hidden",done||lockedByOther);if(lockedByOther)$("saveMeta").textContent=`Prise en charge temporaire par ${claimOwnerName(cl)} — réservation active`;markOpsClean()}
+);$("saveMeta").textContent=s.Derniere_modification?`Dernière modification : ${dateTimeFR(s.Derniere_modification)}${s.Modifie_par?" — "+s.Modifie_par:""}`:(hasRealSuivi?"Suivi existant":(!selectedSuivi&&hasSourceFollowup(selected)?"Suivi existant — issu des données FE":"Aucun suivi enregistré"));let done=(s.Statut||"Non attribué")==="Terminé";const lockedByOther=!!cl&&!claimOwnedByMe(cl);renderInlineTextFields(s,done||lockedByOther);$("toggleDone").textContent=done?"Réouvrir — En cours":"Terminé";$("toggleDone").classList.toggle("finish",!done);["equipier","suivi","emas","notes","eleveSuivi"].forEach(id=>$(id).disabled=done||lockedByOther);document.querySelectorAll("[data-choice-field]").forEach(cb=>cb.disabled=done||lockedByOther);$("save").classList.toggle("hidden",done||lockedByOther);if(lockedByOther)$("saveMeta").textContent=`Prise en charge temporaire par ${claimOwnerName(cl)} — réservation active`;markOpsClean()}
 function pdfTextValue(v){
   if(v===null||v===undefined)return "";
   return String(v).replace(/\r/g,"").trim();
@@ -2230,93 +2600,6 @@ async function retryDeferredActivity(){
 function feContextToken(f){return f?`${f._source||T.CUR}:${Number(f.id)}:${String(f.Numero_FE||"")}`:""}
 function assertFeContext(token){if(!token||feContextToken(selected)!==token)throw new Error("Vous avez changé de fiche pendant l’opération. Écriture interrompue.")}
 function assertEtabContext(uai){if(String(selectedEtab?.UAI||"").trim()!==uai)throw new Error("Vous avez changé d’établissement pendant l’opération. Écriture interrompue.")}
-async function resetFollowup(){
-  if(!selected||isArchivedFact(selected))return;
-  const target=selected,context=feContextToken(target);
-  let numero;try{numero=requireFeNumericKey(selected.Numero_FE)}catch(e){await showModal({title:"Réinitialisation impossible",message:e.message,type:"error"});return}
-  const numeroAffiche=feDisplayNumber(selected.Numero_FE);
-  const liveFact=await api(T.CUR,{filter:{id:[Number(selected.id)]},limit:1});
-  if(!liveFact.length||!isActiveFact(liveFact[0])){await showModal({title:"Réinitialisation impossible",message:"Ce FE est désactivé ou n’existe plus dans la base courante.",type:"error"});return}
-  const ok=await showModal({title:"Réinitialiser entièrement ce suivi ?",message:`Le suivi EMAS, l’attribution, les qualifications d’activité et les données de traitement enregistrées pour le FE ${numeroAffiche} seront supprimés. Cette action est irréversible.`,type:"error",confirmText:"Réinitialiser",cancelText:"Annuler"});
-  if(!ok)return;
-  try{assertFeContext(context)}catch(e){toast(e.message,"error","Réinitialisation annulée");return}
-  // La poubelle doit pouvoir renouveler une réservation expirée, mais ne doit
-  // jamais contourner une réservation active appartenant à un autre équipier.
-  // Reprendre la réservation AVANT de désactiver les boutons / supprimer l'activité.
-  try{
-    const activeClaims=(await api(T.CLAIM,{filter:{Numero_FE:[numero]},limit:30})).filter(claimIsActive);
-    if(activeClaims.some(c=>!claimOwnedByMe(c))){
-      await showModal({title:"Réinitialisation impossible",message:"Ce FE est actuellement pris en charge dans une autre session. Réinitialisation bloquée pour éviter un conflit.",type:"error"});
-      return;
-    }
-    if(!activeClaims.length){
-      const resumed=await ensureTemporaryClaim();
-      if(!resumed)return;
-      assertFeContext(context);
-    }
-    await requireOwnedActiveClaim(numero);
-  }catch(e){await showModal({title:"Réinitialisation impossible",message:e.message,type:"error"});return}
-  const btn=$("resetFollowup");btn.disabled=true;$("save").disabled=true;$("toggleDone").disabled=true;
-  try{
-    const suivis=await api(T.SUIVI,{filter:{Numero_FE:[numero]},limit:50});
-    if(suivis.length>1)throw new Error(`Doublon SUIVI détecté pour le FE ${numeroAffiche}. Réinitialisation bloquée.`);
-    const resetFields={Equipier:null,Statut:"Non attribué",Suivi_etablissement:"",Accompagnement_EMAS:"",Notes_informations:"",Eleve_suivi:"",Securisation:gristChoiceList([]),Prevention:gristChoiceList([]),Accompagnement:gristChoiceList([]),Formation:gristChoiceList([]),Representation_Partenariat:gristChoiceList([]),Date_traitement_EMS:null,Derniere_modification:null,Modifie_par:null};
-    // Ne jamais supprimer un suivi qui a changé depuis l'ouverture de la fiche.
-    await requireOwnedActiveClaim(numero);
-    if(suivis.length){
-      if(!selectedSuivi||Number(selectedSuivi.id)!==Number(suivis[0].id))throw new Error("Suivi différent de celui ouvert : réinitialisation bloquée.");
-      if(Number(selectedSuivi.Derniere_modification||0)!==Number(suivis[0].Derniere_modification||0))throw new Error("Suivi modifié depuis son ouverture : réinitialisation bloquée.");
-    }else if(selectedSuivi)throw new Error("Le suivi a été supprimé par une autre session : réinitialisation bloquée.");
-    const finalResetRows=await api(T.SUIVI,{filter:{Numero_FE:[numero]},limit:3});
-    if(finalResetRows.length!==suivis.length||finalResetRows.some((r,i)=>Number(r.id)!==Number(suivis[i].id)||Number(r.Derniere_modification||0)!==Number(suivis[i].Derniere_modification||0)))throw new Error("Le suivi a changé avant la suppression : réinitialisation bloquée.");
-    await requireOwnedActiveClaim(numero);
-    assertFeContext(context);
-    // Supprimer d'abord l'activité : si cette étape échoue, le suivi demeure
-    // intact et la réinitialisation peut être retentée sans perdre ses données.
-    let activityRemoved=false;
-    try{
-      await removeActivityForFact(target);
-      activityRemoved=true;
-      await requireOwnedActiveClaim(numero);
-      assertFeContext(context);
-      const beforeDelete=await api(T.SUIVI,{filter:{Numero_FE:[numero]},limit:3});
-      if(beforeDelete.length!==suivis.length||beforeDelete.some((r,i)=>Number(r.id)!==Number(suivis[i].id)||Number(r.Derniere_modification||0)!==Number(suivis[i].Derniere_modification||0)))throw new Error("Le suivi a changé pendant la réinitialisation : suppression interrompue.");
-      // Le suivi peut aussi être présent dans la table FE source : sans vider
-      // ces champs, sourceSuivi() le réaffiche après suppression de SUIVI.
-      const clearSource={Equipier:null,Statut:"Non attribué",Suivi_etablissement:"",Accompagnement_EMAS:"",Notes_informations:"",Date_traitement_EMS:null};
-      await grist.docApi.applyUserActions([["UpdateRecord",T.CUR,Number(target.id),clearSource]]);
-      const verifiedSource=await api(T.CUR,{filter:{id:[Number(target.id)]},limit:1});
-      if(verifiedSource.length!==1||String(verifiedSource[0].Equipier??"").trim()||
-         String(verifiedSource[0].Suivi_etablissement??"").trim()||
-         String(verifiedSource[0].Accompagnement_EMAS??"").trim()||
-         String(verifiedSource[0].Notes_informations??"").trim()||
-         sourceStatus(verifiedSource[0])!=="Non attribué")
-        throw new Error("Remise à zéro des champs de la base FE non confirmée : suppression du suivi interrompue.");
-      if(suivis.length)await grist.docApi.applyUserActions([["RemoveRecord",T.SUIVI,suivis[0].id]]);
-      const afterDelete=await api(T.SUIVI,{filter:{Numero_FE:[numero]},limit:3});
-      if(afterDelete.length)throw new Error("Suppression du suivi non confirmée dans Grist.");
-      assertFeContext(context);
-      Object.assign(target,verifiedSource[0]);
-      const localFact=currentRows.find(f=>f._source===T.CUR&&Number(f.id)===Number(target.id));
-      if(localFact&&localFact!==target)Object.assign(localFact,verifiedSource[0]);
-      selectedSuivi=null;suiviMap.delete(numero);
-      // La suppression du suivi efface aussi son auteur et sa date de modification.
-      // Nettoyer les éventuelles copies locales pour ne pas afficher un ancien « modifié par ».
-      for(const fact of [target,localFact])if(fact){fact.Modifie_par=null;fact.Derniere_modification=null;}
-      // La réservation temporaire affiche artificiellement En cours / Equipier.
-      // Il faut la libérer AVANT de redessiner la fiche.
-      await releaseMyTemporaryClaim();
-      renderOps();$("saveMeta").textContent="Aucun suivi enregistré";render();
-      toast(`Le FE ${numeroAffiche} est de nouveau non attribué.`,"success","Suivi remis à zéro",5000);
-    }catch(e){
-      if(activityRemoved){
-        toast("L'activité a été supprimée, mais la suppression du suivi n'a pas été confirmée. Vérifiez la fiche avant toute nouvelle opération.","error","Réinitialisation partielle",10000);
-      }
-      throw e;
-    }
-  }catch(e){await showModal({title:"Réinitialisation impossible",message:e.message,type:"error"})}
-  finally{btn.disabled=false;$("save").disabled=false;$("toggleDone").disabled=false}
-}
 async function persistOps(forcedStatus=null){
   if(!selected||isArchivedFact(selected)||!isActiveFact(selected))return false;
   const target=selected,context=feContextToken(target);
@@ -2331,6 +2614,8 @@ async function persistOps(forcedStatus=null){
     await showModal({title:"Vérification impossible",message:"Impossible de vérifier l’état actuel du FE avant l’enregistrement : "+e.message,type:"error"});
     return false;
   }
+  if(feContextToken(selected)!==context)return false;
+  lastFeInteraction=Date.now();
   let currentState=selectedSuivi||sourceSuivi(selected);
   let cl=activeClaimFor(selected);
   if(!cl||!claimOwnedByMe(cl)){
@@ -2339,7 +2624,7 @@ async function persistOps(forcedStatus=null){
   }
   try{cl=await requireOwnedActiveClaim(numero)}
   catch(e){await showModal({title:"Enregistrement impossible",message:e.message,type:"error"});return false}
-  let eq=equipierSelectionTouched?($("equipier").value?Number($("equipier").value):null):equipierRef(currentState.Equipier);if(claimOwnedByMe(cl)&&!equipierSelectionTouched)eq=Number(currentEquipier.id);
+  let eq=equipierSelectionTouched?($("equipier").value?Number($("equipier").value):null):equipierRef(currentState.Equipier);if(claimOwnedByMe(cl)&&!equipierSelectionTouched&&!eq)eq=Number(currentEquipier.id);
   let st=forcedStatus||$("editStatus").value;if(!forcedStatus&&st!=="Terminé")st="En cours";
   let now=Math.floor(Date.now()/1000);
   let fields={Equipier:eq,Statut:st,Suivi_etablissement:$("suivi").value.trim(),Accompagnement_EMAS:$("emas").value.trim(),Notes_informations:$("notes").value.trim(),Eleve_suivi:$("eleveSuivi").value.trim(),Securisation:activityChoicePayload("Securisation"),Prevention:activityChoicePayload("Prevention"),Accompagnement:activityChoicePayload("Accompagnement"),Formation:activityChoicePayload("Formation"),Representation_Partenariat:activityChoicePayload("Representation_Partenariat"),Derniere_modification:now,[ACTIVITY_SYNC_COLUMN]:degreeActivityTable(target)?ACTIVITY_SYNC_PENDING:ACTIVITY_SYNC_NA};
@@ -2446,10 +2731,23 @@ async function persistOps(forcedStatus=null){
     return false;
   }finally{$("save").disabled=false;$("toggleDone").disabled=false}
 }
+function updateFeLockUI(){
+  if(!selected||isArchivedFact(selected)||!$("save"))return;
+  const cl=activeClaimFor(selected),other=!!cl&&!claimOwnedByMe(cl),done=(selectedSuivi||sourceSuivi(selected)).Statut==="Terminé";
+  ["equipier","suivi","emas","notes","eleveSuivi"].forEach(id=>$(id).disabled=done||other);
+  document.querySelectorAll("[data-choice-field]").forEach(cb=>cb.disabled=done||other);
+  $("save").classList.toggle("hidden",done||other);
+  if(other)$("saveMeta").textContent=`Prise en charge temporaire par ${claimOwnerName(cl)} — brouillon conservé`;
+}
+function requestClaimOnEdit(){
+  lastFeInteraction=Date.now();
+  if(!selected||isArchivedFact(selected)||!isActiveFact(selected)||claimOwnedByMe(activeClaimFor(selected)))return;
+  void ensureTemporaryClaim();
+}
 function wireTemporaryClaimTriggers(){
-  ["suivi","emas","notes","eleveSuivi"].forEach(id=>$(id)?.addEventListener("input",()=>{ensureTemporaryClaim()}));
-  ["equipier"].forEach(id=>$(id)?.addEventListener("change",()=>{ensureTemporaryClaim()}));
-  document.querySelectorAll("[data-choice-field]").forEach(cb=>cb.addEventListener("change",()=>{ensureTemporaryClaim()}));
+  ["suivi","emas","notes","eleveSuivi"].forEach(id=>$(id)?.addEventListener("input",requestClaimOnEdit));
+  ["equipier"].forEach(id=>$(id)?.addEventListener("change",requestClaimOnEdit));
+  document.querySelectorAll("[data-choice-field]").forEach(cb=>cb.addEventListener("change",requestClaimOnEdit));
 }
 async function saveOps(){return persistOps(null)}
 async function toggleDone(){
@@ -2553,7 +2851,7 @@ async function archivedHistoryFor(table,ref){
   try{return await pending}
   catch(e){if(archivedHistoryCache.get(key)===pending)archivedHistoryCache.delete(key);throw e}
 }
-async function openEstablishment(e,ref){if(Number(selectedEtab?.UAI)!==Number(ref))liveEtabFingerprint="";const generation=++establishmentLoadGeneration;selectedEtab=e||etabMap.get(Number(ref))||null;$("etabBack").textContent=etabReturnTarget==="detail"?"← Retour à la fiche":"← Retour";$("detailView").classList.add("hidden");$("etabView").classList.remove("hidden");$("etabTitle").textContent=e?.Etablissement||selected?.Etablissement||"Établissement";$("etabSub").textContent=[e?.UAI,e?.Ville,e?.Departement].filter(Boolean).join(" — ");$("etabGrid").innerHTML=[info("UAI",e?.UAI),info("Degré",e?.Degre),info("Ville",e?.Ville),info("Département",e?.Departement),info("Bassin",e?.Bassin),info("Type",e?.Type_etablissement),info("Secteur",e?.Secteur),info("Code postal",e?.Code_postal)].join("");$("history").innerHTML='<div class="loading">Chargement de l’historique par UAI…</div>';$("etabCounts").textContent="Chargement du nombre de faits…";$("ambianceDisplay").classList.remove("hidden");$("ambianceEditor").classList.add("hidden");$("ambianceDisplay").innerHTML='<div class="loading">Chargement…</div>';loadAmbiance(e);try{let [cur,old,old2]=await Promise.all([apiAllPaged(T.CUR,{filter:{UAI:[ref]},sort:"-Date_de_saisie"}),archivedHistoryFor(T.OLD,ref),archivedHistoryFor(T.OLD2,ref)]);if(generation!==establishmentLoadGeneration)return;cur=cur.filter(isActiveFact);$("etabCounts").innerHTML=`<strong>Nombre de faits établissement :</strong> 2026-2027 : <strong>${cur.length}</strong> &nbsp;•&nbsp; 2025-2026 : <strong>${old.length}</strong> &nbsp;•&nbsp; 2024-2025 : <strong>${old2.length}</strong>`;let all=[...cur,...old,...old2].sort((a,b)=>(date(b.Date_de_saisie)?.getTime()||0)-(date(a.Date_de_saisie)?.getTime()||0));await loadSuiviFor(cur);if(generation!==establishmentLoadGeneration)return;let lastSchoolYear=null;$("history").innerHTML=all.length?all.map(f=>{const level=displayLevel(f.Niveau);const warning=level==="3"?'<span class="level-warning" title="Fait de niveau 3" aria-label="Fait de niveau 3">⚠</span>':"";const schoolYear=String(f.Annee_scolaire|| (f._source===T.CUR?"2026-2027":f._source===T.OLD?"2025-2026":"2024-2025"));const separator=schoolYear!==lastSchoolYear?`<div class="school-year-separator"><span>Année scolaire ${esc(schoolYear)}</span></div>`:"";lastSchoolYear=schoolYear;const oldYear=isArchivedFact(f);return `${separator}<div class="event ${oldYear?"old-school-year":""}"><div class="event-title">FE n°${esc(f.Numero_FE)} — <span class="${level==="3"?"event-level3":""}">Niveau ${esc(level)}</span> ${warning}</div><div class="event-meta">${dateFR(f.Date_de_saisie)} — ${esc(schoolYear)} — Équipier : ${esc(isArchivedFact(f)?(String(f.Equipier||"N/A").trim()||"N/A"):eqName(suiviMap.get(feNumericKey(f.Numero_FE)) ? suiviMap.get(feNumericKey(f.Numero_FE)).Equipier : f.Equipier))}</div>${historyTypeBadges(f,level)}<div>${esc(cleanDisplayText((isArchivedFact(f) && (!String(f.Resume_du_fait||"").trim() || norm(f.Resume_du_fait).includes("resume non renseigne"))) ? (f.Expose_des_faits||"Résumé non renseigné") : (f.Resume_du_fait||"Résumé non renseigné")))}</div><button class="btn" style="margin-top:7px" data-hist="${f._source}:${f.id}">Ouvrir la fiche</button></div>`}).join(""):'<div class="muted">Aucun fait trouvé pour cet UAI.</div>';if(generation!==establishmentLoadGeneration)return;const existing=new Set(rows.map(r=>`${r._source}:${r.id}`));all.forEach(f=>{const key=`${f._source}:${f.id}`;if(!existing.has(key)){rows.push(f);existing.add(key)}});document.querySelectorAll("[data-hist]").forEach(b=>b.onclick=()=>openFact(b.dataset.hist))}catch(e){if(generation===establishmentLoadGeneration)$("history").innerHTML='<div class="notice error">Impossible de charger l’historique : '+esc(e.message)+'</div>'}}
+async function openEstablishment(e,ref){if(Number(selectedEtab?.id)!==Number(ref))liveEtabFingerprint="";const generation=++establishmentLoadGeneration;selectedEtab=e||etabMap.get(Number(ref))||null;$("etabBack").textContent=etabReturnTarget==="detail"?"← Retour à la fiche":"← Retour";$("detailView").classList.add("hidden");$("etabView").classList.remove("hidden");$("etabTitle").textContent=e?.Etablissement||selected?.Etablissement||"Établissement";$("etabSub").textContent=[e?.UAI,e?.Ville,e?.Departement].filter(Boolean).join(" — ");$("etabGrid").innerHTML=[info("UAI",e?.UAI),info("Degré",e?.Degre),info("Ville",e?.Ville),info("Département",e?.Departement),info("Bassin",e?.Bassin),info("Type",e?.Type_etablissement),info("Secteur",e?.Secteur),info("Code postal",e?.Code_postal)].join("");$("history").innerHTML='<div class="loading">Chargement de l’historique par UAI…</div>';$("etabCounts").textContent="Chargement du nombre de faits…";$("ambianceDisplay").classList.remove("hidden");$("ambianceEditor").classList.add("hidden");$("ambianceDisplay").innerHTML='<div class="loading">Chargement…</div>';loadAmbiance(e);try{let [cur,old,old2]=await Promise.all([apiAllPaged(T.CUR,{filter:{UAI:[ref]},sort:"-Date_de_saisie"}),archivedHistoryFor(T.OLD,ref),archivedHistoryFor(T.OLD2,ref)]);if(generation!==establishmentLoadGeneration)return;cur=cur.filter(isActiveFact);$("etabCounts").innerHTML=`<strong>Nombre de faits établissement :</strong> 2026-2027 : <strong>${cur.length}</strong> &nbsp;•&nbsp; 2025-2026 : <strong>${old.length}</strong> &nbsp;•&nbsp; 2024-2025 : <strong>${old2.length}</strong>`;let all=[...cur,...old,...old2].sort((a,b)=>(date(b.Date_de_saisie)?.getTime()||0)-(date(a.Date_de_saisie)?.getTime()||0));await loadSuiviFor(cur);if(generation!==establishmentLoadGeneration)return;let lastSchoolYear=null;$("history").innerHTML=all.length?all.map(f=>{const level=displayLevel(f.Niveau);const warning=level==="3"?'<span class="level-warning" title="Fait de niveau 3" aria-label="Fait de niveau 3">⚠</span>':"";const schoolYear=String(f.Annee_scolaire|| (f._source===T.CUR?"2026-2027":f._source===T.OLD?"2025-2026":"2024-2025"));const separator=schoolYear!==lastSchoolYear?`<div class="school-year-separator"><span>Année scolaire ${esc(schoolYear)}</span></div>`:"";lastSchoolYear=schoolYear;const oldYear=isArchivedFact(f);return `${separator}<div class="event ${oldYear?"old-school-year":""}"><div class="event-title">FE n°${esc(f.Numero_FE)} — <span class="${level==="3"?"event-level3":""}">Niveau ${esc(level)}</span> ${warning}</div><div class="event-meta">${dateFR(f.Date_de_saisie)} — ${esc(schoolYear)} — Équipier : ${esc(isArchivedFact(f)?(String(f.Equipier||"N/A").trim()||"N/A"):eqName(suiviMap.get(feNumericKey(f.Numero_FE)) ? suiviMap.get(feNumericKey(f.Numero_FE)).Equipier : f.Equipier))}</div>${historyTypeBadges(f,level)}<div>${esc(cleanDisplayText((isArchivedFact(f) && (!String(f.Resume_du_fait||"").trim() || norm(f.Resume_du_fait).includes("resume non renseigne"))) ? (f.Expose_des_faits||"Résumé non renseigné") : (f.Resume_du_fait||"Résumé non renseigné")))}</div><button class="btn" style="margin-top:7px" data-hist="${f._source}:${f.id}">Ouvrir la fiche</button></div>`}).join(""):'<div class="muted">Aucun fait trouvé pour cet UAI.</div>';if(generation!==establishmentLoadGeneration)return;const historyByKey=new Map(all.map(f=>[`${f._source}:${f.id}`,f]));document.querySelectorAll("[data-hist]").forEach(b=>b.onclick=()=>openFact(b.dataset.hist,historyByKey.get(b.dataset.hist)))}catch(e){if(generation===establishmentLoadGeneration)$("history").innerHTML='<div class="notice error">Impossible de charger l’historique : '+esc(e.message)+'</div>'}}
 document.querySelectorAll("[data-inline-edit]").forEach(b=>b.onclick=()=>editInlineField(b.dataset.inlineEdit));
 document.querySelectorAll("[data-inline-cancel]").forEach(b=>b.onclick=()=>cancelInlineField(b.dataset.inlineCancel));
 document.querySelectorAll("[data-inline-save]").forEach(b=>b.onclick=()=>saveInlineField(b.dataset.inlineSave));
@@ -2564,7 +2862,7 @@ $("ambianceSave").onclick=saveAmbiance;
 
 $("q").onkeydown=async e=>{if(e.key!=="Enter")return;e.preventDefault();let raw=$("q").value.trim();if(!raw){rows=[...currentRows];page=1;render();return}let idMatch=/^id\s*=\s*(\d+)$/i.exec(raw);if(idMatch){await searchOperationalId(idMatch[1])}else if(/^\d{6,}$/.test(raw)){await searchExactFE(raw)}else{rows=[...currentRows];page=1;render();await renderEtabMatches(raw)}};
 $("equipier").onchange=()=>{equipierSelectionTouched=true};["dep","degree","level","status","equipierFilter"].forEach(id=>$(id).onchange=()=>{page=1;render()});$("daySelect").onchange=()=>{loadCurrent()};$("weekSelect").onchange=()=>{populateDayOptions($("weekSelect").value);loadCurrent()};$("prev").onclick=()=>{page--;render()};$("next").onclick=()=>{page++;render()};$("exportFePdf").onclick=exportCurrentFePdf;$("assignOperationalId").onclick=assignOperationalId;
-$("back").onclick=async()=>{if(!(await confirmLeaveIfDirty()))return;await releaseCurrentEditResources();opsCleanSnapshot=null;ambianceCleanSnapshot=null;const wasOperationalSearch=/^id\s*=\s*\d+$/i.test($("q").value.trim());if(wasOperationalSearch){$("q").value="";rows=[...currentRows];page=1;notice("")}$("detailView").classList.add("hidden");$("listView").classList.remove("hidden");render()};$("openEtab").onclick=showEstablishment;$("etabBack").onclick=async()=>{if(!(await confirmLeaveIfDirty()))return;const lockUai=String(selectedEtab?.UAI||"").trim();await releaseEditLock("ETAB",lockUai);currentEtabLock=null;ambianceCleanSnapshot=null;$("etabView").classList.add("hidden");if(etabReturnTarget==="detail"&&selected){$("detailView").classList.remove("hidden");markOpsClean()}else{$("listView").classList.remove("hidden");render()}};$("save").onclick=saveOps;
+$("back").onclick=async()=>{if(!(await confirmLeaveIfDirty()))return;await releaseCurrentEditResources();opsCleanSnapshot=null;ambianceCleanSnapshot=null;const wasOperationalSearch=/^id\s*=\s*\d+$/i.test($("q").value.trim());if(wasOperationalSearch){$("q").value="";rows=[...currentRows];page=1;notice("")}selected=null;selectedSuivi=null;selectedEtab=null;establishmentLoadGeneration++;$("detailView").classList.add("hidden");$("listView").classList.remove("hidden");render()};$("openEtab").onclick=showEstablishment;$("etabBack").onclick=async()=>{if(!(await confirmLeaveIfDirty()))return;const lockUai=String(selectedEtab?.UAI||"").trim();await releaseEditLock("ETAB",lockUai);currentEtabLock=null;ambianceCleanSnapshot=null;$("etabView").classList.add("hidden");if(etabReturnTarget==="detail"&&selected){$("detailView").classList.remove("hidden");markOpsClean()}else{$("listView").classList.remove("hidden");render()}};$("save").onclick=saveOps;
 // Copie de secours accessible sans modifier les mécanismes de sauvegarde ou de verrouillage.
 const opsSaveButton=$("save");
 if(opsSaveButton&&opsSaveButton.parentElement&&!$("copyOpsDraftButton")){
@@ -2574,7 +2872,7 @@ if(opsSaveButton&&opsSaveButton.parentElement&&!$("copyOpsDraftButton")){
   draftButton.title="Copier les champs en cours de rédaction avant un éventuel conflit";
   draftButton.onclick=copyOpsDraft;
   opsSaveButton.parentElement.insertBefore(draftButton,opsSaveButton);
-}$("toggleDone").onclick=toggleDone;$("resetFollowup").onclick=resetFollowup;
+}$("toggleDone").onclick=toggleDone;
 (async()=>{try{initIssueJournal();initActivityFields();
 // Chargements indépendants en parallèle : référentiels, identifiants et index des périodes.
 await loadSmallTables();
@@ -2588,4 +2886,157 @@ void loadOperationalIds().catch(e=>console.warn("Index ID_FE indisponible",e));
 // Aucun balayage annuel des FE : les périodes sont un calendrier local.
 void detectCurrentEquipier().then(async()=>{await issueSync(true);if(!feNoticeReady){try{await feNoticeInitialize();}catch(e){console.warn("Notifications en attente d'identification :",e)}}}).catch(e=>console.warn(e));
 setInterval(()=>{if(!document.hidden)void issueSync()},60000);wireTemporaryClaimTriggers();startLiveRefresh();void initFeBell();startClaimHeartbeat();startEditLockHeartbeat();setInterval(retryDeferredActivity,30000);repairLegacyChoiceLists()}catch(e){console.error(e);notice("Erreur Grist : "+e.message,"error");$("body").innerHTML='<tr><td colspan="9" class="loading">Impossible de charger les données.</td></tr>'}})();
-</script></body></html>
+</script></div><div hidden="" id="activityApp"><div class="page">
+<header class="hero"><div class="toolbar"><div><h1>Gestion des activités EMAS</h1><div class="muted">Formations, accompagnements, prévention, sécurisation et conseil</div></div><div class="actions"><span class="pill" id="connection" hidden aria-hidden="true">Connexion à Grist…</span><button class="btn" id="refresh" hidden type="button" tabindex="-1">Actualiser</button><button class="btn primary" id="newTop" hidden type="button" tabindex="-1">+ Nouvelle activité</button></div></div><div class="nav"><button class="tab active" data-view="agenda">Agenda</button><button class="tab" data-view="liste">Toutes les activités</button><button class="tab" data-view="formulaire">Saisir une activité</button></div><div class="notice hidden" id="message" role="status"></div></header>
+<section aria-label="Indicateurs" class="grid" hidden aria-hidden="true"><div class="kpi"><strong id="kTotal">0</strong><span>Total des activités</span></div><div class="kpi"><strong id="kDone">0</strong><span>Réalisées</span></div><div class="kpi"><strong id="kFuture">0</strong><span>À venir</span></div><div class="kpi"><strong id="kParticipants">0</strong><span>Participations réelles</span></div></section>
+<section class="section" id="filtersPanel"><h3>Rechercher et filtrer</h3><div class="filters"><input aria-label="Recherche" id="search" placeholder="Intitulé, structure, lieu, UAI…" type="search"/><select aria-label="Type d'activité" id="filterType"><option value="">Tous les types</option></select><select aria-label="Statut" id="filterStatus"><option value="">Tous les statuts</option></select><select aria-label="Département" id="filterDept"><option value="">Tous les départements</option></select><select aria-label="Degré" id="filterDegree"><option value="">Tous les degrés</option></select><button class="btn" id="resetFilters">Effacer les filtres</button></div><div class="count" id="filterCount" aria-live="polite"></div></section>
+<section class="section view active" id="view-agenda"><div class="calendar-head"><div><h2>Agenda des activités</h2><div class="muted small">Cliquer sur une activité pour la consulter ou la modifier.</div></div><div class="actions"><button aria-label="Mois précédent" class="btn mini" id="prevMonth">←</button><button class="btn" id="today">Aujourd'hui</button><button aria-label="Mois suivant" class="btn mini" id="nextMonth">→</button><strong id="monthTitle"></strong></div></div><div class="calendar" id="calendar"></div><p class="muted small">Une activité est affichée à sa date de début et sur chaque jour couvert par sa date de fin. Les activités sans date ne figurent que dans la liste.</p></section>
+<section class="section view" id="view-liste"><div class="layoutline"><h2>Répertoire des activités</h2><span class="count" id="listCount"></span></div><div class="tablewrap"><table><thead><tr><th>Date</th><th>Activité</th><th>Nature</th><th>Structure / lieu</th><th>Département</th><th>Statut</th><th></th></tr></thead><tbody id="activityRows"></tbody></table></div></section>
+<section class="section view" id="view-detail"><div class="layoutline"><h2>Fiche d'activité</h2><div class="actions"><button class="btn" id="backDetail">Retour à la liste</button><button class="btn primary" id="editDetail">Modifier cette activité</button></div></div><div class="detail" id="detailContent"></div></section>
+<section class="section view" id="view-formulaire"><div class="layoutline"><div><h2 id="formTitle">Nouvelle activité</h2></div><button class="btn" id="cancelForm" type="button" hidden aria-hidden="true" tabindex="-1">Annuler</button></div><form autocomplete="off" id="activityForm"><div class="formgrid">
+<div class="subhead">Informations essentielles</div>
+<div class="field"><label for="Type_activite">Type d'activité *</label><select id="Type_activite" required=""></select></div>
+<div class="field wide"><label for="Intitule">Intitulé *</label><input id="Intitule" maxlength="250" placeholder="Ex. Diagnostic de sécurité – collège…" required=""/></div>
+<div class="field"><label for="Thematique">Thématique</label><input id="Thematique" placeholder="Ex. PPMS, gestion des conflits"/></div>
+<div class="field wide"><label for="Objet_demande">Objet / demande initiale</label><textarea id="Objet_demande" rows="2"></textarea></div>
+<div class="subhead">Date et organisation</div>
+<div class="field"><label for="Date_debut">Date de début *</label><input id="Date_debut" required="" type="date"/></div>
+<div class="field"><label for="Date_fin">Date de fin</label><input id="Date_fin" type="date"/><small>À laisser vide pour une seule journée.</small></div>
+<div class="field"><label for="Annee_scolaire">Année scolaire</label><input id="Annee_scolaire" placeholder="2026-2027" readonly=""/></div>
+<div class="field"><label for="Heure_debut">Heure de début</label><input id="Heure_debut" type="time"/></div>
+<div class="field"><label for="Heure_fin">Heure de fin</label><input id="Heure_fin" type="time"/></div>
+<div class="field"><label for="Statut">Statut *</label><select id="Statut" required=""></select></div>
+<div class="subhead">Lieu et structure concernée</div>
+<div class="field"><label for="Departement">Département</label><select id="Departement"></select></div>
+<div class="field"><label for="Degre">Degré</label><select id="Degre"></select></div>
+<div class="field"><label for="Equipe_EMAS">Équipe EMAS</label><select id="Equipe_EMAS"></select></div>
+<div class="field wide"><label for="Structure_concernee">Structure concernée</label><input id="Structure_concernee" placeholder="Circonscription, établissement, service, groupe…"/></div>
+<div class="field"><label for="Lieu">Lieu de l'activité</label><input id="Lieu" placeholder="Ville, adresse ou lieu"/></div>
+<div class="field wide"><label for="etabSearch">Rechercher un établissement (facultatif)</label><div class="lookup"><input aria-autocomplete="list" aria-controls="etabSuggestions" aria-expanded="false" autocomplete="off" id="etabSearch" placeholder="Nom de l’établissement (ex. Mendès)…" role="combobox"/><div class="lookup-results hidden" id="etabSuggestions" role="listbox"></div></div><div class="lookup-info" id="etabInfo">Importez la table ETABLISSEMENTS dans ce document Grist pour activer les suggestions.</div><button class="btn mini hidden" id="clearEtab" style="margin-top:7px" type="button">Dissocier l’établissement</button></div><input id="UAI" type="hidden"/>
+<div class="subhead" id="bilanHeading">Suivi de l’activité</div>
+<div class="field"><label for="Intervenants">Intervenants</label><input id="Intervenants" placeholder="Noms séparés par des virgules"/></div>
+<div class="field"><label for="Participants_prevus">Participants prévus</label><input id="Participants_prevus" min="0" step="1" type="number"/></div>
+<div class="field"><label for="Participants_reels">Participants réels</label><input id="Participants_reels" min="0" step="1" type="number"/></div>
+<div class="field full"><label for="Compte_rendu">Compte rendu / bilan</label><textarea id="Compte_rendu" rows="4"></textarea></div>
+<div class="field full"><label for="Observations">Observations</label><textarea id="Observations" rows="3"></textarea></div>
+</div><div class="sticky layoutline" id="activityBottomBar"><div class="actions"><button class="btn" id="cancelBottom" type="button">Annuler</button><button class="btn danger" id="deleteActivity" type="button" hidden>Supprimer</button><button class="btn primary" id="saveBtn" type="submit">Enregistrer</button></div></div></form></section>
+</div>
+</div><script>(function(){
+
+'use strict';
+const TABLE='ACTIVITES_EMAS';
+const COLS=['ID_Activite','Type_activite','Intitule','Thematique','Objet_demande','Date_debut','Date_fin','Heure_debut','Heure_fin','Annee_scolaire','Statut','Departement','Degre','Structure_concernee','Lieu','UAI','Equipe_EMAS','Intervenants','Participants_prevus','Participants_reels','Compte_rendu','Observations','Date_modification'];
+const TYPES=['Formation','Sensibilisation','Accompagnement','Diagnostic de sécurité','Sécurisation','Conseil de discipline','Exercice de crise','Conseil et expertise','Réunion et coordination','Autre'];
+const STATUSES=['Programmée','Reportée','Terminée'];
+const DEPTS=['11','30','34','48','66'];const DEGREES=['1er degré','2nd degré'];
+const $=id=>document.getElementById(id);let establishments=[],etabSelectedIndex=-1,records=[],currentId=null,editingId=null,view='agenda',activityOrigin='agenda',month=new Date(new Date().getFullYear(),new Date().getMonth(),1),connected=false,busy=false;
+function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function isoDate(v){if(v==null||v==='')return '';if(v instanceof Date)return [v.getFullYear(),String(v.getMonth()+1).padStart(2,'0'),String(v.getDate()).padStart(2,'0')].join('-');if(typeof v==='number'){const d=new Date(v*1000);return Number.isNaN(d.getTime())?'':d.toISOString().slice(0,10);}let s=String(v).trim();if(/^\d{4}-\d\d-\d\d/.test(s))return s.slice(0,10);if(/^\d\d\/\d\d\/\d{4}$/.test(s)){let [d,m,y]=s.split('/');return `${y}-${m}-${d}`;}return '';}
+function localDate(s){if(!s)return null;const d=new Date(s+'T12:00:00');return Number.isNaN(d.getTime())?null:d;}
+function fmtDate(s){const d=localDate(isoDate(s));return d?d.toLocaleDateString('fr-FR'):'Date non renseignée';}
+function dateToGrist(s){if(!s)return null;return Math.floor(Date.parse(s+'T00:00:00Z')/1000);}
+function schoolYear(s){const d=localDate(s);if(!d)return '';let y=d.getFullYear();if(d.getMonth()<7)y--;return `${y}-${y+1}`;}
+function activityTypeBadge(type){const i=TYPES.indexOf(type);return type?`<span class="activity-type-badge activity-type-${i<0?9:i}">${esc(type)}</span>`:'';}
+function classStatus(s){return ({'Terminée':'realisee','Annulée':'annulee','Reportée':'reportee'})[s]||'';}
+let activityToastTimer=null;
+function toast(t,kind=''){
+  if(activityToastTimer!==null){clearTimeout(activityToastTimer);activityToastTimer=null;}
+  const m=$('message');m.textContent=t;m.className='notice '+kind;
+  if(kind==='success')activityToastTimer=setTimeout(()=>{m.className='notice hidden';activityToastTimer=null;},4500);
+}
+function clearToast(){if(activityToastTimer!==null){clearTimeout(activityToastTimer);activityToastTimer=null;}$('message').className='notice hidden';}
+function setConnection(t,ok){$('connection').textContent=t;$('connection').style.background=ok?'#e7f7ef':'#fff2ed';$('connection').style.color=ok?'#067647':'#b42318';}
+function options(id,arr,placeholder){$(id).innerHTML=(placeholder?`<option value="">${esc(placeholder)}</option>`:'')+arr.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('');}
+function normalizeSearch(v){return String(v??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('fr').replace(/[^a-z0-9]+/g,' ').trim();}
+function deptCode(v,uai){let x=String(v||'').trim();let m={'Aude':'11','Gard':'30','Hérault':'34','Herault':'34','Lozère':'48','Lozere':'48','Pyrénées-Orientales':'66','Pyrenees-Orientales':'66'};return m[x]||(/^(11|30|34|48|66)$/.test(x)?x:'')||(/^(011|030|034|048|066)/.test(String(uai||''))?String(uai).slice(1,3):'');}
+function degreeValue(v){let x=normalizeSearch(v);return x==='1er'||x==='1er degre'||x==='premier degre'?'1er degré':x==='2nd'||x==='2nd degre'||x==='second degre'?'2nd degré':'';}
+function hideSuggestions(){const el=$('etabSuggestions');el.classList.add('hidden');$('etabSearch').setAttribute('aria-expanded','false');etabSelectedIndex=-1;}
+function matchingEstabs(q){let n=normalizeSearch(q);if(!n)return [];let parts=n.split(/\s+/);return establishments.filter(e=>parts.every(t=>e.search.includes(t))).slice(0,25);}
+function showSuggestions(){const q=$('etabSearch').value.trim(),box=$('etabSuggestions');if(!q||!establishments.length){hideSuggestions();return;}const found=matchingEstabs(q);box.innerHTML=found.length?found.map((e,i)=>`<button type="button" role="option" class="lookup-option" data-index="${i}"><strong>${esc(e.Etablissement)}</strong><small>${esc(e.Ville)} · ${esc(e.Departement)}</small></button>`).join(''):'<div class="lookup-empty">Aucun établissement trouvé.</div>';box.classList.remove('hidden');$('etabSearch').setAttribute('aria-expanded','true');etabSelectedIndex=-1;box.querySelectorAll('[data-index]').forEach(b=>b.addEventListener('mousedown',ev=>{ev.preventDefault();chooseEtab(found[Number(b.dataset.index)]);}));}
+function chooseEtab(e){if(!e)return;$('etabSearch').value=e.Etablissement;$('UAI').value=e.UAI;const d=deptCode(e.Departement,e.UAI);if(d)$('Departement').value=d;const degree=degreeValue(e.Degre);if(degree)$('Degre').value=degree;if(d&&!$('Equipe_EMAS').value)$('Equipe_EMAS').value='EMAS '+d;$('etabInfo').textContent=`Établissement sélectionné : ${e.Etablissement} (${e.UAI})`;$('etabInfo').className='lookup-picked';$('clearEtab').classList.remove('hidden');hideSuggestions();}
+function resetEtabSearch(){ $('etabSearch').value='';$('etabInfo').textContent=establishments.length?`${establishments.length.toLocaleString('fr-FR')} établissements disponibles. Saisissez le nom d’un établissement.`:'Importez la table ETABLISSEMENTS dans ce document Grist pour activer les suggestions.';$('etabInfo').className='lookup-info';$('clearEtab').classList.add('hidden');hideSuggestions();}
+async function loadEstablishments(){if(!window.grist)return;try{const data=await grist.docApi.fetchTable('ETABLISSEMENTS');if(!Array.isArray(data.id))throw Error('Format inattendu');establishments=data.id.map((id,i)=>{const g=k=>String((data[k]||[])[i]??'').trim();let e={id,UAI:g('UAI'),Etablissement:g('Etablissement'),Ville:g('Ville'),Departement:g('Departement'),Degre:g('Degre')};e.search=normalizeSearch([e.UAI,e.Etablissement,e.Ville,e.Departement,g('Nom_court')].join(' '));return e;}).filter(e=>e.UAI&&e.Etablissement);resetEtabSearch();render();}catch(e){establishments=[];resetEtabSearch();$('etabInfo').textContent='Recherche indisponible : ajoutez la table ETABLISSEMENTS (colonnes UAI, Etablissement, Ville, Departement, Degre) dans ce document Grist.';}}
+function initEtabLookup(){const el=$('etabSearch');el.addEventListener('input',()=>{if($('UAI').value&&normalizeSearch(el.value)!==normalizeSearch((establishments.find(e=>e.UAI===$('UAI').value)||{}).Etablissement)){$('UAI').value='';$('clearEtab').classList.add('hidden');}showSuggestions();});el.addEventListener('focus',showSuggestions);el.addEventListener('keydown',ev=>{let options=Array.from($('etabSuggestions').querySelectorAll('[data-index]'));if(!options.length)return;if(ev.key==='ArrowDown'||ev.key==='ArrowUp'){ev.preventDefault();etabSelectedIndex=(etabSelectedIndex+(ev.key==='ArrowDown'?1:-1)+options.length)%options.length;options.forEach((b,i)=>b.classList.toggle('selected',i===etabSelectedIndex));options[etabSelectedIndex].scrollIntoView({block:'nearest'});}else if(ev.key==='Enter'&&!$('etabSuggestions').classList.contains('hidden')){ev.preventDefault();options[Math.max(0,etabSelectedIndex)].dispatchEvent(new MouseEvent('mousedown',{bubbles:true}));}else if(ev.key==='Escape')hideSuggestions();});el.addEventListener('blur',()=>setTimeout(hideSuggestions,140));$('clearEtab').onclick=()=>{['UAI'].forEach(id=>$(id).value='');resetEtabSearch();el.focus();};}
+
+const ALWAYS=['Type_activite','Intitule','Date_debut','Statut','Departement','Lieu'];
+const BY_TYPE={
+ 'Formation':['Thematique','Structure_concernee','etabSearch','Participants_prevus','Participants_reels','Intervenants'],
+ 'Sensibilisation':['Thematique','Structure_concernee','etabSearch','Participants_prevus','Participants_reels','Intervenants'],
+ 'Accompagnement':['Objet_demande','Structure_concernee','etabSearch','Intervenants','Compte_rendu'],
+ 'Diagnostic de sécurité':['Objet_demande','Structure_concernee','etabSearch','Intervenants','Compte_rendu'],
+ 'Sécurisation':['Objet_demande','Structure_concernee','etabSearch','Intervenants','Compte_rendu'],
+ 'Conseil de discipline':['Structure_concernee','etabSearch','Intervenants','Compte_rendu'],
+ 'Exercice de crise':['Thematique','Structure_concernee','etabSearch','Participants_prevus','Participants_reels','Intervenants','Compte_rendu'],
+ 'Conseil et expertise':['Objet_demande','Structure_concernee','etabSearch','Intervenants','Compte_rendu'],
+ 'Réunion et coordination':['Objet_demande','Structure_concernee','etabSearch','Intervenants','Participants_reels'],
+ 'Autre':['Objet_demande','Structure_concernee','etabSearch','Intervenants','Compte_rendu']
+};
+function adaptForm(){
+ const type=$('Type_activite').value;
+ const relevant=new Set([...ALWAYS,...(BY_TYPE[type]||[])]);
+ // In modification mode, keep populated fields visible to prevent losing context.
+ if(editingId!==null){for(const c of COLS){const el=$(c);if(el&&String(el.value||'').trim())relevant.add(c);}}
+ document.querySelectorAll('#activityForm .field').forEach(field=>{
+  const control=field.querySelector('input[id],select[id],textarea[id]');
+  if(!control)return;
+  const show=relevant.has(control.id);
+  field.hidden=!show;
+ });
+ // Subheadings only appear if at least one following field is visible.
+ document.querySelectorAll('#activityForm .subhead').forEach(h=>{
+  let n=h.nextElementSibling,has=false;
+  while(n&&!n.classList.contains('subhead')&&!n.classList.contains('form-more')){
+   if(n.classList.contains('field')&&!n.hidden)has=true;
+   n=n.nextElementSibling;
+  }
+  h.hidden=!has;
+ });
+}
+function setup(){initEtabLookup();$('Type_activite').addEventListener('change',adaptForm);options('Type_activite',TYPES);options('Statut',STATUSES);options('Departement',DEPTS,'Non précisé');options('Degre',DEGREES,'Non précisé');options('Equipe_EMAS',DEPTS.map(x=>'EMAS '+x),'Non précisée');options('filterType',TYPES,'Tous les types');options('filterStatus',STATUSES,'Tous les statuts');options('filterDept',DEPTS,'Tous les départements');options('filterDegree',DEGREES,'Tous les degrés');document.querySelectorAll('#activityApp .tab').forEach(x=>x.onclick=()=>{if(busy)return;if(x.dataset.view==='formulaire')newActivity();else show(x.dataset.view);});$('refresh').onclick=load;$('newTop').onclick=newActivity;$('prevMonth').onclick=()=>moveMonth(-1);$('nextMonth').onclick=()=>moveMonth(1);$('today').onclick=()=>{month=new Date(new Date().getFullYear(),new Date().getMonth(),1);renderCalendar();};$('resetFilters').onclick=()=>{['search','filterType','filterStatus','filterDept','filterDegree'].forEach(id=>$(id).value='');render();};['search','filterType','filterStatus','filterDept','filterDegree'].forEach(id=>$(id).addEventListener('input',render));$('activityForm').onsubmit=save;$('deleteActivity').onclick=deleteActivity;$('cancelForm').onclick=$('cancelBottom').onclick=()=>show(activityOrigin);$('backDetail').onclick=()=>show(activityOrigin);$('editDetail').onclick=()=>editActivity(currentId);$('Date_debut').onchange=()=>{$('Annee_scolaire').value=schoolYear($('Date_debut').value);};$('Departement').onchange=()=>{if(!$('Equipe_EMAS').value&&$('Departement').value)$('Equipe_EMAS').value='EMAS '+$('Departement').value;};}
+function show(name){view=name;document.querySelectorAll('.view').forEach(x=>x.classList.toggle('active',x.id==='view-'+name));document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active',x.dataset.view===name));$('filtersPanel').classList.toggle('hidden',name==='formulaire'||name==='detail');if(name==='agenda')renderCalendar();if(name==='liste')renderList();window.scrollTo({top:0,behavior:'smooth'});}
+function filtered(){let q=$('search').value.trim().toLocaleLowerCase('fr');return records.filter(r=>{if($('filterType').value&&r.Type_activite!==$('filterType').value)return false;if($('filterStatus').value&&r.Statut!==$('filterStatus').value)return false;if($('filterDept').value&&r.Departement!==$('filterDept').value)return false;if($('filterDegree').value&&r.Degre!==$('filterDegree').value)return false;return !q||[r.Intitule,r.Thematique,r.Structure_concernee,r.Lieu,r.UAI,(establishments.find(e=>e.UAI===String(r.UAI||''))||{}).Etablissement,(establishments.find(e=>e.UAI===String(r.UAI||''))||{}).Ville,r.Intervenants,r.ID_Activite].some(v=>String(v||'').toLocaleLowerCase('fr').includes(q));});}
+function render(){const f=filtered(),today=new Date().toISOString().slice(0,10);$('kTotal').textContent=f.length;$('kDone').textContent=f.filter(r=>r.Statut==='Terminée').length;$('kFuture').textContent=f.filter(r=>r.Date_debut&&r.Date_debut>=today&&!['Terminée','Annulée','Reportée'].includes(r.Statut)).length;$('kParticipants').textContent=f.reduce((n,r)=>n+(r.Statut==='Terminée'&&Number.isFinite(+r.Participants_reels)?Number(r.Participants_reels):0),0).toLocaleString('fr-FR');$('filterCount').textContent=`${records.length} ${records.length<=1?'activité':'activités'} au total — ${records.filter(r=>r.Statut==='Terminée').length} ${records.filter(r=>r.Statut==='Terminée').length<=1?'activité réalisée':'activités réalisées'} dont ${records.filter(r=>['Programmée'].includes(r.Statut)).length} ${records.filter(r=>['Programmée'].includes(r.Statut)).length<=1?'activité planifiée':'activités planifiées'}`;renderCalendar();renderList();}
+function moveMonth(n){month=new Date(month.getFullYear(),month.getMonth()+n,1);renderCalendar();}
+function renderCalendar(){const root=$('calendar');const y=month.getFullYear(),m=month.getMonth();$('monthTitle').textContent=month.toLocaleDateString('fr-FR',{month:'long',year:'numeric'});let start=new Date(y,m,1);start.setDate(start.getDate()-((start.getDay()+6)%7));let html=['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'].map(x=>`<div class="weekday">${x}</div>`).join('');let f=filtered(),now=new Date().toISOString().slice(0,10);for(let i=0;i<42;i++){let d=new Date(start);d.setDate(start.getDate()+i);let s=[d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-');let dayEvents=f.filter(r=>r.Date_debut&&r.Date_debut<=s&&(r.Date_fin?r.Date_fin>=s:r.Date_debut===s)).sort((a,b)=>(a.Heure_debut||'').localeCompare(b.Heure_debut||''));html+=`<div class="day ${d.getMonth()===m?'':'other'} ${s===now?'today':''}"><span class="num">${d.getDate()}</span>${dayEvents.slice(0,5).map(r=>`<button type="button" class="event activity-event-${TYPES.includes(r.Type_activite)?TYPES.indexOf(r.Type_activite):9}" data-record="${r.id}" title="${esc([fmtDate(s),r.Intitule,(establishments.find(e=>e.UAI===String(r.UAI||''))||{}).Etablissement,r.Structure_concernee].filter(v=>v&&String(v).trim()&&v!=='—').join(' — '))}"><span class="time">${esc(r.Heure_debut||'')}</span> ${esc(r.Intitule)}${activityTypeBadge(r.Type_activite)}</button>`).join('')}${dayEvents.length>5?`<div class="small muted">+${dayEvents.length-5} autres</div>`:''}</div>`;}root.innerHTML=html;root.querySelectorAll('[data-record]').forEach(b=>b.onclick=()=>detail(Number(b.dataset.record)));}
+function renderList(){const today=new Date().toLocaleDateString('sv-SE');let f=filtered().filter(r=>r.Date_debut&&r.Date_debut>=today).slice().sort((a,b)=>a.Date_debut.localeCompare(b.Date_debut)||(a.Heure_debut||'').localeCompare(b.Heure_debut||'')||(a.Intitule||'').localeCompare(b.Intitule||''));$('listCount').textContent=f.length+' activité(s)';$('activityRows').innerHTML=f.length?f.map(r=>`<tr><td>${esc(fmtDate(r.Date_debut))}${r.Heure_debut?`<div class="muted small">${esc(r.Heure_debut)}</div>`:''}</td><td><strong>${esc(r.Intitule)}</strong><div class="muted small">${esc(r.ID_Activite||'')}</div></td><td>${activityTypeBadge(r.Type_activite)}</td><td>${esc(r.Structure_concernee||(establishments.find(e=>e.UAI===String(r.UAI||''))||{}).Etablissement||'—')}<div class="muted small">${esc(r.Lieu||'')}</div></td><td>${esc(r.Departement||'—')}</td><td><span class="pill ${classStatus(r.Statut)}">${esc(r.Statut||'—')}</span></td><td><button type="button" class="btn mini" data-record="${r.id}">Consulter</button></td></tr>`).join(''):'<tr><td colspan="7" class="empty">Aucune activité trouvée.</td></tr>';$('activityRows').querySelectorAll('[data-record]').forEach(b=>b.onclick=()=>detail(Number(b.dataset.record)));}
+function detail(id){const r=records.find(x=>x.id===id);if(!r)return;if(view==='agenda'||view==='liste')activityOrigin=view;$('backDetail').textContent=activityOrigin==='agenda'?'Retour à l’agenda':'Retour à la liste';currentId=id;const items=[['Intitulé',r.Intitule],['Lieu',r.Lieu],['Nature',r.Type_activite],['Statut',r.Statut],['Thématique',r.Thematique],['Objet / demande',r.Objet_demande],['Date de début',fmtDate(r.Date_debut)],['Date de fin',r.Date_fin?fmtDate(r.Date_fin):'—'],['Horaires',[r.Heure_debut,r.Heure_fin].filter(Boolean).join(' – ')],['Année scolaire',r.Annee_scolaire],['Département',r.Departement],['Degré',r.Degre],['Équipe EMAS',r.Equipe_EMAS],['Structure concernée',r.Structure_concernee],['UAI',r.UAI],['Établissement',(establishments.find(e=>e.UAI===String(r.UAI||''))||{}).Etablissement],['Ville',(establishments.find(e=>e.UAI===String(r.UAI||''))||{}).Ville],['Intervenants',r.Intervenants],['Participants prévus',r.Participants_prevus],['Participants réels',r.Participants_reels],['Compte rendu',r.Compte_rendu],['Observations',r.Observations],['Dernière modification',r.Date_modification?String(r.Date_modification):'']];$('detailContent').innerHTML=items.filter(([k,v])=>['Intitulé','Lieu','Nature','Statut'].includes(k)||v!==null&&v!==undefined&&String(v).trim()!==''&&v!=='—'&&v!=='Date non renseignée').map(([k,v])=>`<div class="item ${['Intitulé','Objet / demande','Compte rendu','Observations'].includes(k)?'wide':''}"><b>${esc(k)}</b><div style="white-space:pre-wrap">${k==='Nature'?activityTypeBadge(v):k==='Statut'?`<span class="pill ${v==='Programmée'?'programmee':classStatus(v)}">${esc(v)}</span>`:esc(v===null||v===undefined||v===''?'—':v)}</div></div>`).join('');show('detail');}
+function newActivity(){if(busy)return;if(view==='agenda'||view==='liste')activityOrigin=view;currentId=null;editingId=null;$('activityForm').reset();resetEtabSearch();$('Type_activite').value='Formation';$('Statut').value='Programmée';$('Date_debut').value=new Date().toLocaleDateString('sv-SE');$('Annee_scolaire').value=schoolYear($('Date_debut').value);$('formTitle').textContent='Nouvelle activité';$('saveBtn').textContent='Enregistrer';$('deleteActivity').hidden=true;adaptForm();show('formulaire');}
+function editActivity(id){const r=records.find(x=>x.id===id);if(!r)return;editingId=id;for(const c of COLS){const el=$(c);if(!el)continue;let v=r[c];el.value=(c==='Date_debut'||c==='Date_fin')?isoDate(v):(v==null?'':String(v));if(c==='Statut'&&v&&!STATUSES.includes(v)){el.selectedIndex=-1;} }if(!DEPTS.includes($('Departement').value))$('Departement').value='';resetEtabSearch();if(r.UAI){const et=establishments.find(e=>e.UAI===String(r.UAI));$('etabSearch').value=et?et.Etablissement:'';$('etabInfo').textContent=et?'Établissement associé : '+et.Etablissement+' — '+et.Ville:'UAI associé : '+r.UAI+' (établissement absent du référentiel)';$('clearEtab').classList.remove('hidden');}$('formTitle').textContent='Modifier une activité';$('saveBtn').textContent='Enregistrer';$('deleteActivity').hidden=false;adaptForm();show('formulaire');}
+function parseRows(data){if(!data||!Array.isArray(data.id))throw Error('Réponse Grist inattendue : aucune ligne exploitable.');return data.id.map((id,i)=>{let r={id};for(let c of COLS){let v=(data[c]||[])[i];if(c==='Date_debut'||c==='Date_fin')v=isoDate(v);if(c==='Departement'&&v!=null)v=String(v);if(c==='Type_activite')v=({'Conseil / expertise':'Conseil et expertise','Réunion / coordination':'Réunion et coordination'})[v]||v;if(c==='Statut')v=({'Réalisée':'Terminée','À confirmer':'Programmée','À planifier':'Programmée'})[v]||v;r[c]=v==null?'':v;}return r;});}
+async function load(){if(!window.grist){setConnection('Hors Grist',false);toast('Ouvrez cette page comme widget personnalisé dans Grist, avec accès complet au document.','error');return;}try{const data=await grist.docApi.fetchTable(TABLE);records=parseRows(data);connected=true;setConnection('Grist connecté',true);clearToast();render();}catch(e){connected=false;setConnection('Connexion indisponible',false);toast('Impossible de lire la table '+TABLE+' : '+(e.message||e)+'. Vérifiez le nom de la table et les autorisations du widget.','error');}}
+function nextId(){let max=0;for(let r of records){const m=/^ACT-(\d+)$/i.exec(r.ID_Activite||'');if(m)max=Math.max(max,Number(m[1]));}return 'ACT-'+String(max+1).padStart(4,'0');}
+function values(){const o={};for(const c of COLS){if(c==='ID_Activite'||c==='Date_modification')continue;const el=$(c);if(!el)continue;let v=el.value.trim();if(['Date_debut','Date_fin'].includes(c))v=dateToGrist(v);else if(['Participants_prevus','Participants_reels'].includes(c))v=v===''?null:Number(v);o[c]=v===''?null:v;}o.Annee_scolaire=schoolYear($('Date_debut').value);o.Date_modification=Math.floor(Date.now()/1000);return o;}
+async function deleteActivity(){
+  if(busy||editingId===null)return;
+  const r=records.find(x=>x.id===editingId);
+  if(!r)return;
+  const targetId=editingId;
+  busy=true;
+  let confirmed=false;
+  try{confirmed=await showModal({title:'Supprimer cette activité ?',message:'Vous êtes sur le point de supprimer définitivement l’activité suivante :\n'+(r.Intitule||r.ID_Activite||'')+'\n\nCette action est irréversible.',type:'error',confirmText:'Supprimer',cancelText:'Annuler'});}
+  finally{busy=false;}
+  if(!confirmed||editingId!==targetId||document.getElementById('activityApp').hidden)return;
+  if(!connected){toast('La connexion Grist est nécessaire pour supprimer.','error');return;}
+  busy=true;$('deleteActivity').disabled=true;$('saveBtn').disabled=true;
+  try{
+    await grist.docApi.applyUserActions([['RemoveRecord',TABLE,editingId]]);
+    editingId=null;
+    await load();
+    show(activityOrigin);
+    toast('Activité supprimée.','success');
+  }catch(err){toast('Suppression impossible : '+(err.message||err),'error');}
+  finally{busy=false;$('deleteActivity').disabled=false;$('saveBtn').disabled=false;}
+}
+async function save(e){e.preventDefault();if(busy)return;if(!connected){toast('La connexion Grist est nécessaire pour enregistrer.','error');return;}if($('Date_fin').value&&$('Date_fin').value<$('Date_debut').value){toast('La date de fin doit être postérieure ou égale à la date de début.','error');return;}if($('Heure_debut').value&&$('Heure_fin').value&&(!$('Date_fin').value||$('Date_fin').value===$('Date_debut').value)&&$('Heure_fin').value<$('Heure_debut').value){toast('L’heure de fin précède l’heure de début.','error');return;}if($('etabSearch').value.trim()&&!$('UAI').value.trim()){toast('Sélectionnez un établissement dans la liste de suggestions ou videz la recherche.','error');return;}if(!STATUSES.includes($('Statut').value)){toast('Sélectionnez un statut valide.','error');return;}const wasEditing=editingId!==null;const fields=values();if(wasEditing&&!fields.Degre){const old=records.find(r=>r.id===editingId);if(old&&old.Degre&&!DEGREES.includes(old.Degre))fields.Degre=old.Degre;}if(!wasEditing)fields.ID_Activite=nextId();const action=wasEditing?['UpdateRecord',TABLE,editingId,fields]:['AddRecord',TABLE,null,fields];busy=true;$('saveBtn').disabled=true;try{await grist.docApi.applyUserActions([action]);await load();toast(wasEditing?'Activité modifiée et enregistrée.':'Nouvelle activité enregistrée.','success');editingId=null;currentId=null;show(activityOrigin);}catch(err){toast('Enregistrement refusé par Grist : '+(err.message||err)+'. Vérifiez les types des colonnes et les droits du widget.','error');}finally{busy=false;$('saveBtn').disabled=false;}}
+setup();render();if(window.grist){grist.ready({requiredAccess:'full',allowSelectBy:false});grist.onRecords(()=>{if(!busy&&view!=='formulaire')load();});load();loadEstablishments();}else{setConnection('Hors Grist',false);toast('Mode aperçu : installez ce HTML dans un widget personnalisé Grist et autorisez l’accès complet pour activer la sauvegarde.','error');}
+
+})();</script><div aria-labelledby="appModalTitle" aria-modal="true" class="modal-backdrop hidden" id="appModal" role="dialog"><div class="modal-box" id="appModalBox"><div class="modal-title" id="appModalTitle"></div><div class="modal-message" id="appModalMessage"></div><div class="modal-actions" id="appModalActions"></div></div></div><script>(function(){
+ const tabs=document.querySelectorAll('#emasMainTabs [data-section]');
+ function setSection(name){
+  document.getElementById('operationalApp').hidden=name!=='operational';
+  document.getElementById('activityApp').hidden=name!=='activities';
+  tabs.forEach(b=>{const on=b.dataset.section===name;b.classList.toggle('selected',on);b.setAttribute('aria-pressed',String(on));});
+ }
+ tabs.forEach(b=>b.addEventListener('click',()=>{const returning=b.dataset.section==='operational'&&document.getElementById('operationalApp').hidden;setSection(b.dataset.section);if(returning){render();void refreshFEAndNotifications();}}));
+ setSection('operational');
+})();</script></body></html>
