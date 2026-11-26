@@ -823,7 +823,7 @@ function factTypeBadges(v,level,structured){
   }
   if(!groups.size)return '<span class="muted">—</span>';
   return '<div class="type-badges">'+[...groups].map(([key,labels])=>{
-    const label=key;
+    const label=({AttPers:"Atteintes aux personnes",AttBiens:"Atteintes aux biens",AttSecu:"Atteintes à la sécurité",ValRep:"Atteintes aux valeurs de la République",Harcel:"Harcèlement"})[key]||key;
     return `<span class="type-badge ${String(level)==="3"?"level3":""}" tabindex="0" data-fe-tooltip="${esc([...labels].join(", "))}" aria-label="${esc(label+": "+[...labels].join(", "))}">${esc(label)}</span>`;
   }).join("")+'</div>';
 }
@@ -1773,7 +1773,7 @@ async function assignOperationalId(){
     await loadOperationalIds();assertNoIdConflict();
     const existing=idByNumero.get(numero);
     if(existing!=null){renderOperationalId();return}
-    const preview=Math.max(0,...idOccupied)+1;
+    const preview=Math.max(484,...idOccupied)+1;
     const ok=await showModal({title:"Attribuer un ID opérationnel ?",message:`Le prochain ID disponible est actuellement ${preview}. L’ID définitif sera recalculé au moment de l’attribution.`,confirmText:"Attribuer un ID",cancelText:"Annuler"});
     if(!ok)return;
     assertSameFact();
@@ -1791,7 +1791,7 @@ async function assignOperationalId(){
     await loadOperationalIds();assertNoIdConflict();
     if(idByNumero.has(numero)){renderOperationalId();return}
 
-    let candidate=Math.max(0,...idOccupied)+1;
+    let candidate=Math.max(484,...idOccupied)+1;
     while(idOccupied.has(candidate))candidate++;
 
     // Dernière relecture sous verrou : ni le FE ni le candidat ne doivent avoir été pris.
@@ -2430,13 +2430,12 @@ async function exportCurrentFePdf(){
     }
 
     const hasQualifications=[su.Securisation,su.Prevention,su.Accompagnement,su.Formation,su.Representation_Partenariat].some(v=>choiceValues(v).length);
-    const hasFollowup=[su.Eleve_suivi,su.Suivi_etablissement,su.Accompagnement_EMAS,su.Notes_informations].some(pdfHasValue);
+    const hasFollowup=[su.Eleve_suivi,su.Suivi_etablissement,su.Accompagnement_EMAS].some(pdfHasValue);
     if(hasFollowup||hasQualifications){
       section("Suivi opérationnel EMAS");
       narrativeBlock("Suivi de l’établissement",su.Suivi_etablissement);
       narrativeBlock("Accompagnement EMAS",su.Accompagnement_EMAS);
       if(pdfHasValue(su.Eleve_suivi))compactRow([["Élève suivi",su.Eleve_suivi]]);
-      narrativeBlock("Notes internes",su.Notes_informations);
       if(hasQualifications)compactQualifications([["Sécurisation",su.Securisation],["Prévention",su.Prevention],["Accompagnement",su.Accompagnement],["Formation",su.Formation],["Représentation / Partenariat",su.Representation_Partenariat]]);
     }
     footer();doc.save("Compte rendu EMAS 34 - FE "+pdfTextValue(selected.Numero_FE)+".pdf");
