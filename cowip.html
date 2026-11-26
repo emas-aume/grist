@@ -18,17 +18,17 @@ select{background-color:#fff!important;color-scheme:light!important;}
 .btn:not(.primary){color:#172033!important;-webkit-text-fill-color:#172033!important;background:#fff!important;}
 
 /* Ajustements du listing */
-#listView .tablewrap table{table-layout:fixed;min-width:970px}
-#listView th:nth-child(1),#listView td:nth-child(1){width:45px;text-align:center}
-#listView th:nth-child(2),#listView td:nth-child(2){width:70px}
-#listView th:nth-child(3),#listView td:nth-child(3){width:55px;text-align:center}
-#listView th:nth-child(4),#listView td:nth-child(4){width:530px}
+#listView .tablewrap table{table-layout:fixed;min-width:945px}
+#listView th:nth-child(7),#listView td:nth-child(7){width:45px;text-align:center}
+#listView th:nth-child(1),#listView td:nth-child(1){width:70px}
+#listView th:nth-child(2),#listView td:nth-child(2){width:55px;text-align:center}
+#listView th:nth-child(3),#listView td:nth-child(3){width:530px}
+#listView th:nth-child(4),#listView td:nth-child(4){width:85px;white-space:nowrap}
 #listView th:nth-child(5),#listView td:nth-child(5){width:90px;white-space:nowrap}
-#listView th:nth-child(6),#listView td:nth-child(6){width:100px;white-space:nowrap}
-#listView th:nth-child(7),#listView td:nth-child(7){width:80px}
-#listView td:nth-child(2){font-size:12.5px;white-space:pre-line;text-align:left}
-#listView td:nth-child(4) .etab-link{display:block;font-size:11px;line-height:1.25;font-weight:700;color:var(--text)!important;margin-bottom:4px;overflow-wrap:anywhere}
-#listView td:nth-child(4){font-size:11.5px;line-height:1.4;white-space:pre-line;overflow-wrap:anywhere}
+#listView th:nth-child(6),#listView td:nth-child(6){width:70px}
+#listView td:nth-child(1){font-size:12.5px;white-space:pre-line;text-align:left}
+#listView td:nth-child(3) .etab-link{display:block;font-size:11px;line-height:1.25;font-weight:700;color:var(--text)!important;margin-bottom:4px;overflow-wrap:anywhere}
+#listView td:nth-child(3){font-size:11.5px;line-height:1.4;white-space:pre-line;overflow-wrap:anywhere}
 #listView .type-badge[data-fe-tooltip]{cursor:help}
 #listView .type-badge[data-fe-tooltip]:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
 #listView .fe-summary-text{white-space:pre-line;overflow-wrap:anywhere}
@@ -37,10 +37,10 @@ select{background-color:#fff!important;color-scheme:light!important;}
 .fe-detail-tooltip.visible{opacity:1;visibility:visible}
 .fe-detail-tooltip strong{display:block;margin-bottom:4px;font-size:11px;color:#cbd5e1}
 @media(prefers-reduced-motion:reduce){.fe-detail-tooltip{transition:none}}
-#listView td:nth-child(3) .badge{justify-content:center;min-width:30px}
+#listView td:nth-child(2) .badge{justify-content:center;min-width:30px}
 #listView .status-badge,#listView .equipier-badge{white-space:nowrap}
-#listView td:nth-child(5),#listView td:nth-child(6){white-space:nowrap}
-#listView td:nth-child(7){font-weight:400;font-size:12.5px}
+#listView td:nth-child(4),#listView td:nth-child(5){white-space:nowrap}
+#listView td:nth-child(6){font-weight:400;font-size:12.5px}
 #listView .open-btn{white-space:nowrap;width:36px;height:36px;padding:0;display:inline-flex;align-items:center;justify-content:center;font-size:18px;font-weight:700}
 
 
@@ -309,7 +309,7 @@ select{background-color:#fff!important;color-scheme:light!important;}
 </div>
 <div class="hidden" id="etabMatches" style="margin-top:10px"></div>
 <div aria-live="polite" class="hidden" id="notice"></div>
-<div class="tablewrap" style="margin-top:14px"><table><thead><tr><th></th><th>Date</th><th>Niveau</th><th>Résumé du fait établissement</th><th>Statut</th><th>Équipier</th><th>N° FE</th></tr></thead><tbody id="body"><tr><td class="loading" colspan="7">Chargement…</td></tr></tbody></table></div>
+<div class="tablewrap" style="margin-top:14px"><table><thead><tr><th>Date</th><th>Niveau</th><th>Résumé du fait établissement</th><th>Statut</th><th>Équipier</th><th>N° FE</th><th></th></tr></thead><tbody id="body"><tr><td class="loading" colspan="7">Chargement…</td></tr></tbody></table></div>
 <div class="pagination"><div class="actions"><button aria-label="Journal des anomalies" class="btn" id="issueButton" title="Consulter le journal des anomalies" type="button">☷ <span hidden="" id="issueCount">0</span></button><span class="muted" id="count"></span></div><div class="actions"><button class="btn" id="prev">Précédent</button><span class="muted" id="pageInfo"></span><button class="btn" id="next">Suivant</button></div></div>
 </section>
 <section class="hidden" id="detailView">
@@ -1939,7 +1939,7 @@ function filtered(){
     return true;
   }).sort(feOrderDescending);
 }
-function render(){hideFeTooltip();let a=filtered(),pages=Math.max(1,Math.ceil(a.length/PAGE));page=Math.min(page,pages);let slice=a.slice((page-1)*PAGE,page*PAGE);$("body").innerHTML=slice.length?slice.map(f=>{let su=suiviMap.get(feNumericKey(f.Numero_FE)),cl=activeClaimFor(f);let eq=isArchivedFact(f)?(f.Equipier||"N/A"):eqName(cl ? cl.Equipier : (su?su.Equipier:f.Equipier));return `<tr><td><button class="btn open-btn" data-open="${f._source}:${f.id}" title="Ouvrir le fait" aria-label="Ouvrir le fait">↗</button></td><td>${esc(listTransmissionDate(f))}</td><td><span class="badge ${displayLevel(f.Niveau)==="3"?"b3":""}">${esc(displayLevel(f.Niveau))}</span></td><td><button class="etab-link" data-etab-from-fe="${f._source}:${f.id}">${esc([f.Etablissement,f.Ville].filter(Boolean).join(" — ")||"—")}</button><div class="fe-summary-text">${esc(f.Resume_du_fait||"—")}</div>${factTypeBadges(f.Types_de_fait,displayLevel(f.Niveau),f.Types_de_fait_structure)}</td><td>${badgeStatus(statusOf(f))}</td><td>${equipierBadge(eq)}</td><td>${esc(f.Numero_FE)}</td></tr>`}).join(""):'<tr><td colspan="7" class="loading">Aucun résultat.</td></tr>';document.querySelectorAll("[data-open]").forEach(b=>b.onclick=()=>openFact(b.dataset.open));document.querySelectorAll("[data-etab-from-fe]").forEach(b=>b.onclick=()=>openEstablishmentFromFact(b.dataset.etabFromFe));$("count").textContent=a.length+" résultat(s) dans les données actuellement chargées";$("pageInfo").textContent=`Page ${page} / ${pages}`;$("prev").disabled=page<=1;$("next").disabled=page>=pages}
+function render(){hideFeTooltip();let a=filtered(),pages=Math.max(1,Math.ceil(a.length/PAGE));page=Math.min(page,pages);let slice=a.slice((page-1)*PAGE,page*PAGE);$("body").innerHTML=slice.length?slice.map(f=>{let su=suiviMap.get(feNumericKey(f.Numero_FE)),cl=activeClaimFor(f);let eq=isArchivedFact(f)?(f.Equipier||"N/A"):eqName(cl ? cl.Equipier : (su?su.Equipier:f.Equipier));return `<tr><td>${esc(listTransmissionDate(f))}</td><td><span class="badge ${displayLevel(f.Niveau)==="3"?"b3":""}">${esc(displayLevel(f.Niveau))}</span></td><td><button class="etab-link" data-etab-from-fe="${f._source}:${f.id}">${esc([f.Etablissement,f.Ville].filter(Boolean).join(" — ")||"—")}</button><div class="fe-summary-text">${esc(f.Resume_du_fait||"—")}</div>${factTypeBadges(f.Types_de_fait,displayLevel(f.Niveau),f.Types_de_fait_structure)}</td><td>${badgeStatus(statusOf(f))}</td><td>${equipierBadge(eq)}</td><td>${esc(f.Numero_FE)}</td><td><button class="btn open-btn" data-open="${f._source}:${f.id}" title="Ouvrir le fait" aria-label="Ouvrir le fait">↗</button></td></tr>`}).join(""):'<tr><td colspan="7" class="loading">Aucun résultat.</td></tr>';document.querySelectorAll("[data-open]").forEach(b=>b.onclick=()=>openFact(b.dataset.open));document.querySelectorAll("[data-etab-from-fe]").forEach(b=>b.onclick=()=>openEstablishmentFromFact(b.dataset.etabFromFe));$("count").textContent=a.length+" résultat(s) dans les données actuellement chargées";$("pageInfo").textContent=`Page ${page} / ${pages}`;$("prev").disabled=page<=1;$("next").disabled=page>=pages}
 async function openEstablishmentFromFact(key){
   if(!(await confirmLeaveIfDirty()))return;
   await releaseCurrentEditResources();
