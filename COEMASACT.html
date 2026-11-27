@@ -1987,7 +1987,7 @@ document.addEventListener("DOMContentLoaded",()=>{ $("annPhone").onclick=()=>ann
 let annSchools=null,annPeople=null,annSchoolPending=null,annPeoplePending=null,annFilter='',annEpoch=0;
 function annUai(v){return String(v||'').trim().toUpperCase()}
 function annFactUai(f){const raw=annUai(f?.UAI);return /^\d{7}[A-Z]$/.test(raw)?raw:annUai(etabUai(f?.UAI))}
-function annLoadSchools(){if(annSchools)return Promise.resolve(annSchools);if(!annSchoolPending)annSchoolPending=api('ANNUAIRE_ETABLISSEMENTS').then(r=>annSchools=new Map(r.filter(e=>annUai(e.UAI)).map(e=>[annUai(e.UAI),e]))).finally(()=>annSchoolPending=null);return annSchoolPending}
+function annLoadSchools(){if(annSchools)return Promise.resolve(annSchools);if(!annSchoolPending)annSchoolPending=api('ANNUAIRE_ETABLISSEMENTS').then(r=>annSchools=new Map(r.filter(e=>/^(034|048)\d{4}[A-Z]$/.test(annUai(e.UAI))).map(e=>[annUai(e.UAI),e]))).finally(()=>annSchoolPending=null);return annSchoolPending}
 function annLoadPeople(){if(annPeople)return Promise.resolve(annPeople);if(!annPeoplePending)annPeoplePending=api('ANNUAIRE_PERSONNELS').then(r=>{const unique=new Map();for(const p of r){if(!/^(034|048)/.test(annUai(p.UAI)))continue;const key=JSON.stringify([annUai(p.UAI),...['Nom','Prenom','Fonction','Telephone','Mobile_pro','Mobile_perso','Email'].map(k=>annText(p[k]).trim())]);if(!unique.has(key))unique.set(key,p)}return annPeople=[...unique.values()]}).finally(()=>annPeoplePending=null);return annPeoplePending}
 function annAuthorKey(v){return annText(v).replace(/[^a-z0-9]+/g,' ').trim().split(/\s+/).sort().join(' ')}
 function annAuthorContacts(f,people,u){
